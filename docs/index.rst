@@ -1,20 +1,21 @@
-.. happler documentation master file, created by
-   sphinx-quickstart on Thu Oct 28 10:59:19 2021.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. _manual-main:
 
-Welcome to happler's documentation!
-===================================
+=======
+happler
+=======
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :caption: Execution
+   :name: executing
+   :hidden:
+   :maxdepth: 1
 
+   executing/inputs.rst
 
+.. toctree::
+   :caption: Project Info
+   :name: project-info
+   :hidden:
+   :maxdepth: 1
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   project_info/contributing
