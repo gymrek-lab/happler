@@ -4,6 +4,8 @@ version = "0.0.1"
 description = "A haplotype-based fine-mapping method"
 authors = ["Arya Massarat"]
 license = "MIT"
+repository = "https://github.com/aryarm/happler"
+homepage = "https://github.com/aryarm/happler"
 
 [tool.poetry.dependencies]
 python = "^3.9"
@@ -11,6 +13,11 @@ click = "^8.0.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"
+black = "^21.10b0"
+Sphinx = {version = "^4.2.0", optional = true}
+
+[tool.poetry.scripts]
+happler = 'happler.__main__:main'
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
