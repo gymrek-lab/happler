@@ -1,3 +1,6 @@
+.. _executing-inputs:
+
+
 Inputs
 =========
 

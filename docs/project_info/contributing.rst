@@ -13,11 +13,11 @@ Dev Setup
 
 Follow these steps to set up a development environment.
 
-1. Create a conda environment with ``poetry`` and ``sphinx``
+1. Create a conda environment with ``poetry``
 
     .. code-block:: console
 
-        conda create -n happler-dev -c conda-forge poetry sphinx
+        conda create -n happler-dev  'conda-forge::poetry'
 2. Activate the environment
 
     .. code-block:: console
@@ -49,17 +49,26 @@ Before creating your pull request, please do the following.
 
     .. code-block:: console
 
-        poetry run black .
+        black .
 
 2. If you made changes to the docs, check that they appear correctly.
 
     .. code-block:: console
 
-        make -C docs html
+        make html
         open docs/_build/html/index.html
 
 3. Run all of the tests
 
     .. code-block:: console
 
-        poetry run pytest tests/
+        pytest tests/
+
+-----
+Style
+-----
+~~~~
+Code
+~~~~
+
+1. Please type-hint all function parameters
