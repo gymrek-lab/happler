@@ -1,4 +1,6 @@
 # Python cache
 __pycache__
+# pytest cache
+.pytest_cache
 # Sphinx documentation
 docs/_build/
