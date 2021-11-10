@@ -20,3 +20,4 @@ def test_load_genotypes():
     np.testing.assert_allclose(gts.data, expected)
 
     gts.to_MAC()
+    np.testing.assert_allclose(gts.data, expected)

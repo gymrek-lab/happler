@@ -102,7 +102,7 @@ class Genotypes(Data):
         """
         convert an ALT count GT matrix into a matrix of minor allele counts
         """
-        if self.mac_converted:
+        if self.variants.dtype.names[3] == 'maf':
             raise AssertionError(
                 "The matrix already counts instances of the minor allele rather than"
                 "the ALT allele."
@@ -110,8 +110,9 @@ class Genotypes(Data):
         need_conversion = self.variants['aaf'] > 0.5
         # flip the strands on the variants that have an alternate allele frequency
         # above 0.5
-        self.data = self.data[need_conversion, :, ::-1]
+        self.data[need_conversion, :, :] = self.data[need_conversion, :, ::-1]
+        # also encode an MAF instead of an AAF in self.variants
         self.variants['aaf'][need_conversion] = 1 - self.variants['aaf'][need_conversion]
-        dtype = list(self.variants.dtype.names)
-        dtype[-1] = 'maf'
-        self.variants.astype(dtype)
+        dtype_names = list(self.variants.dtype.names)
+        dtype_names[3] = 'maf'
+        self.variants.dtype.names = dtype_names
