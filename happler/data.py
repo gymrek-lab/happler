@@ -17,9 +17,8 @@ class Data(ABC):
     """
 
     def __init__(self, fname: Path):
-        self.loaded = False
         self.fname = fname
-        self.data = np.array([])
+        self.data = None
         super().__init__()
 
     @abstractmethod
@@ -27,7 +26,10 @@ class Data(ABC):
         """
         Load the file contents into self.data
         """
-        pass
+        if self.data is not None:
+            raise AssertionError(
+                "The data has already been loaded."
+            )
 
 
 class Genotypes(Data):
@@ -37,7 +39,7 @@ class Genotypes(Data):
     Attributes
     ----------
     data : np.array
-        The genotypes in an n x p x 2 array
+        The genotypes in an n (samples) x p (variants) x 2 (strands) array
     samples : list
         Sample-level meta information
     variants : list
@@ -53,10 +55,7 @@ class Genotypes(Data):
         """
         Read genotypes from a VCF into a numpy matrix
         """
-        if self.loaded:
-            raise AssertionError(
-                "The data has already been loaded."
-            )
+        super().load()
         # load all info into memory
         vcf = VCF(str(self.fname))
         self.samples = vcf.samples
@@ -76,7 +75,8 @@ class Genotypes(Data):
         self.data = np.array([
             variant.genotypes for variant in variants
         ], dtype=np.bool_)
-        self.loaded = True
+        # transpose the GT matrix so that samples are rows and variants are columns
+        self.data = self.data.transpose((1,0,2))
 
     def check_phase(self):
         """
@@ -87,12 +87,12 @@ class Genotypes(Data):
                 "Phase information has already been removed from the data"
             )
         # check: are there any variants that are heterozygous and unphased?
-        unphased = (self.data[:,:,0] ^ self.data[:,:,1]) & (self.data[:,:,2])
+        unphased = (self.data[:,:,0] ^ self.data[:,:,1]) & (~self.data[:,:,2])
         if np.any(unphased):
-            variant_idx, samp_idx = np.nonzero(unphased)
+            samp_idx, variant_idx = np.nonzero(unphased)
             raise ValueError(
                 "Variant with ID {} at POS {}:{} is unphased for sample {}".format(
-                    *self.variants[variant_idx], vcf.samples[samp_idx]
+                    *tuple(self.variants[variant_idx[0]])[:3], self.samples[samp_idx[0]]
                 )
             )
         # remove the last dimension that contains the phase info
@@ -110,7 +110,7 @@ class Genotypes(Data):
         need_conversion = self.variants['aaf'] > 0.5
         # flip the strands on the variants that have an alternate allele frequency
         # above 0.5
-        self.data[need_conversion, :, :] = self.data[need_conversion, :, ::-1]
+        self.data[:, need_conversion, :] = self.data[:, need_conversion, ::-1]
         # also encode an MAF instead of an AAF in self.variants
         self.variants['aaf'][need_conversion] = 1 - self.variants['aaf'][need_conversion]
         dtype_names = list(self.variants.dtype.names)
