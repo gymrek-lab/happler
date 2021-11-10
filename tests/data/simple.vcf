@@ -1,6 +1,5 @@
 ##fileformat=VCFv4.2
 ##filedate=20180225
-##source="beagle.08Jun17.d8b.jar (version 4.1)"
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##contig=<ID=1>
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	HG00096	HG00097	HG00099	HG00100	HG00101
