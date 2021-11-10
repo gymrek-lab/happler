@@ -110,9 +110,10 @@ class Genotypes(Data):
         need_conversion = self.variants['aaf'] > 0.5
         # flip the strands on the variants that have an alternate allele frequency
         # above 0.5
-        self.data[:, need_conversion, :] = self.data[:, need_conversion, ::-1]
+        self.data[:, need_conversion, :2] = self.data[:, need_conversion, 1::-1]
         # also encode an MAF instead of an AAF in self.variants
         self.variants['aaf'][need_conversion] = 1 - self.variants['aaf'][need_conversion]
-        dtype_names = list(self.variants.dtype.names)
-        dtype_names[3] = 'maf'
-        self.variants.dtype.names = dtype_names
+        # replace 'aaf' with 'maf' in the matrix
+        self.variants.dtype.names = [
+            (x, 'maf')[x == 'aaf'] for x in self.variants.dtype.names
+        ]
