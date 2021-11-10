@@ -11,7 +11,7 @@ from .data import Genotypes
 def main():
     """
     happler: A haplotype-based fine-mapping method
-    
+
     Test for associations between a trait and haplotypes (ie sets of correlated SNPs rather than individual SNPs)
     """
     pass
@@ -23,12 +23,12 @@ def main():
 def run(genotypes: Path, phenotypes: Path):
     """
     Use the tool to find trait-associated haplotypes
-    
+
     GENOTYPES must be formatted as VCFs and
     PHENOTYPES must be a tab-separated file containing two columns: sample ID and
     phenotype value
-    
-    \f    
+
+    \f
     Parameters
     ----------
     genotypes : Path

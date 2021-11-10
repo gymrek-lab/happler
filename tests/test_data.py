@@ -5,20 +5,21 @@ from pathlib import Path
 from happler.data import Genotypes
 
 
-DATADIR = Path(__file__).parent.joinpath('data')
+DATADIR = Path(__file__).parent.joinpath("data")
+
 
 def test_load_genotypes():
     # create a GT matrix with shape: samples x SNPs x (strands+phase)
-    expected = np.zeros(60).reshape((5,4,3)).astype(np.bool_)
+    expected = np.zeros(60).reshape((5, 4, 3)).astype(np.bool_)
     expected[:, 1, 1] = 1
     expected[2, 1, 0] = 1
     expected[:, :, 2] = 1
 
     # can we load the data from the VCF?
-    gts = Genotypes(DATADIR.joinpath('simple.vcf'))
+    gts = Genotypes(DATADIR.joinpath("simple.vcf"))
     gts.load()
     np.testing.assert_allclose(gts.data, expected)
-    assert gts.samples == ['HG00096', 'HG00097', 'HG00099', 'HG00100', 'HG00101']
+    assert gts.samples == ["HG00096", "HG00097", "HG00099", "HG00100", "HG00101"]
 
     # try loading the data again - it should fail b/c we've already done it
     with pytest.raises(AssertionError):
@@ -44,11 +45,11 @@ def test_load_genotypes():
         gts.check_phase()
 
     # convert the matrix of alt allele counts to a matrix of minor allele counts
-    gts.variants['aaf'][:2] == [0, 0.6]
+    gts.variants["aaf"][:2] == [0, 0.6]
     gts.to_MAC()
     expected[:, 1, :] = expected[:, 1, ::-1]
     np.testing.assert_allclose(gts.data, expected)
-    gts.variants['maf'][:2] == [0, 0.4]
+    gts.variants["maf"][:2] == [0, 0.4]
 
     # try to do the MAC conversion again - it should fail b/c we've already done it
     with pytest.raises(AssertionError):
