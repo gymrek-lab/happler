@@ -3,7 +3,7 @@
 import click
 from pathlib import Path
 
-from . import data
+from . import Data, Tree
 
 
 @click.group()
@@ -36,5 +36,6 @@ def run(genotypes: Path, phenotypes: Path):
     phenotypes : Path
         The path to the phenotypes in TSV format
     """
-    gt = data.Genotypes.load(genotypes)
-    ph = data.Phenotypes.load(phenotypes)
+    gt = Data.Genotypes.load(genotypes)
+    ph = Data.Phenotypes.load(phenotypes)
+    tree = Tree.TreeBuilder(gt, ph)

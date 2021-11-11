@@ -13,10 +13,10 @@ Command line interface
 Module contents
 ---------------
 
-happler.data module
+happler.Data module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: happler.data
+.. automodule:: happler.Data
    :members:
    :undoc-members:
    :show-inheritance:

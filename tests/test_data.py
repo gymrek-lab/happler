@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from pathlib import Path
 
-from happler.data import Genotypes, Phenotypes
+from happler.Data import Genotypes, Phenotypes
 
 
 DATADIR = Path(__file__).parent.joinpath("data")
