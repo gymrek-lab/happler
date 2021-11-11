@@ -22,10 +22,21 @@ class Data(ABC):
         self.data = None
         super().__init__()
 
+    def __repr__(self):
+        return str(self.fname)
+
+    @classmethod
     @abstractmethod
-    def load(self):
+    def load(cls, fname: Path):
         """
-        Load the file contents into self.data
+        Read the file contents and perform any recommended pre-processing
+        """
+        pass
+
+    @abstractmethod
+    def read(self):
+        """
+        Read the raw file contents into the class properties
         """
         if self.data is not None:
             raise AssertionError("The data has already been loaded.")
@@ -33,16 +44,24 @@ class Data(ABC):
 
 class Genotypes(Data):
     """
-    A class for reading genotypes
+    A class for processing genotypes from a file
 
     Attributes
     ----------
     data : np.array
         The genotypes in an n (samples) x p (variants) x 2 (strands) array
     samples : tuple
-        Sample-level meta information
+        The names of each of the n samples
     variants : list
-        Variant-level meta information
+        Variant-level meta information:
+            1. ID
+            2. CHROM
+            3. POS
+            4. MAF
+
+    Examples
+    --------
+    >>> genotypes = Genotypes.load('tests/data/simple.vcf')
     """
 
     def __init__(self, fname: Path):
@@ -50,11 +69,24 @@ class Genotypes(Data):
         self.samples = tuple()
         self.variants = np.array([])
 
-    def load(self):
+    @classmethod
+    def load(cls, fname: Path):
+        """
+        Load genotypes from a VCF file
+
+        Read the file contents, check the genotype phase, and create the MAC matrix
+        """
+        genotypes = cls(fname)
+        genotypes.read()
+        genotypes.check_phase()
+        genotypes.to_MAC()
+        return genotypes
+
+    def read(self):
         """
         Read genotypes from a VCF into a numpy matrix stored in :py:attr:`~.Genotypes.data`
         """
-        super().load()
+        super().read()
         # load all info into memory
         vcf = VCF(str(self.fname))
         self.samples = tuple(vcf.samples)
@@ -87,6 +119,8 @@ class Genotypes(Data):
         """
         Check that the genotypes are phased then remove the phasing info from the data
 
+        This function modifies :py:attr:`~.Genotypes.data` in-place
+
         Raises
         ------
         AssertionError
@@ -113,7 +147,8 @@ class Genotypes(Data):
     def to_MAC(self):
         """
         Convert the ALT count GT matrix into a matrix of minor allele counts
-        Modifies self.data
+
+        This function modifies :py:attr:`~.Genotypes.data` in-place
 
         Raises
         ------
@@ -141,29 +176,53 @@ class Genotypes(Data):
 
 class Phenotypes(Data):
     """
-    A class for reading phenotypes
+    A class for processing phenotypes from a file
 
     Attributes
     ----------
     data : np.array
         The phenotypes in an n (samples) x 1 (phenotype value) array
     samples : tuple
-        Sample-level meta information
+        The names of each of the n samples
+
+    Examples
+    --------
+    >>> phenotypes = Phenotypes.load('tests/data/simple.tsv')
     """
 
     def __init__(self, fname: Path):
         super().__init__(fname)
         self.samples = tuple()
 
-    def load(self):
+    @classmethod
+    def load(cls, fname: Path):
         """
-        Read phenotypes from a TSV file into a numpy matrix
+        Load phenotypes from a TSV file
+
+        Read the file contents and standardize the phenotypes
         """
-        super().load()
+        phenotypes = cls(fname)
+        phenotypes.read()
+        phenotypes.standardize()
+        return phenotypes
+
+    def read(self):
+        """
+        Read phenotypes from a TSV file into a numpy matrix stored in :py:attr:`~.Penotypes.data`
+        """
+        super().read()
         # load all info into memory
         with open(self.fname) as phens:
             phen_text = list(reader(phens, delimiter="\t"))
         # fill out the samples and data properties
         self.samples, self.data = zip(*phen_text)
         # coerce strings to floats
-        self.data = np.array(self.data, dtype='float64')
+        self.data = np.array(self.data, dtype="float64")
+
+    def standardize(self):
+        """
+        Standardize phenotypes so they have a mean of 0 and a stdev of 1
+
+        This function modifies :py:attr:`~.Genotypes.data` in-place
+        """
+        self.data = (self.data - np.mean(self.data)) / np.std(self.data)

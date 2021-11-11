@@ -17,13 +17,13 @@ def test_load_genotypes():
 
     # can we load the data from the VCF?
     gts = Genotypes(DATADIR.joinpath("simple.vcf"))
-    gts.load()
+    gts.read()
     np.testing.assert_allclose(gts.data, expected)
     assert gts.samples == ("HG00096", "HG00097", "HG00099", "HG00100", "HG00101")
 
     # try loading the data again - it should fail b/c we've already done it
     with pytest.raises(AssertionError):
-        gts.load()
+        gts.read()
 
     # force one of the het SNPs to be unphased and check that we get an error message
     gts.data[1, 1, 2] = 0
@@ -55,16 +55,21 @@ def test_load_genotypes():
     with pytest.raises(AssertionError):
         gts.to_MAC()
 
+
 def test_load_phenotypes():
     # create a phenotype vector with shape: samples
     expected = np.array([1, 1, 2, 2, 0])
 
     # can we load the data from the phenotype file?
     phens = Phenotypes(DATADIR.joinpath("simple.tsv"))
-    phens.load()
+    phens.read()
     np.testing.assert_allclose(phens.data, expected)
     assert phens.samples == ("HG00096", "HG00097", "HG00099", "HG00100", "HG00101")
 
     # try loading the data again - it should fail b/c we've already done it
     with pytest.raises(AssertionError):
-        phens.load()
+        phens.read()
+
+    expected = (expected - np.mean(expected)) / np.std(expected)
+    phens.standardize()
+    np.testing.assert_allclose(phens.data, expected)
