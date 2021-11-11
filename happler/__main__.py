@@ -3,7 +3,7 @@
 import click
 from pathlib import Path
 
-from .data import Genotypes
+from . import data
 
 
 @click.group()
@@ -36,7 +36,5 @@ def run(genotypes: Path, phenotypes: Path):
     phenotypes : Path
         The path to the phenotypes in TSV format
     """
-    gt = Genotypes(genotypes)
-    gt.load()
-    gt.check_phase()
-    gt.to_MAC()
+    gt = data.Genotypes.load(genotypes)
+    ph = data.Phenotypes.load(phenotypes)

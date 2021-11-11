@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 from csv import reader
 from pathlib import Path
@@ -27,9 +28,14 @@ class Data(ABC):
 
     @classmethod
     @abstractmethod
-    def load(cls, fname: Path):
+    def load(cls: Data, fname: Path):
         """
         Read the file contents and perform any recommended pre-processing
+
+        Parameters
+        ----------
+        fname : Path
+            See documentation for :py:attr:`~.Data.fname`
         """
         pass
 
@@ -70,11 +76,21 @@ class Genotypes(Data):
         self.variants = np.array([])
 
     @classmethod
-    def load(cls, fname: Path):
+    def load(cls: Genotypes, fname: Path) -> Genotypes:
         """
         Load genotypes from a VCF file
 
         Read the file contents, check the genotype phase, and create the MAC matrix
+
+        Parameters
+        ----------
+        fname
+            See documentation for :py:attr:`~.Data.fname`
+
+        Returns
+        -------
+        genotypes
+            A Genotypes object with the data loaded into its properties
         """
         genotypes = cls(fname)
         genotypes.read()
@@ -195,11 +211,21 @@ class Phenotypes(Data):
         self.samples = tuple()
 
     @classmethod
-    def load(cls, fname: Path):
+    def load(cls: Phenotypes, fname: Path) -> Phenotypes:
         """
         Load phenotypes from a TSV file
 
         Read the file contents and standardize the phenotypes
+
+        Parameters
+        ----------
+        fname
+            See documentation for :py:attr:`~.Data.fname`
+
+        Returns
+        -------
+        phenotypes
+            A Phenotypes object with the data loaded into its properties
         """
         phenotypes = cls(fname)
         phenotypes.read()
@@ -209,11 +235,23 @@ class Phenotypes(Data):
     def read(self):
         """
         Read phenotypes from a TSV file into a numpy matrix stored in :py:attr:`~.Penotypes.data`
+
+        Raises
+        ------
+        AssertionError
+            If the provided file doesn't follow the expected format
         """
         super().read()
         # load all info into memory
         with open(self.fname) as phens:
             phen_text = list(reader(phens, delimiter="\t"))
+        # there should only be two columns
+        assert len(phen_text[0]) == 2, "The phenotype TSV should only have two columns."
+        # the second column should be castable to a float
+        try:
+            float(phen_text[0][1])
+        except:
+            raise AssertionError("The second column of the TSV file must numeric.")
         # fill out the samples and data properties
         self.samples, self.data = zip(*phen_text)
         # coerce strings to floats
