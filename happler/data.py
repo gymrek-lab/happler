@@ -1,6 +1,7 @@
 import numpy as np
-from cyvcf2 import VCF, Variant
+from csv import reader
 from pathlib import Path
+from cyvcf2 import VCF, Variant
 from abc import ABC, abstractmethod
 
 
@@ -51,7 +52,7 @@ class Genotypes(Data):
 
     def load(self):
         """
-        Read genotypes from a VCF into a numpy matrix
+        Read genotypes from a VCF into a numpy matrix stored in `self.data`
         """
         super().load()
         # load all info into memory
@@ -85,6 +86,13 @@ class Genotypes(Data):
     def check_phase(self):
         """
         Check that the genotypes are phased then remove the phasing info from the data
+
+        Raises
+        ------
+        AssertionError
+            If the phase information has already been checked and removed from the data
+        ValueError
+            If any heterozgyous genotpyes are unphased
         """
         if self.data.shape[2] < 3:
             raise AssertionError(
@@ -104,7 +112,12 @@ class Genotypes(Data):
 
     def to_MAC(self):
         """
-        convert an ALT count GT matrix into a matrix of minor allele counts
+        Convert the ALT count GT matrix into a matrix of minor allele counts
+
+        Raises
+        ------
+        AssertionError
+            If the matrix has already been converted
         """
         if self.variants.dtype.names[3] == "maf":
             raise AssertionError(

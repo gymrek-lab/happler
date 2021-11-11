@@ -4,7 +4,7 @@ Documentation
 Command line interface
 ----------------------
 
-.. automodule:: happler.__main__ module
+.. automodule:: happler.__main__
    :members:
    :undoc-members:
    :show-inheritance:
@@ -13,7 +13,10 @@ Command line interface
 Module contents
 ---------------
 
-.. automodule:: happler.data module
+happler.data module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: happler.data
    :members:
    :undoc-members:
    :show-inheritance:
