@@ -39,7 +39,7 @@ class Genotypes(Data):
     ----------
     data : np.array
         The genotypes in an n (samples) x p (variants) x 2 (strands) array
-    samples : list
+    samples : tuple
         Sample-level meta information
     variants : list
         Variant-level meta information
@@ -47,17 +47,17 @@ class Genotypes(Data):
 
     def __init__(self, fname: Path):
         super().__init__(fname)
-        self.samples = []
+        self.samples = tuple()
         self.variants = np.array([])
 
     def load(self):
         """
-        Read genotypes from a VCF into a numpy matrix stored in `self.data`
+        Read genotypes from a VCF into a numpy matrix stored in :py:attr:`~.Genotypes.data`
         """
         super().load()
         # load all info into memory
         vcf = VCF(str(self.fname))
-        self.samples = vcf.samples
+        self.samples = tuple(vcf.samples)
         variants = list(vcf)
         # save meta information about each variant
         self.variants = np.array(
@@ -113,6 +113,7 @@ class Genotypes(Data):
     def to_MAC(self):
         """
         Convert the ALT count GT matrix into a matrix of minor allele counts
+        Modifies self.data
 
         Raises
         ------
@@ -136,3 +137,33 @@ class Genotypes(Data):
         self.variants.dtype.names = [
             (x, "maf")[x == "aaf"] for x in self.variants.dtype.names
         ]
+
+
+class Phenotypes(Data):
+    """
+    A class for reading phenotypes
+
+    Attributes
+    ----------
+    data : np.array
+        The phenotypes in an n (samples) x 1 (phenotype value) array
+    samples : tuple
+        Sample-level meta information
+    """
+
+    def __init__(self, fname: Path):
+        super().__init__(fname)
+        self.samples = tuple()
+
+    def load(self):
+        """
+        Read phenotypes from a TSV file into a numpy matrix
+        """
+        super().load()
+        # load all info into memory
+        with open(self.fname) as phens:
+            phen_text = list(reader(phens, delimiter="\t"))
+        # fill out the samples and data properties
+        self.samples, self.data = zip(*phen_text)
+        # coerce strings to floats
+        self.data = np.array(self.data, dtype='float64')

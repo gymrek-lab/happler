@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from pathlib import Path
 
-from happler.data import Genotypes
+from happler.data import Genotypes, Phenotypes
 
 
 DATADIR = Path(__file__).parent.joinpath("data")
@@ -19,7 +19,7 @@ def test_load_genotypes():
     gts = Genotypes(DATADIR.joinpath("simple.vcf"))
     gts.load()
     np.testing.assert_allclose(gts.data, expected)
-    assert gts.samples == ["HG00096", "HG00097", "HG00099", "HG00100", "HG00101"]
+    assert gts.samples == ("HG00096", "HG00097", "HG00099", "HG00100", "HG00101")
 
     # try loading the data again - it should fail b/c we've already done it
     with pytest.raises(AssertionError):
@@ -54,3 +54,17 @@ def test_load_genotypes():
     # try to do the MAC conversion again - it should fail b/c we've already done it
     with pytest.raises(AssertionError):
         gts.to_MAC()
+
+def test_load_phenotypes():
+    # create a phenotype vector with shape: samples
+    expected = np.array([1, 1, 2, 2, 0])
+
+    # can we load the data from the phenotype file?
+    phens = Phenotypes(DATADIR.joinpath("simple.tsv"))
+    phens.load()
+    np.testing.assert_allclose(phens.data, expected)
+    assert phens.samples == ("HG00096", "HG00097", "HG00099", "HG00100", "HG00101")
+
+    # try loading the data again - it should fail b/c we've already done it
+    with pytest.raises(AssertionError):
+        phens.load()
