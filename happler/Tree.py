@@ -5,8 +5,10 @@ from .Data import Genotypes, Phenotypes
 
 class Tree:
     """
-    A tree where nodes are variants (and haplotypes) and each node can have at most two
-    branches for each of its alleles
+    A tree where
+
+    1. nodes are variants (and also haplotypes)
+    2. each node can have at most two branches for each of its alleles
 
     Attributes
     ----------

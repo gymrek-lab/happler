@@ -20,3 +20,11 @@ happler.Data module
    :members:
    :undoc-members:
    :show-inheritance:
+
+happler.Tree module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: happler.Tree
+   :members:
+   :undoc-members:
+   :show-inheritance:

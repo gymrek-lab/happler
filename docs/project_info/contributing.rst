@@ -17,7 +17,7 @@ Follow these steps to set up a development environment.
 
     .. code-block:: console
 
-        conda create -n happler-dev  'conda-forge::poetry'
+        conda create -n happler-dev  'conda-forge::poetry==1.1.11'
 2. Activate the environment
 
     .. code-block:: console
