@@ -47,7 +47,7 @@ def test_load_genotypes():
     # convert the matrix of alt allele counts to a matrix of minor allele counts
     assert gts.variants["aaf"][1] == 0.6
     gts.to_MAC()
-    expected[:, 1, :] = expected[:, 1, ::-1]
+    expected[:, 1, :] = ~expected[:, 1, :]
     np.testing.assert_allclose(gts.data, expected)
     assert gts.variants["maf"][1] == 0.4
 

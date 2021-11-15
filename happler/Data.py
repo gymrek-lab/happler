@@ -63,7 +63,7 @@ class Genotypes(Data):
             1. ID
             2. CHROM
             3. POS
-            4. MAF
+            4. AAF: allele freq of alternate allele (or MAF if to_MAC() is called)
 
     Examples
     --------
@@ -95,7 +95,7 @@ class Genotypes(Data):
         genotypes = cls(fname)
         genotypes.read()
         genotypes.check_phase()
-        genotypes.to_MAC()
+        # genotypes.to_MAC()
         return genotypes
 
     def read(self):
@@ -166,6 +166,8 @@ class Genotypes(Data):
 
         This function modifies :py:attr:`~.Genotypes.data` in-place
 
+        It also changes the 'aaf' record in :py:attr:`~.Genotypes.variants` to 'maf'
+
         Raises
         ------
         AssertionError
@@ -177,9 +179,9 @@ class Genotypes(Data):
                 "the ALT allele."
             )
         need_conversion = self.variants["aaf"] > 0.5
-        # flip the strands on the variants that have an alternate allele frequency
+        # flip the count on the variants that have an alternate allele frequency
         # above 0.5
-        self.data[:, need_conversion, :2] = self.data[:, need_conversion, 1::-1]
+        self.data[:, need_conversion, :2] = ~self.data[:, need_conversion, :2]
         # also encode an MAF instead of an AAF in self.variants
         self.variants["aaf"][need_conversion] = (
             1 - self.variants["aaf"][need_conversion]
