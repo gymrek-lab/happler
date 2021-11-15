@@ -1,4 +1,8 @@
-# Python cache
+# python cache
 __pycache__
-# Sphinx documentation
+# pytest cache
+.pytest_cache
+# sphinx documentation
 docs/_build/
+# poetry
+dist/

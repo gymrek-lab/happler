@@ -13,6 +13,14 @@ happler
    executing/inputs.rst
 
 .. toctree::
+   :caption: API
+   :name: api
+   :hidden:
+   :maxdepth: 1
+
+   api/modules
+
+.. toctree::
    :caption: Project Info
    :name: project-info
    :hidden:
