@@ -94,6 +94,7 @@ class Genotypes(Data):
         """
         genotypes = cls(fname)
         genotypes.read()
+        genotypes.check_biallelic()
         genotypes.check_phase()
         # genotypes.to_MAC()
         return genotypes
@@ -126,10 +127,38 @@ class Genotypes(Data):
         # 2) presence of REF in strand two
         # 3) whether the genotype is phased
         self.data = np.array(
-            [variant.genotypes for variant in variants], dtype=np.bool_
+            [variant.genotypes for variant in variants], dtype=np.uint8
         )
         # transpose the GT matrix so that samples are rows and variants are columns
         self.data = self.data.transpose((1, 0, 2))
+
+    def check_biallelic(self):
+        """
+        Check that each genotype is composed of only two alleles
+
+        This function modifies the dtype of :py:attr:`~.Genotypes.data` from uint8 to bool
+
+        Raises
+        ------
+        AssertionError
+            If the number of alleles has already been checked and the dtype has been
+            converted to bool
+        ValueError
+            If any of the genotypes have more than two alleles
+        """
+        if self.data.dtype == np.bool_:
+            raise AssertionError("All genotypes are already biallelic")
+        # check: are there any variants that have genotype values above 1?
+        # A genotype value above 1 would imply the variant has more than one ALT allele
+        multiallelic = np.any(self.data[:, :, :2] > 1, axis=2)
+        if np.any(multiallelic):
+            samp_idx, variant_idx = np.nonzero(multiallelic)
+            raise ValueError(
+                "Variant with ID {} at POS {}:{} is multiallelic for sample {}".format(
+                    *tuple(self.variants[variant_idx[0]])[:3], self.samples[samp_idx[0]]
+                )
+            )
+        self.data = self.data.astype(np.bool_)
 
     def check_phase(self):
         """
