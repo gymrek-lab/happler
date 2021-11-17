@@ -1,3 +1,5 @@
+[![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://happler.rtfd.io/)
+
 # happler
 A haplotype-based fine-mapping method
 

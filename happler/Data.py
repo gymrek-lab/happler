@@ -5,6 +5,8 @@ from pathlib import Path
 from cyvcf2 import VCF, Variant
 from abc import ABC, abstractmethod
 
+from typing import List
+
 
 class Data(ABC):
     """
@@ -76,7 +78,9 @@ class Genotypes(Data):
         self.variants = np.array([])
 
     @classmethod
-    def load(cls: Genotypes, fname: Path) -> Genotypes:
+    def load(
+        cls: Genotypes, fname: Path, region: str = None, samples: List[str] = None
+    ) -> Genotypes:
         """
         Load genotypes from a VCF file
 
@@ -86,6 +90,10 @@ class Genotypes(Data):
         ----------
         fname
             See documentation for :py:attr:`~.Data.fname`
+        region : str, optional
+            See documentation for :py:meth:`~.Data.Genotypes.read`
+        samples : List[str], optional
+            See documentation for :py:meth:`~.Data.Genotypes.read`
 
         Returns
         -------
@@ -93,21 +101,32 @@ class Genotypes(Data):
             A Genotypes object with the data loaded into its properties
         """
         genotypes = cls(fname)
-        genotypes.read()
+        genotypes.read(region, samples)
         genotypes.check_biallelic()
         genotypes.check_phase()
         # genotypes.to_MAC()
         return genotypes
 
-    def read(self):
+    def read(self, region: str = None, samples: List[str] = None):
         """
         Read genotypes from a VCF into a numpy matrix stored in :py:attr:`~.Genotypes.data`
+
+        Parameters
+        ----------
+        region : str, optional
+            The region from which to extract genotypes; ex: 'chr1:1234-34566' or 'chr7'
+            For this to work, the VCF must be indexed and the seqname must match!
+            Defaults to loading all genotypes
+        samples : List[str], optional
+            A subset of the samples from which to extract genotypes
+            Defaults to loading genotypes from all samples
         """
         super().read()
         # load all info into memory
-        vcf = VCF(str(self.fname))
+        vcf = VCF(str(self.fname), samples=samples)
         self.samples = tuple(vcf.samples)
-        variants = list(vcf)
+        variants = list(vcf(region))
+        vcf.close()
         # save meta information about each variant
         self.variants = np.array(
             [
@@ -242,7 +261,7 @@ class Phenotypes(Data):
         self.samples = tuple()
 
     @classmethod
-    def load(cls: Phenotypes, fname: Path) -> Phenotypes:
+    def load(cls: Phenotypes, fname: Path, samples: List[str] = None) -> Phenotypes:
         """
         Load phenotypes from a TSV file
 
@@ -252,6 +271,8 @@ class Phenotypes(Data):
         ----------
         fname
             See documentation for :py:attr:`~.Data.fname`
+        samples : List[str], optional
+            See documentation for :py:meth:`~.Data.Phenotypes.read`
 
         Returns
         -------
@@ -259,13 +280,19 @@ class Phenotypes(Data):
             A Phenotypes object with the data loaded into its properties
         """
         phenotypes = cls(fname)
-        phenotypes.read()
+        phenotypes.read(samples)
         phenotypes.standardize()
         return phenotypes
 
-    def read(self):
+    def read(self, samples: List[str] = None):
         """
         Read phenotypes from a TSV file into a numpy matrix stored in :py:attr:`~.Penotypes.data`
+
+        Parameters
+        ----------
+        samples : List[str], optional
+            A subset of the samples from which to extract genotypes
+            Defaults to loading genotypes from all samples
 
         Raises
         ------
@@ -275,7 +302,13 @@ class Phenotypes(Data):
         super().read()
         # load all info into memory
         with open(self.fname) as phens:
-            phen_text = list(reader(phens, delimiter="\t"))
+            phen_text = reader(phens, delimiter="\t")
+            # convert to list and subset samples if need be
+            if samples:
+                samples = set(samples)
+                phen_text = [phen for phen in phen_text if phen[0] in samples]
+            else:
+                phen_text = list(phen_text)
         # there should only be two columns
         assert len(phen_text[0]) == 2, "The phenotype TSV should only have two columns."
         # the second column should be castable to a float
