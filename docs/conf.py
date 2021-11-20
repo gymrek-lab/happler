@@ -33,6 +33,7 @@ extensions = [
     "sphinx_autodoc_typehints",
     "sphinx_rtd_theme",
     "numpydoc",
+    "sphinx_click",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -45,6 +46,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Extension configuration -------------------------------------------------
 autosummary_generate = True
+numpydoc_show_class_members = False 
 
 # -- Options for HTML output -------------------------------------------------
 

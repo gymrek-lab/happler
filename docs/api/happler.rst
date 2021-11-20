@@ -4,27 +4,50 @@ Documentation
 Command line interface
 ----------------------
 
-.. automodule:: happler.__main__
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. click:: happler.__main__:main
+   :prog: happler
+   :nested: full
 
 
 Module contents
 ---------------
 
-happler.Data module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+happler.data.data module
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: happler.Data
+.. automodule:: happler.data.data
    :members:
    :undoc-members:
    :show-inheritance:
 
-happler.Tree module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+happler.data.genotypes module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: happler.Tree
+.. automodule:: happler.data.genotypes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+happler.data.phenotypes module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: happler.data.phenotypes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+happler.tree.tree module
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: happler.tree.tree
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+happler.tree.treebuilder module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: happler.tree.treebuilder
    :members:
    :undoc-members:
    :show-inheritance:
