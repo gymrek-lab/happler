@@ -1,53 +1,10 @@
 from __future__ import annotations
 import numpy as np
-from csv import reader
+from typing import List
 from pathlib import Path
 from cyvcf2 import VCF, Variant
-from abc import ABC, abstractmethod
 
-from typing import List
-
-
-class Data(ABC):
-    """
-    Abstract class for accessing read-only data files
-
-    Attributes
-    ----------
-    data : np.array
-        The contents of the data file, once loaded
-    fname : Path
-        The path to the read-only file containing the data
-    """
-
-    def __init__(self, fname: Path):
-        self.fname = fname
-        self.data = None
-        super().__init__()
-
-    def __repr__(self):
-        return str(self.fname)
-
-    @classmethod
-    @abstractmethod
-    def load(cls: Data, fname: Path):
-        """
-        Read the file contents and perform any recommended pre-processing
-
-        Parameters
-        ----------
-        fname : Path
-            See documentation for :py:attr:`~.Data.fname`
-        """
-        pass
-
-    @abstractmethod
-    def read(self):
-        """
-        Read the raw file contents into the class properties
-        """
-        if self.data is not None:
-            raise AssertionError("The data has already been loaded.")
+from .data import Data
 
 
 class Genotypes(Data):
@@ -91,9 +48,9 @@ class Genotypes(Data):
         fname
             See documentation for :py:attr:`~.Data.fname`
         region : str, optional
-            See documentation for :py:meth:`~.Data.Genotypes.read`
+            See documentation for :py:meth:`~.Genotypes.read`
         samples : List[str], optional
-            See documentation for :py:meth:`~.Data.Genotypes.read`
+            See documentation for :py:meth:`~.Genotypes.read`
 
         Returns
         -------
@@ -238,93 +195,3 @@ class Genotypes(Data):
         self.variants.dtype.names = [
             (x, "maf")[x == "aaf"] for x in self.variants.dtype.names
         ]
-
-
-class Phenotypes(Data):
-    """
-    A class for processing phenotypes from a file
-
-    Attributes
-    ----------
-    data : np.array
-        The phenotypes in an n (samples) x 1 (phenotype value) array
-    samples : tuple
-        The names of each of the n samples
-
-    Examples
-    --------
-    >>> phenotypes = Phenotypes.load('tests/data/simple.tsv')
-    """
-
-    def __init__(self, fname: Path):
-        super().__init__(fname)
-        self.samples = tuple()
-
-    @classmethod
-    def load(cls: Phenotypes, fname: Path, samples: List[str] = None) -> Phenotypes:
-        """
-        Load phenotypes from a TSV file
-
-        Read the file contents and standardize the phenotypes
-
-        Parameters
-        ----------
-        fname
-            See documentation for :py:attr:`~.Data.fname`
-        samples : List[str], optional
-            See documentation for :py:meth:`~.Data.Phenotypes.read`
-
-        Returns
-        -------
-        phenotypes
-            A Phenotypes object with the data loaded into its properties
-        """
-        phenotypes = cls(fname)
-        phenotypes.read(samples)
-        phenotypes.standardize()
-        return phenotypes
-
-    def read(self, samples: List[str] = None):
-        """
-        Read phenotypes from a TSV file into a numpy matrix stored in :py:attr:`~.Penotypes.data`
-
-        Parameters
-        ----------
-        samples : List[str], optional
-            A subset of the samples from which to extract genotypes
-            Defaults to loading genotypes from all samples
-
-        Raises
-        ------
-        AssertionError
-            If the provided file doesn't follow the expected format
-        """
-        super().read()
-        # load all info into memory
-        with open(self.fname) as phens:
-            phen_text = reader(phens, delimiter="\t")
-            # convert to list and subset samples if need be
-            if samples:
-                samples = set(samples)
-                phen_text = [phen for phen in phen_text if phen[0] in samples]
-            else:
-                phen_text = list(phen_text)
-        # there should only be two columns
-        assert len(phen_text[0]) == 2, "The phenotype TSV should only have two columns."
-        # the second column should be castable to a float
-        try:
-            float(phen_text[0][1])
-        except:
-            raise AssertionError("The second column of the TSV file must numeric.")
-        # fill out the samples and data properties
-        self.samples, self.data = zip(*phen_text)
-        # coerce strings to floats
-        self.data = np.array(self.data, dtype="float64")
-
-    def standardize(self):
-        """
-        Standardize phenotypes so they have a mean of 0 and a stdev of 1
-
-        This function modifies :py:attr:`~.Genotypes.data` in-place
-        """
-        self.data = (self.data - np.mean(self.data)) / np.std(self.data)

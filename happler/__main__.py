@@ -4,7 +4,7 @@ import click
 from pathlib import Path
 from typing import Union, Tuple
 
-from . import Data, Tree
+from . import data, tree
 
 
 @click.group()
@@ -74,9 +74,9 @@ def run(
     phenotypes : Path
         The path to the phenotypes in TSV format
     region : str, optional
-        See documentation for :py:meth:`~.Data.Genotypes.read`
+        See documentation for :py:meth:`~.data.Genotypes.read`
     sample : Tuple[str], optional
-        See documentation for :py:meth:`~.Data.Genotypes.read`
+        See documentation for :py:meth:`~.data.Genotypes.read`
     samples_file : Path, optional
         A single column txt file containing a list of the samples (one per line) to
         subset from the genotypes file
@@ -95,6 +95,6 @@ def run(
     else:
         samples = None
     # load data
-    gt = Data.Genotypes.load(genotypes, region=region, samples=samples)
-    ph = Data.Phenotypes.load(phenotypes, samples=samples)
-    tree = Tree.TreeBuilder(gt, ph)
+    gt = data.Genotypes.load(genotypes, region=region, samples=samples)
+    ph = data.Phenotypes.load(phenotypes, samples=samples)
+    tree = tree.TreeBuilder(gt, ph)
