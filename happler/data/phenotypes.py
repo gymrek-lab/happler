@@ -58,8 +58,9 @@ class Phenotypes(Data):
         Parameters
         ----------
         samples : List[str], optional
-            A subset of the samples from which to extract genotypes
-            Defaults to loading genotypes from all samples
+            A subset of the samples from which to extract phenotypes
+
+            Defaults to loading phenotypes from all samples
 
         Raises
         ------

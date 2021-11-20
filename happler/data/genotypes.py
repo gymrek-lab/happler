@@ -72,10 +72,13 @@ class Genotypes(Data):
         ----------
         region : str, optional
             The region from which to extract genotypes; ex: 'chr1:1234-34566' or 'chr7'
+
             For this to work, the VCF must be indexed and the seqname must match!
+            
             Defaults to loading all genotypes
         samples : List[str], optional
             A subset of the samples from which to extract genotypes
+
             Defaults to loading genotypes from all samples
         """
         super().read()
@@ -262,10 +265,13 @@ class GenotypesPLINK(Data):
         ----------
         region : str, optional
             The region from which to extract genotypes; ex: 'chr1:1234-34566' or 'chr7'
+
             For this to work, the VCF must be indexed and the seqname must match!
+
             Defaults to loading all genotypes
         samples : List[str], optional
             A subset of the samples from which to extract genotypes
+
             Defaults to loading genotypes from all samples
         """
         super().read()
