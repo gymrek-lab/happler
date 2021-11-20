@@ -195,3 +195,99 @@ class Genotypes(Data):
         self.variants.dtype.names = [
             (x, "maf")[x == "aaf"] for x in self.variants.dtype.names
         ]
+
+
+class GenotypesPLINK(Data):
+    """
+    A class for processing genotypes from a PLINK .pgen file
+
+    Attributes
+    ----------
+    data : np.array
+        The genotypes in an n (samples) x p (variants) x 2 (strands) array
+    samples : tuple
+        The names of each of the n samples
+    variants : list
+        Variant-level meta information:
+            1. ID
+            2. CHROM
+            3. POS
+            4. AAF: allele freq of alternate allele (or MAF if to_MAC() is called)
+
+    Examples
+    --------
+    >>> genotypes = Genotypes.load('tests/data/simple.pgen')
+    """
+
+    def __init__(self, fname: Path):
+        super().__init__(fname)
+        self.samples = tuple()
+        self.variants = np.array([])
+
+    @classmethod
+    def load(
+        cls: Genotypes, fname: Path, region: str = None, samples: List[str] = None
+    ) -> Genotypes:
+        """
+        Load genotypes from a VCF file
+
+        Read the file contents, check the genotype phase, and create the MAC matrix
+
+        Parameters
+        ----------
+        fname
+            See documentation for :py:attr:`~.Data.fname`
+        region : str, optional
+            See documentation for :py:meth:`~.Genotypes.read`
+        samples : List[str], optional
+            See documentation for :py:meth:`~.Genotypes.read`
+
+        Returns
+        -------
+        genotypes
+            A Genotypes object with the data loaded into its properties
+        """
+        genotypes = cls(fname)
+        genotypes.read(region, samples)
+        genotypes.check_biallelic()
+        genotypes.check_phase()
+        # genotypes.to_MAC()
+        return genotypes
+
+    def read(self, region: str = None, samples: List[str] = None):
+        """
+        Read genotypes from a VCF into a numpy matrix stored in :py:attr:`~.Genotypes.data`
+
+        Parameters
+        ----------
+        region : str, optional
+            The region from which to extract genotypes; ex: 'chr1:1234-34566' or 'chr7'
+            For this to work, the VCF must be indexed and the seqname must match!
+            Defaults to loading all genotypes
+        samples : List[str], optional
+            A subset of the samples from which to extract genotypes
+            Defaults to loading genotypes from all samples
+        """
+        super().read()
+        # TODO: load the variant-level info from the .pvar file
+        # and use that info to figure out how many variants there are in the region
+        variant_ct_start = 0
+        variant_ct_end = None
+        variant_ct = variant_ct_end - variant_ct_start
+        # load the pgen-reader file
+        # note: very little is loaded into memory at this point
+        from pgenlib import PgenReader  # TODO: figure out how to install this package
+
+        pgen = PgenReader(bytes(self.fname))
+        sample_ct = pgen.get_raw_sample_ct()
+        # the genotypes start out as a simple 2D array with twice the number of samples
+        # so each column is a different chromosomal strand
+        self.data = np.empty((variant_ct, sample_ct * 2), np.int32)
+        pgen.read_alleles_range(variant_ct_start, variant_ct_end, self.data)
+        # extract the genotypes to a np matrix of size n x p x 2
+        # the last dimension has two items:
+        # 1) presence of REF in strand one
+        # 2) presence of REF in strand two
+        self.data = np.dstack((self.data[:, ::2], self.data[:, 1::2]))
+        # transpose the GT matrix so that samples are rows and variants are columns
+        self.data = self.data.transpose((1, 0, 2))
