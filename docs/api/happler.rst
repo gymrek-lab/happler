@@ -4,10 +4,9 @@ Documentation
 Command line interface
 ----------------------
 
-.. automodule:: happler.__main__
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. click:: happler.__main__:main
+   :prog: happler
+   :nested: full
 
 
 Module contents

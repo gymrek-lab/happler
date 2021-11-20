@@ -97,4 +97,8 @@ def run(
     # load data
     gt = data.Genotypes.load(genotypes, region=region, samples=samples)
     ph = data.Phenotypes.load(phenotypes, samples=samples)
-    tree = tree.TreeBuilder(gt, ph)
+    hap_tree = tree.TreeBuilder(gt, ph)
+
+if __name__ == '__main__':
+    # run the CLI if someone tries 'python -m happler' on the command line
+    main(prog_name="happler")

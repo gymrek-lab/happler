@@ -33,6 +33,7 @@ extensions = [
     "sphinx_autodoc_typehints",
     "sphinx_rtd_theme",
     "numpydoc",
+    "sphinx_click",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
