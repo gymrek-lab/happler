@@ -46,7 +46,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Extension configuration -------------------------------------------------
 autosummary_generate = True
-numpydoc_show_class_members = False 
+numpydoc_show_class_members = False
 
 # -- Options for HTML output -------------------------------------------------
 
