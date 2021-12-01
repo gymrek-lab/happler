@@ -99,6 +99,7 @@ def run(
     ph = data.Phenotypes.load(phenotypes, samples=samples)
     hap_tree = tree.TreeBuilder(gt, ph)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # run the CLI if someone tries 'python -m happler' on the command line
     main(prog_name="happler")
