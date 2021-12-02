@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+
 from pathlib import Path
 
 from happler.data import VariantType, Genotypes, Phenotypes
