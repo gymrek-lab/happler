@@ -1,9 +1,9 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from collections import defaultdict
+
 import numpy as np
 import networkx as nx
-
-from dataclasses import dataclass
-from __future__ import annotations
-from collections import defaultdict
 
 from ..data import VariantType
 
