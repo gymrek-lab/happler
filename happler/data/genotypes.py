@@ -1,10 +1,41 @@
 from __future__ import annotations
 import numpy as np
-from typing import List
 from pathlib import Path
 from cyvcf2 import VCF, Variant
 
 from .data import Data
+
+
+class VariantType:
+    """
+    A class denoting the type of variant
+
+    Attributes
+    ----------
+    type : str, optional
+        The type of variant (ex: SNP, STR, etc)
+
+        Defaults to a single nucleotide polymorphism
+
+    """
+
+    def __init__(self, variant_type: str = "snp"):
+        # TODO: add support for STRs, SVs, etc
+        supported_types = ["snp"]
+        # a VariantType has a dtype of str
+        self.dtype = np.dtype("S5")
+        # store the type if it is supported
+        variant_type = variant_type.lower()
+        if variant_type in supported_types:
+            self.type = variant_type
+        else:
+            raise ValueError("{}s are not yet supported.".format(variant_type.upper()))
+
+    def __repr__(self):
+        return self.type.upper()
+
+    def __eq__(self, other):
+        return self.type == other.type
 
 
 class Genotypes(Data):
@@ -36,7 +67,7 @@ class Genotypes(Data):
 
     @classmethod
     def load(
-        cls: Genotypes, fname: Path, region: str = None, samples: List[str] = None
+        cls: Genotypes, fname: Path, region: str = None, samples: list[str] = None
     ) -> Genotypes:
         """
         Load genotypes from a VCF file
@@ -49,7 +80,7 @@ class Genotypes(Data):
             See documentation for :py:attr:`~.Data.fname`
         region : str, optional
             See documentation for :py:meth:`~.Genotypes.read`
-        samples : List[str], optional
+        samples : list[str], optional
             See documentation for :py:meth:`~.Genotypes.read`
 
         Returns
@@ -64,7 +95,7 @@ class Genotypes(Data):
         # genotypes.to_MAC()
         return genotypes
 
-    def read(self, region: str = None, samples: List[str] = None):
+    def read(self, region: str = None, samples: list[str] = None):
         """
         Read genotypes from a VCF into a numpy matrix stored in :py:attr:`~.Genotypes.data`
 
@@ -74,9 +105,9 @@ class Genotypes(Data):
             The region from which to extract genotypes; ex: 'chr1:1234-34566' or 'chr7'
 
             For this to work, the VCF must be indexed and the seqname must match!
-            
+
             Defaults to loading all genotypes
-        samples : List[str], optional
+        samples : list[str], optional
             A subset of the samples from which to extract genotypes
 
             Defaults to loading genotypes from all samples
@@ -229,7 +260,7 @@ class GenotypesPLINK(Data):
 
     @classmethod
     def load(
-        cls: Genotypes, fname: Path, region: str = None, samples: List[str] = None
+        cls: Genotypes, fname: Path, region: str = None, samples: list[str] = None
     ) -> Genotypes:
         """
         Load genotypes from a VCF file
@@ -242,7 +273,7 @@ class GenotypesPLINK(Data):
             See documentation for :py:attr:`~.Data.fname`
         region : str, optional
             See documentation for :py:meth:`~.Genotypes.read`
-        samples : List[str], optional
+        samples : list[str], optional
             See documentation for :py:meth:`~.Genotypes.read`
 
         Returns
@@ -257,7 +288,7 @@ class GenotypesPLINK(Data):
         # genotypes.to_MAC()
         return genotypes
 
-    def read(self, region: str = None, samples: List[str] = None):
+    def read(self, region: str = None, samples: list[str] = None):
         """
         Read genotypes from a VCF into a numpy matrix stored in :py:attr:`~.Genotypes.data`
 
@@ -269,7 +300,7 @@ class GenotypesPLINK(Data):
             For this to work, the VCF must be indexed and the seqname must match!
 
             Defaults to loading all genotypes
-        samples : List[str], optional
+        samples : list[str], optional
             A subset of the samples from which to extract genotypes
 
             Defaults to loading genotypes from all samples

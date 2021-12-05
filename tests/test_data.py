@@ -1,8 +1,9 @@
 import pytest
 import numpy as np
+
 from pathlib import Path
 
-from happler.data import Genotypes, Phenotypes
+from happler.data import VariantType, Genotypes, Phenotypes
 
 
 DATADIR = Path(__file__).parent.joinpath("data")
@@ -132,3 +133,12 @@ def test_load_phenotypes_subset():
     phens.read(samples=samples)
     np.testing.assert_allclose(phens.data, expected)
     assert phens.samples == tuple(samples)
+
+
+def test_variant_type():
+    assert VariantType("snp") == VariantType("SNP")
+
+    assert str(VariantType("snp")) == "SNP"
+
+    with pytest.raises(ValueError):
+        VariantType("indel")

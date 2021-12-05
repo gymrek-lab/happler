@@ -1,7 +1,6 @@
 from __future__ import annotations
 import numpy as np
 from csv import reader
-from typing import List
 from pathlib import Path
 
 from .data import Data
@@ -28,7 +27,7 @@ class Phenotypes(Data):
         self.samples = tuple()
 
     @classmethod
-    def load(cls: Phenotypes, fname: Path, samples: List[str] = None) -> Phenotypes:
+    def load(cls: Phenotypes, fname: Path, samples: list[str] = None) -> Phenotypes:
         """
         Load phenotypes from a TSV file
 
@@ -38,7 +37,7 @@ class Phenotypes(Data):
         ----------
         fname
             See documentation for :py:attr:`~.Data.fname`
-        samples : List[str], optional
+        samples : list[str], optional
             See documentation for :py:meth:`~.Data.Phenotypes.read`
 
         Returns
@@ -51,13 +50,13 @@ class Phenotypes(Data):
         phenotypes.standardize()
         return phenotypes
 
-    def read(self, samples: List[str] = None):
+    def read(self, samples: list[str] = None):
         """
         Read phenotypes from a TSV file into a numpy matrix stored in :py:attr:`~.Penotypes.data`
 
         Parameters
         ----------
-        samples : List[str], optional
+        samples : list[str], optional
             A subset of the samples from which to extract phenotypes
 
             Defaults to loading phenotypes from all samples
