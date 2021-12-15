@@ -1,3 +1,3 @@
 from .data import Data
-from .genotypes import VariantType, Genotypes
+from .genotypes import Genotypes
 from .phenotypes import Phenotypes

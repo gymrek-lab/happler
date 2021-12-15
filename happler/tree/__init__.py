@@ -1,2 +1,3 @@
+from .tree import Tree
 from .treebuilder import TreeBuilder
-from .tree import Node, Haplotype, Tree
+from .haplotype import Variant, Haplotype
