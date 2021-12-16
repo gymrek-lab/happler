@@ -1,6 +1,7 @@
 from .tree import Tree
-from .haplotype import Variant, Haplotype
 from ..data import Genotypes, Phenotypes
+from .haplotypes import Variant, Haplotype
+from .test_assoc import TestAssoc, TestAssocSimple
 
 
 class TreeBuilder:
@@ -15,11 +16,14 @@ class TreeBuilder:
         The genotypes from which the tree should be built
     phens: Phenotypes
         The phenotypes from which the tree should be built
+    method: TestAssoc
+        The type of association test to perform at each node when constructing the tree
     """
 
-    def __init__(self, genotypes: Genotypes, phenotypes: Phenotypes):
+    def __init__(self, genotypes: Genotypes, phenotypes: Phenotypes, method: TestAssoc):
         self.gens = genotypes
         self.phens = phenotypes
+        self.method = method
         self.tree = None
 
     def __repr__(self):
@@ -79,5 +83,7 @@ class TreeBuilder:
         TODO
         """
         # step 1: transform GT matrix into haplotype matrix
+        hap_matrix = parent.transform(self.gens)
         # step 2: test assoc
+        p_values = self.method.run(hap_matrix, self.phenotypes.data)
         # step 3:

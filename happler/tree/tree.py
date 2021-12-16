@@ -1,5 +1,4 @@
 from __future__ import annotations
-from dataclasses import dataclass
 from collections import defaultdict
 
 import numpy as np

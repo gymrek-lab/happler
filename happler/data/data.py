@@ -11,10 +11,10 @@ class Data(ABC):
 
     Attributes
     ----------
-    data : np.array
-        The contents of the data file, once loaded
     fname : Path
         The path to the read-only file containing the data
+    data : np.array
+        The contents of the data file, once loaded
     """
 
     def __init__(self, fname: Path):

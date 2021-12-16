@@ -3,7 +3,7 @@ import numpy as np
 
 from pathlib import Path
 
-from happler.data import VariantType, Genotypes, Phenotypes
+from happler.data import Genotypes, Phenotypes
 
 
 DATADIR = Path(__file__).parent.joinpath("data")
@@ -22,7 +22,7 @@ def test_load_genotypes():
     expected = get_expected_genotypes()
 
     # can we load the data from the VCF?
-    gts = Genotypes(DATADIR.joinpath("simple.vcf.gz"))
+    gts = Genotypes(DATADIR.joinpath("simple.vcf"))
     gts.read()
     np.testing.assert_allclose(gts.data, expected)
     assert gts.samples == ("HG00096", "HG00097", "HG00099", "HG00100", "HG00101")
@@ -133,12 +133,3 @@ def test_load_phenotypes_subset():
     phens.read(samples=samples)
     np.testing.assert_allclose(phens.data, expected)
     assert phens.samples == tuple(samples)
-
-
-def test_variant_type():
-    assert VariantType("snp") == VariantType("SNP")
-
-    assert str(VariantType("snp")) == "SNP"
-
-    with pytest.raises(ValueError):
-        VariantType("indel")

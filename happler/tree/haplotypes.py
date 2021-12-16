@@ -1,6 +1,9 @@
 from __future__ import annotations
-import numpy as np
 from pathlib import Path
+from dataclasses import dataclass
+
+import numpy as np
+import numpy.typing as npt
 
 from ..data import Genotypes
 
@@ -97,13 +100,19 @@ class Haplotype:
     ----------
     nodes : tuple[tuple[Variant, int]]
         An ordered collection of pairs, where each pair is a node and its allele
+    data : npt.NDArray[np.bool_]
+        A np array (with length n, the number of samples) denoting the presence
+        of this haplotype in each sample
     """
 
     # TODO: consider using a named tuple?
     nodes: tuple[tuple[Variant, int]]
+    data: npt.NDArray[np.bool_]
 
     @classmethod
-    def from_node(cls, node: Variant, allele: int) -> Haplotype:
+    def from_node(
+        cls, node: Variant, allele: int, variant_genotypes: npt.NDArray[np.bool_]
+    ) -> Haplotype:
         """
         Create a new haplotype with a single node entry
 
@@ -119,11 +128,13 @@ class Haplotype:
         Haplotype
             The newly created haplotype object containing node and allele
         """
-        return cls(((node, allele),))
+        return cls(((node, allele),), variant_genotypes)
 
-    def append(self, node: Variant, allele: int) -> Haplotype:
+    def append(
+        self, node: Variant, allele: int, variant_genotypes: npt.NDArray[np.bool_]
+    ) -> Haplotype:
         """
-        Append a new node to this haplotype
+        Append a new node (variant) to this haplotype
 
         Parameters
         ----------
@@ -137,7 +148,9 @@ class Haplotype:
         Haplotype
             A new haplotype object extended by the node and its allele
         """
-        return Haplotype(self.nodes + ((Variant, allele),))
+        new_haplotype = self.nodes + ((node, allele),)
+        new_haplotype_values = self.data & variant_genotypes
+        return Haplotype(new_haplotype, new_haplotype_values)
 
     @property
     def node_indices(self) -> tuple[int]:
@@ -150,3 +163,72 @@ class Haplotype:
             The indices of the nodes
         """
         return tuple(node[0].idx for node in self.nodes)
+
+    def transform(self, genotypes: Genotypes) -> npt.NDArray[np.bool_]:
+        """
+        Transform a genotypes matrix via the current haplotype:
+
+        Each entry in the returned matrix denotes the presence of the current haplotype
+        extended by each of the variants in the genotype matrix
+
+        Parameters
+        ----------
+        genotypes : Genotypes
+            The genotypes which to transform using the current haplotype
+
+        Returns
+        -------
+        npt.NDArray[np.bool_]
+            A haplotype matrix similar to the genotype matrix but with haplotypes
+            instead of variants in the columns
+        """
+        # first, remove any variants that are already in this haplotype using np.delete
+        return np.logical_and(
+            np.delete(genotypes.data, self.node_indices, axis=1),
+            self.data[:, np.newaxis, np.newaxis]
+        )
+
+
+class Haplotypes:
+    """
+    A class for processing haplotypes from a file
+
+    Attributes
+    ----------
+    genotypes : Genotypes
+        The original genotypes from which these Haplotypes were derived
+    data : np.array
+        The haplotypes in an n (samples) x p (variants) x 2 (strands) array
+    haplotypes : list[Haplotype]
+        Haplotype-level meta information
+
+    Examples
+    --------
+    >>> haplotypes = Haplotypes.load('tests/data/simple.vcf')
+    """
+
+    def __init__(self, genotypes: Genotypes):
+        self.genotypes = genotypes
+        # initialize data to a matrix composed of no haplotypes
+        self.data = np.empty((len(self.genotypes.samples), 0), dtype=np.bool_)
+        self.haplotypes = []
+
+    def add_variant(self, variant: Variant, allele: int, hap_idxs: list[int] = None):
+        # do we already have any haplotypes?
+        variant_gts = self.genotypes.data[:, variant.idx, allele][:, np.newaxis]
+        if self.haplotypes:
+            if hap_idxs is None:
+                hap_idxs = list(range(len(self.haplotypes)))
+            for hap_idx in hap_idxs:
+                self.haplotypes[hap_idx] = self.haplotypes[hap_idx].append(
+                    variant, allele, variant_gts
+                )
+            self.data[:, hap_idxs] = np.logical_and(self.data[:, hap_idxs], variant_gts)
+        else:
+            self.haplotypes = [Haplotype.from_node(variant, allele, variant_gts)]
+            self.data = variant_gts
+
+    # WHAT DO WE NEED THIS CLASS TO DO?
+    # 1) create a haplotype matrix where each (SNP, allele) pair is added to an existing haplotype
+    # - at the root of the tree, this is just the same as add_variant()
+    # 2) compose a vector of haplotype dosages from the haplotype matrix

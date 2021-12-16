@@ -14,7 +14,9 @@ class Genotypes(Data):
     ----------
     data : np.array
         The genotypes in an n (samples) x p (variants) x 2 (strands) array
-    samples : tuple
+    fname : Path
+        The path to the read-only file containing the data
+    samples : tuple[str]
         The names of each of the n samples
     variants : list
         Variant-level meta information:
