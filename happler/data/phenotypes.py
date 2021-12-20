@@ -14,6 +14,8 @@ class Phenotypes(Data):
     ----------
     data : np.array
         The phenotypes in an n (samples) x 1 (phenotype value) array
+    fname : Path
+        The path to the read-only file containing the data
     samples : tuple
         The names of each of the n samples
 

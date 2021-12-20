@@ -1,5 +1,7 @@
-from .tree import Node, Haplotype, Tree
+from .tree import Tree
 from ..data import Genotypes, Phenotypes
+from .haplotypes import Variant, Haplotype
+from .test_assoc import TestAssoc, TestAssocSimple
 
 
 class TreeBuilder:
@@ -14,11 +16,14 @@ class TreeBuilder:
         The genotypes from which the tree should be built
     phens: Phenotypes
         The phenotypes from which the tree should be built
+    method: TestAssoc
+        The type of association test to perform at each node when constructing the tree
     """
 
-    def __init__(self, genotypes: Genotypes, phenotypes: Phenotypes):
+    def __init__(self, genotypes: Genotypes, phenotypes: Phenotypes, method: TestAssoc):
         self.gens = genotypes
         self.phens = phenotypes
+        self.method = method
         self.tree = None
 
     def __repr__(self):
@@ -35,13 +40,13 @@ class TreeBuilder:
             index into :py:attr:`~.TreeBuilder.gens`
         """
         # step one: initialize the tree
-        root_node = Node.from_np(self.gens[root], idx=root)
+        root_node = Variant.from_np(self.gens[root], idx=root)
         self.tree = Tree(root_node)
         # step two: create the tree
         self._create_tree(root_node)
 
     def _create_tree(
-        self, parent: Node, parent_hap: Haplotype = None, parent_idx: int = 0
+        self, parent: Variant, parent_hap: Haplotype = None, parent_idx: int = 0
     ):
         """
         Recursive helper to the run() function
@@ -50,7 +55,7 @@ class TreeBuilder:
 
         Parameters
         ----------
-        parent : Node
+        parent : Variant
             An existing node in the tree under which we should consider creating a subtree
         parent_hap : Haplotype
             The haplotype containing all variants up to (but NOT including) the parent
@@ -69,7 +74,7 @@ class TreeBuilder:
             parent_hap.append(parent, allele)
             self._create_tree(best_variant, parent_hap, new_node_idx)
 
-    def _find_split(self, parent: Haplotype, parent_idx: int, allele: int) -> Node:
+    def _find_split(self, parent: Haplotype, parent_idx: int, allele: int) -> Variant:
         """
         Find the variant that best fits under the parent_idx node with the allele edge
 
@@ -77,4 +82,8 @@ class TreeBuilder:
         ----------
         TODO
         """
-        pass
+        # step 1: transform GT matrix into haplotype matrix
+        hap_matrix = parent.transform(self.gens)
+        # step 2: test assoc
+        p_values = self.method.run(hap_matrix, self.phenotypes.data)
+        # step 3:

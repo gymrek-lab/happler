@@ -51,3 +51,11 @@ happler.tree.treebuilder module
    :members:
    :undoc-members:
    :show-inheritance:
+
+happler.tree.haplotypes module
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: happler.tree.haplotypes
+   :members:
+   :undoc-members:
+   :show-inheritance:

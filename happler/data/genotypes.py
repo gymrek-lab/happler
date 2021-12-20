@@ -6,38 +6,6 @@ from cyvcf2 import VCF, Variant
 from .data import Data
 
 
-class VariantType:
-    """
-    A class denoting the type of variant
-
-    Attributes
-    ----------
-    type : str, optional
-        The type of variant (ex: SNP, STR, etc)
-
-        Defaults to a single nucleotide polymorphism
-
-    """
-
-    def __init__(self, variant_type: str = "snp"):
-        # TODO: add support for STRs, SVs, etc
-        supported_types = ["snp"]
-        # a VariantType has a dtype of str
-        self.dtype = np.dtype("S5")
-        # store the type if it is supported
-        variant_type = variant_type.lower()
-        if variant_type in supported_types:
-            self.type = variant_type
-        else:
-            raise ValueError("{}s are not yet supported.".format(variant_type.upper()))
-
-    def __repr__(self):
-        return self.type.upper()
-
-    def __eq__(self, other):
-        return self.type == other.type
-
-
 class Genotypes(Data):
     """
     A class for processing genotypes from a file
@@ -46,7 +14,9 @@ class Genotypes(Data):
     ----------
     data : np.array
         The genotypes in an n (samples) x p (variants) x 2 (strands) array
-    samples : tuple
+    fname : Path
+        The path to the read-only file containing the data
+    samples : tuple[str]
         The names of each of the n samples
     variants : list
         Variant-level meta information:
