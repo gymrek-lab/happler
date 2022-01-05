@@ -44,7 +44,7 @@ class Tree:
         self.variant_locs[root].add(self.num_nodes)
         self.graph.add_node(self.num_nodes, idx=root.idx, label=root.id)
 
-    def add_node(self, node: Variant, parent_idx: int, allele: int) -> int:
+    def add_node(self, node: Variant, parent_idx: int, allele: int, pval: float) -> int:
         """
         Add node to the tree
 
@@ -56,6 +56,8 @@ class Tree:
             The index of the node under which to place the new node
         allele : int
             The allele for the edge from parent to node
+        pval : float
+            The p-value of the haplotype once this variant is included
 
         Returns
         -------
@@ -63,10 +65,21 @@ class Tree:
             The index of the new node within the tree
         """
         new_node_idx = self.num_nodes
-        self.graph.add_node(new_node_idx, idx=node.idx, label=node.id)
+        self.graph.add_node(new_node_idx, idx=node.idx, label=node.id, pval=pval)
         self.variant_locs[node].add(new_node_idx)
         self.graph.add_edge(parent_idx, new_node_idx, label=allele)
         return new_node_idx
+
+    def haplotypes(self) -> list[list[tuple[str, float]]]:
+        """
+        Return the haplotypes at the leaves of this tree
+
+        Returns
+        -------
+        list[list[tuple[str, float]]]
+            A list of haplotypes, where each haplotype consists of a list of tuples: a variant ID and a score
+        """
+        pass
 
     def ascii(self) -> str:
         """

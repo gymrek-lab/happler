@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
+from .tree import Tree
 from ..data import Genotypes
 
 
@@ -204,23 +205,34 @@ class Haplotypes:
 
     Attributes
     ----------
-    genotypes : Genotypes
-        The original genotypes from which these Haplotypes were derived
-    data : np.array
-        The haplotypes in an n (samples) x p (variants) x 2 (strands) array
-    haplotypes : list[Haplotype]
-        Haplotype-level meta information
+    data : npt.NDArray
+        An array describing the composition of a series of haplotypes
 
     Examples
     --------
-    >>> haplotypes = Haplotypes.load('tests/data/simple.vcf')
+    >>> haplotypes = Haplotypes.load('tests/data/simple.haps')
     """
 
-    def __init__(self, genotypes: Genotypes):
-        self.genotypes = genotypes
-        # initialize data to a matrix composed of no haplotypes
-        self.data = np.empty((len(self.genotypes.samples), 0), dtype=np.bool_)
-        self.haplotypes = []
+    def __init__(self):
+        self.data = np.array()
+
+    @classmethod
+    def from_tree(cls, tree: Tree) -> Haplotypes:
+        haps = cls()
+        # TODO: iterate through the tree and grab each variant and its score
+        haplotypes = tree.haplotypes()
+        haps.data = np.array(
+            [
+                (hap.id, hap.tree_id, hap.varID, variant.pval)
+                for haplotype in haplotypes
+            ],
+            dtype=[
+                ("hap", np.uint),
+                ("tree", np.uint),
+                ("variant", "U50"),
+                ("score", np.float64),
+            ],
+        )
 
     def add_variant(self, variant: Variant, allele: int, hap_idxs: list[int] = None):
         # do we already have any haplotypes?

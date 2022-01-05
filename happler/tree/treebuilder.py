@@ -79,13 +79,15 @@ class TreeBuilder:
                 new_parent_hap = parent_hap.append(parent, allele, variant_gts)
             # find the best variant, add it to the tree, and then create a new subtree
             # under it
-            best_variant = self._find_split(new_parent_hap, parent_idx, allele)
+            best_variant, pval = self._find_split(new_parent_hap, parent_idx, allele)
             if best_variant is None:
                 continue
-            new_node_idx = self.tree.add_node(best_variant, parent_idx, allele)
+            new_node_idx = self.tree.add_node(best_variant, parent_idx, allele, pval)
             self._create_tree(best_variant, new_parent_hap, new_node_idx)
 
-    def _find_split(self, parent: Haplotype, parent_idx: int, allele: int) -> Variant:
+    def _find_split(
+        self, parent: Haplotype, parent_idx: int, allele: int
+    ) -> tuple[Variant, float]:
         """
         Find the variant that best fits under the parent_idx node with the allele edge
 
@@ -100,8 +102,9 @@ class TreeBuilder:
 
         Returns
         -------
-        Variant
-            The variant that best fits under the parent node with the allele edge
+        tuple[Variant, float]
+            The variant that best fits under the parent node with the allele edge AND
+            the pvalue of the haplotype after incorporating that variant
         """
         # step 1: transform the GT matrix into a haplotype matrix
         hap_matrix = parent.transform(self.gens)
@@ -109,9 +112,10 @@ class TreeBuilder:
         p_values = self.method.run(hap_matrix.sum(axis=2), self.phens.data)
         # step 3: find the index of the best variant within the haplotype matrix
         best_p_idx = p_values.argmin()
+        best_pval = p_values[best_p_idx]
         # step 4: check whether we should terminate the branch
-        if self.check_terminate_branch(p_values[best_p_idx], len(p_values)):
-            return None
+        if self.check_terminate_branch(best_pval, len(p_values)):
+            return None, best_pval
         # step 5: find the index of the best variant within the genotype matrix
         # we need to account for indices that we removed when running transform()
         # There might be a faster way of doing this but for now we're just going to
@@ -122,7 +126,7 @@ class TreeBuilder:
                 break
             best_p_idx += 1
         # step 6: return the Variant with the best p-value
-        return Variant.from_np(self.gens.variants[best_p_idx], best_p_idx)
+        return Variant.from_np(self.gens.variants[best_p_idx], best_p_idx), best_pval
 
     def check_terminate_branch(self, pval: float, num_tests: int) -> bool:
         """
@@ -142,4 +146,5 @@ class TreeBuilder:
         """
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
+        # TODO: perform a likelihood ratio test?
         return pval >= self.method.pval_thresh / num_tests
