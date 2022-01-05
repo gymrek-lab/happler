@@ -101,7 +101,7 @@ class Haplotype:
     nodes : tuple[tuple[Variant, int]]
         An ordered collection of pairs, where each pair is a node and its allele
     data : npt.NDArray[np.bool_]
-        A np array (with length n, the number of samples) denoting the presence
+        A np array (with shape n x 1, the number of samples) denoting the presence
         of this haplotype in each sample
     """
 
@@ -122,6 +122,9 @@ class Haplotype:
             The initializing node for this haplotype
         allele : int
             The allele associated with node
+        variant_genotypes : npt.NDArray[np.bool_]
+            A np array (with shape n x 1, the number of samples) denoting the presence of
+            this genotype in each sample
 
         Returns
         -------
@@ -142,6 +145,9 @@ class Haplotype:
             The node to add to this haplotype
         allele : int
             The allele associated with this node
+        variant_genotypes : npt.NDArray[np.bool_]
+            A np array (with length n x 1, the number of samples) denoting the presence of
+            this genotype in each sample
 
         Returns
         -------
@@ -152,6 +158,7 @@ class Haplotype:
         new_haplotype_values = self.data & variant_genotypes
         return Haplotype(new_haplotype, new_haplotype_values)
 
+    # TODO: use @cached_property from python3.8, instead
     @property
     def node_indices(self) -> tuple[int]:
         """
@@ -180,12 +187,14 @@ class Haplotype:
         -------
         npt.NDArray[np.bool_]
             A haplotype matrix similar to the genotype matrix but with haplotypes
-            instead of variants in the columns
+            instead of variants in the columns. It will have the same shape except that
+            the number of columns (second dimension) will have decreased by one.
         """
         # first, remove any variants that are already in this haplotype using np.delete
+        # then, use a np.logical_and to impose the current haplotype onto the GT matrix
         return np.logical_and(
             np.delete(genotypes.data, self.node_indices, axis=1),
-            self.data[:, np.newaxis, np.newaxis]
+            self.data[:, np.newaxis, np.newaxis],
         )
 
 

@@ -4,7 +4,15 @@ import numpy as np
 from pathlib import Path
 
 from happler.data import Genotypes, Phenotypes
-from happler.tree import VariantType, Variant, Haplotype, Haplotypes, Tree, TreeBuilder
+from happler.tree import (
+    VariantType,
+    Variant,
+    Haplotype,
+    Haplotypes,
+    Tree,
+    TreeBuilder,
+    TestAssocSimple,
+)
 
 
 DATADIR = Path(__file__).parent.joinpath("data")
@@ -50,8 +58,8 @@ def test_tree_builder():
     gens = Genotypes.load(DATADIR.joinpath("simple.vcf"))
     phens = Phenotypes.load(DATADIR.joinpath("simple.tsv"))
     tree_builder = TreeBuilder(gens, phens)
-    # root_node =
-    # tree_builder.run(root_node)
+    root_node = 0
+    tree_builder.run(root_node)
 
 
 def test_haplotype():
@@ -94,5 +102,7 @@ def test_haplotypes():
         np.logical_and(gens.data[:, 0, 0], gens.data[:, 1, 0])[:, np.newaxis], haps.data
     )
 
+
 def test_simple_assoc():
+    # TODO
     pass
