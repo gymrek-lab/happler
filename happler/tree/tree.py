@@ -4,7 +4,7 @@ from collections import defaultdict
 import numpy as np
 import networkx as nx
 
-from .haplotypes import Variant
+from .variant import Variant
 
 
 class Tree:

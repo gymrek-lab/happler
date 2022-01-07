@@ -1,4 +1,5 @@
 from .tree import Tree
 from .treebuilder import TreeBuilder
-from .haplotypes import VariantType, Variant, Haplotype, Haplotypes
+from .variant import VariantType, Variant
+from .haplotypes import Haplotype, Haplotypes
 from .test_assoc import TestAssoc, TestAssocSimple

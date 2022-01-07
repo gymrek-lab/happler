@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from .tree import Tree
 from ..data import Genotypes, Phenotypes
-from .haplotypes import Variant, Haplotype
+from .variant import Variant
+from .haplotypes import Haplotype
 from .test_assoc import TestAssoc, TestAssocSimple
 
 
