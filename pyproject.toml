@@ -8,34 +8,35 @@ repository = "https://github.com/aryarm/happler"
 homepage = "https://github.com/aryarm/happler"
 
 [tool.poetry.dependencies]
-python = "^3.7,<3.11"
-click = "^8.0.3"
-pysam = "^0.17.0"
-cyvcf2 = "^0.30.12"
-networkx = "^2.6.3"
-bgen-reader = "^4.0.8"
-scipy = "^1.7.3"
+python = ">=3.7,<3.11"
+click = ">=8.0.3"
+pysam = ">=0.17.0"
+cyvcf2 = ">=0.30.12"
+networkx = ">=2.6.3"
+bgen-reader = ">=4.0.8"
+scipy = ">=1.7.3"
+pydot = ">=1.4.2"
 
 # docs
 # these belong in dev-dependencies, but RTD doesn't support that yet -- see
 # https://github.com/readthedocs/readthedocs.org/issues/4912
-sphinx = { version = "^4.2.0", optional = true }
-sphinx-autodoc-typehints = { version = "^1.12.0", optional = true }
-sphinx-rtd-theme = { version = "^1.0.0", optional = true }
-numpydoc = { version = "^1.1.0", optional = true }
-sphinx-click = {version = "^3.0.2", optional = true}
+sphinx = { version = ">=4.2.0", optional = true }
+sphinx-autodoc-typehints = { version = ">=1.12.0", optional = true }
+sphinx-rtd-theme = { version = ">=1.0.0", optional = true }
+numpydoc = { version = ">=1.1.0", optional = true }
+sphinx-click = {version = ">=3.0.2", optional = true}
 
 [tool.poetry.dev-dependencies]
-pytest = "^6.2.5"
-black = "^21.10b0"
-ipython = "^7.29.0"
+pytest = ">=6.2.5"
+black = ">=21.10b0"
+ipython = ">=7.29.0"
 
 # docs
-sphinx = { version = "^4.2.0", optional = true }
-sphinx-autodoc-typehints = { version = "^1.12.0", optional = true }
-sphinx-rtd-theme = { version = "^1.0.0", optional = true }
-numpydoc = { version = "^1.1.0", optional = true }
-sphinx-click = {version = "^3.0.2", optional = true}
+sphinx = { version = ">=4.2.0", optional = true }
+sphinx-autodoc-typehints = { version = ">=1.12.0", optional = true }
+sphinx-rtd-theme = { version = ">=1.0.0", optional = true }
+numpydoc = { version = ">=1.1.0", optional = true }
+sphinx-click = {version = ">=3.0.2", optional = true}
 
 [tool.poetry.extras]
 docs = [
