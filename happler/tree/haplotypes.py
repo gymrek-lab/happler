@@ -140,6 +140,7 @@ class Haplotypes:
                 ("hap", np.uint),
                 ("tree", np.uint),
                 ("variant", "U50"),
+                ("allele", np.bool_),
                 ("score", np.float64),
             ],
         )
@@ -147,17 +148,25 @@ class Haplotypes:
     @classmethod
     def from_tree(cls, tree: Tree) -> Haplotypes:
         haps = cls()
-        # TODO: iterate through the tree and grab each variant and its score
         haplotypes = tree.haplotypes()
         haps.data = np.array(
             [
-                (hap.id, hap.tree_id, hap.varID, variant.pval)
-                for haplotype in haplotypes
+                (
+                    hap_idx,
+                    0,
+                    node["variant"].id,
+                    node["allele"],
+                    node["results"]["pval"],
+                )
+                for hap_idx, haplotype in enumerate(haplotypes)
+                for node in haplotype
             ],
             dtype=[
                 ("hap", np.uint),
                 ("tree", np.uint),
                 ("variant", "U50"),
+                ("allele", np.bool_),
                 ("score", np.float64),
             ],
         )
+        return haps

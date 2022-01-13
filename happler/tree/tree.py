@@ -1,6 +1,8 @@
 from __future__ import annotations
-from collections import defaultdict
+from collections.abc import Iterable
+from collections import defaultdict, deque
 
+import pydot
 import numpy as np
 import networkx as nx
 
@@ -42,9 +44,13 @@ class Tree:
         """
         # TODO: consider reducing code duplication between this method and add_node()
         self.variant_locs[root].add(self.num_nodes)
-        self.graph.add_node(self.num_nodes, idx=root.idx, label=root.id)
+        self.graph.add_node(
+            self.num_nodes, variant=root, label=root.id, allele=None, results=None
+        )
 
-    def add_node(self, node: Variant, parent_idx: int, allele: int, pval: float) -> int:
+    def add_node(
+        self, node: Variant, parent_idx: int, allele: int, results: np.void = None
+    ) -> int:
         """
         Add node to the tree
 
@@ -56,8 +62,9 @@ class Tree:
             The index of the node under which to place the new node
         allele : int
             The allele for the edge from parent to node
-        pval : float
-            The p-value of the haplotype once this variant is included
+        results : np.void, optional
+            The results (beta, pval) of the association test for this haplotype once
+            this variant is included
 
         Returns
         -------
@@ -65,25 +72,38 @@ class Tree:
             The index of the new node within the tree
         """
         new_node_idx = self.num_nodes
-        self.graph.add_node(new_node_idx, idx=node.idx, label=node.id, pval=pval)
+        self.graph.add_node(
+            new_node_idx, variant=node, label=node.id, allele=allele, results=results
+        )
         self.variant_locs[node].add(new_node_idx)
         self.graph.add_edge(parent_idx, new_node_idx, label=allele)
         return new_node_idx
 
-    def haplotypes(self) -> list[list[tuple[str, float]]]:
+    def haplotypes(self, root: int = 0) -> list[deque[dict]]:
         """
         Return the haplotypes at the leaves of this tree
 
         Returns
         -------
-        list[list[tuple[str, float]]]
-            A list of haplotypes, where each haplotype consists of a list of tuples: a variant ID and a score
-        """
-        pass
+        list[deque[dict]]
+            A list of haplotypes, where each haplotype consists of a list of dictionaries.
 
-    def ascii(self) -> str:
+            Each dictionary contains the node and all of its attributes.
         """
-        Convert the tree to its ascii representation
+        root_node = deque([self.graph.nodes[root]])
+        # first, check that this node is not a leaf
+        if self.graph.out_degree(root):
+            return [
+                root_node + path
+                for child in self.graph.successors(root)
+                for path in self.haplotypes(child)
+            ]
+        # if it's a leaf, just output a single node
+        return [root_node]
+
+    def dot(self) -> str:
+        """
+        Convert the tree to its representation in the dot language
         This is useful for quickly viewing the tree on the command line
 
         Returns
@@ -93,4 +113,10 @@ class Tree:
 
             Nodes are labeled by their variant ID and edges are labeled by their allele
         """
-        pass
+        # TODO: get rid of the other attributes
+        dot = nx.drawing.nx_pydot.to_pydot(self.graph)
+        # for node in dot.get_nodes():
+        #     node.set_name(node.get('label'))
+        #     node.obj_dict
+        # return dot
+        return dot.to_string()
