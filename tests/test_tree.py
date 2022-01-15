@@ -165,10 +165,6 @@ def _create_fake_phens(data):
     return phens
 
 
-def test_treebuilder_simple_case():
-    pass
-
-
 def test_treebuilder_ppt_case():
     # create genotypes for 3 samples, 4 SNPs
     gens = _create_fake_gens(np.array(
@@ -190,10 +186,14 @@ def test_treebuilder_ppt_case():
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
+    # two haplotypes: one with three SNPs and one with two
     assert len(haps) == 2
     assert tuple([len(hap) for hap in haps]) == (3, 2)
-    assert haps[0][0]["variant"].id == 'snp1'
-    assert haps[0][1]["variant"].id == 'snp2'
-    assert haps[0][2]["variant"].id == 'snp3'
-    assert haps[1][0]["variant"].id == 'snp1'
-    assert haps[1][1]["variant"].id == 'snp2'
+    for i in range(3):
+        assert haps[0][i]["variant"].id == 'snp'+str(i)
+    for i in range(2):
+        assert haps[1][i]["variant"].id == 'snp'+str(i)
+
+
+def test_treebuilder_simple_case():
+    pass
