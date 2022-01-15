@@ -115,8 +115,8 @@ class Tree:
         """
         # TODO: get rid of the other attributes
         dot = nx.drawing.nx_pydot.to_pydot(self.graph)
-        # for node in dot.get_nodes():
-        #     node.set_name(node.get('label'))
-        #     node.obj_dict
-        # return dot
+        for node in dot.get_nodes():
+            # node.set_name(node.get('label'))
+            attrs = node.get_attributes()
+            node.obj_dict["attributes"] = {"label": attrs["label"]}
         return dot.to_string()
