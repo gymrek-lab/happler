@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
+from .tree import Tree
 from ..data import Genotypes
 
 
@@ -101,7 +102,7 @@ class Haplotype:
     nodes : tuple[tuple[Variant, int]]
         An ordered collection of pairs, where each pair is a node and its allele
     data : npt.NDArray[np.bool_]
-        A np array (with length n, the number of samples) denoting the presence
+        A np array (with shape n x 1, the number of samples) denoting the presence
         of this haplotype in each sample
     """
 
@@ -122,6 +123,9 @@ class Haplotype:
             The initializing node for this haplotype
         allele : int
             The allele associated with node
+        variant_genotypes : npt.NDArray[np.bool_]
+            A np array (with shape n x 1, the number of samples) denoting the presence of
+            this genotype in each sample
 
         Returns
         -------
@@ -142,6 +146,9 @@ class Haplotype:
             The node to add to this haplotype
         allele : int
             The allele associated with this node
+        variant_genotypes : npt.NDArray[np.bool_]
+            A np array (with length n x 1, the number of samples) denoting the presence of
+            this genotype in each sample
 
         Returns
         -------
@@ -152,6 +159,7 @@ class Haplotype:
         new_haplotype_values = self.data & variant_genotypes
         return Haplotype(new_haplotype, new_haplotype_values)
 
+    # TODO: use @cached_property from python3.8, instead
     @property
     def node_indices(self) -> tuple[int]:
         """
@@ -180,12 +188,14 @@ class Haplotype:
         -------
         npt.NDArray[np.bool_]
             A haplotype matrix similar to the genotype matrix but with haplotypes
-            instead of variants in the columns
+            instead of variants in the columns. It will have the same shape except that
+            the number of columns (second dimension) will have decreased by one.
         """
         # first, remove any variants that are already in this haplotype using np.delete
+        # then, use a np.logical_and to impose the current haplotype onto the GT matrix
         return np.logical_and(
             np.delete(genotypes.data, self.node_indices, axis=1),
-            self.data[:, np.newaxis, np.newaxis]
+            self.data[:, np.newaxis, np.newaxis],
         )
 
 
@@ -195,23 +205,34 @@ class Haplotypes:
 
     Attributes
     ----------
-    genotypes : Genotypes
-        The original genotypes from which these Haplotypes were derived
-    data : np.array
-        The haplotypes in an n (samples) x p (variants) x 2 (strands) array
-    haplotypes : list[Haplotype]
-        Haplotype-level meta information
+    data : npt.NDArray
+        An array describing the composition of a series of haplotypes
 
     Examples
     --------
-    >>> haplotypes = Haplotypes.load('tests/data/simple.vcf')
+    >>> haplotypes = Haplotypes.load('tests/data/simple.haps')
     """
 
-    def __init__(self, genotypes: Genotypes):
-        self.genotypes = genotypes
-        # initialize data to a matrix composed of no haplotypes
-        self.data = np.empty((len(self.genotypes.samples), 0), dtype=np.bool_)
-        self.haplotypes = []
+    def __init__(self):
+        self.data = np.array()
+
+    @classmethod
+    def from_tree(cls, tree: Tree) -> Haplotypes:
+        haps = cls()
+        # TODO: iterate through the tree and grab each variant and its score
+        haplotypes = tree.haplotypes()
+        haps.data = np.array(
+            [
+                (hap.id, hap.tree_id, hap.varID, variant.pval)
+                for haplotype in haplotypes
+            ],
+            dtype=[
+                ("hap", np.uint),
+                ("tree", np.uint),
+                ("variant", "U50"),
+                ("score", np.float64),
+            ],
+        )
 
     def add_variant(self, variant: Variant, allele: int, hap_idxs: list[int] = None):
         # do we already have any haplotypes?
