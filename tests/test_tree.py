@@ -122,3 +122,63 @@ def test_haplotype_transform():
 def test_simple_assoc():
     # TODO
     pass
+
+
+def _create_fake_gens(data):
+    gens = Genotypes(fname=None)
+    gens.samples = tuple('samp'+str(i) for i in range(data.shape[0]))
+    gens.variants = np.array(
+        [
+            ('snp'+str(i), 'chr0', i, 0.75)
+            for i in range(data.shape[1])
+        ],
+        dtype=[
+            ("id", "U50"),
+            ("chrom", "U10"),
+            ("pos", np.uint),
+            ("aaf", np.float64),
+        ],
+    )
+    gens.data = data
+    return gens
+
+
+def _create_fake_phens(data):
+    phens = Phenotypes(fname=None)
+    phens.samples = tuple('samp'+str(i) for i in range(data.shape[0]))
+    phens.data = data
+    return phens
+
+
+def test_treebuilder_simple_case():
+    pass
+
+
+def test_treebuilder_ppt_case():
+    # create genotypes for 3 samples, 4 SNPs
+    gens = _create_fake_gens(np.array(
+        [
+            [[0, 0], [1, 1], [1, 1], [1, 1]],
+            [[0, 1], [1, 0], [0, 0], [1, 0]],
+            [[1, 1], [0, 0], [0, 0], [0, 0]],
+        ], dtype=np.uint8
+    ))
+    # create phenotypes for 3 samples
+    phens = _create_fake_phens(np.array(
+        [3, 6, 7], dtype=np.float64
+    ))
+
+    # run the treebuilder and extract the haplotypes
+    builder = TreeBuilder(gens, phens, TestAssocSimple(pval_thresh=2))
+    builder.run(root=0)
+    tree = builder.tree
+    haps = tree.haplotypes()
+
+    # check: did the output turn out how we expected?
+    assert len(haps) == 2
+    assert tuple([len(hap) for hap in haps]) == (3, 2)
+    assert haps[0][0]["variant"].id == 'snp1'
+    assert haps[0][1]["variant"].id == 'snp2'
+    assert haps[0][2]["variant"].id == 'snp3'
+    assert haps[1][0]["variant"].id == 'snp1'
+    assert haps[1][1]["variant"].id == 'snp2'
