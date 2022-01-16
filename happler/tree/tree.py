@@ -113,7 +113,6 @@ class Tree:
 
             Nodes are labeled by their variant ID and edges are labeled by their allele
         """
-        # TODO: get rid of the other attributes
         dot = nx.drawing.nx_pydot.to_pydot(self.graph)
         for node in dot.get_nodes():
             # node.set_name(node.get('label'))

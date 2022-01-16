@@ -56,42 +56,6 @@ def _create_fake_phens(data) -> Phenotypes:
     return phens
 
 
-def test_treebuilder_ppt_case():
-    """
-    Test the example case from my powerpoint slides
-    This is a more complicated example.
-    TODO: adjust the genotypes and phenotypes to achieve
-    """
-    # create genotypes for 3 samples, 4 SNPs
-    gens = _create_fake_gens(
-        np.array(
-            [
-                [[0, 0], [1, 1], [1, 1], [1, 1]],
-                [[0, 1], [1, 0], [0, 0], [1, 0]],
-                [[1, 1], [0, 0], [0, 0], [0, 0]],
-            ],
-            dtype=np.bool_,
-        )
-    )
-    # create phenotypes for 3 samples
-    phens = _create_fake_phens(np.array([3, 6, 7], dtype=np.float64))
-
-    # run the treebuilder and extract the haplotypes
-    builder = TreeBuilder(gens, phens, TestAssocSimple(pval_thresh=2))
-    builder.run(root=0)
-    tree = builder.tree
-    haps = tree.haplotypes()
-
-    # check: did the output turn out how we expected?
-    # two haplotypes: one with three SNPs and one with two
-    assert len(haps) == 2
-    assert tuple([len(hap) for hap in haps]) == (3, 2)
-    for i in range(3):
-        assert haps[0][i]["variant"].id == "snp" + str(i)
-    for i in range(2):
-        assert haps[1][i]["variant"].id == "snp" + str(i)
-
-
 def test_treebuilder_one_snp_perfect():
     """
     The most simple case: one causal SNP with a perfect phenotype association:
@@ -217,3 +181,39 @@ def test_treebuilder_two_snps_two_branches_perfect():
         assert haps[i][1]["variant"].id == "snp1"
         assert haps[i][2]["variant"].id == "snp2"
         assert haps[i][2]["allele"] == 1
+
+
+def test_treebuilder_ppt_case():
+    """
+    Test the example case from my powerpoint slides
+    This is a more complicated example.
+    TODO: adjust the genotypes and phenotypes to achieve the phenotypes I want
+    """
+    # create genotypes for 3 samples, 4 SNPs
+    gens = _create_fake_gens(
+        np.array(
+            [
+                [[0, 0], [1, 1], [1, 1], [1, 1]],
+                [[0, 1], [1, 0], [0, 0], [1, 0]],
+                [[1, 1], [0, 0], [0, 0], [0, 0]],
+            ],
+            dtype=np.bool_,
+        )
+    )
+    # create phenotypes for 3 samples
+    phens = _create_fake_phens(np.array([3, 6, 7], dtype=np.float64))
+
+    # run the treebuilder and extract the haplotypes
+    builder = TreeBuilder(gens, phens, TestAssocSimple(pval_thresh=2))
+    builder.run(root=0)
+    tree = builder.tree
+    haps = tree.haplotypes()
+
+    # check: did the output turn out how we expected?
+    # two haplotypes: one with three SNPs and one with two
+    assert len(haps) == 2
+    assert tuple([len(hap) for hap in haps]) == (3, 2)
+    for i in range(3):
+        assert haps[0][i]["variant"].id == "snp" + str(i)
+    for i in range(2):
+        assert haps[1][i]["variant"].id == "snp" + str(i)
