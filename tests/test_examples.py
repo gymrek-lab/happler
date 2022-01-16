@@ -58,8 +58,8 @@ def _create_fake_phens(data) -> Phenotypes:
 
 def test_treebuilder_one_snp_perfect():
     """
-    The most simple case: one causal SNP with a perfect phenotype association:
-    Y = 0.5 * X
+    The most simple case. One causal SNP with a perfect phenotype association:
+    Y = 0.5 * X1
     """
     # 4 samples
     gens = _create_fake_gens(
@@ -74,6 +74,38 @@ def test_treebuilder_one_snp_perfect():
         )
     )
     phens = _create_fake_phens(gens.data.sum(axis=2) * 0.5)
+
+    # run the treebuilder and extract the haplotypes
+    builder = TreeBuilder(gens, phens)
+    builder.run(root=0)
+    tree = builder.tree
+    haps = tree.haplotypes()
+
+    # check: did the output turn out how we expected?
+    # one haplotype: with one SNP
+    assert len(haps) == 1
+    assert len(haps[0]) == 1
+    assert haps[0][0]["variant"].id == "snp1"
+
+
+def test_treebuilder_two_snps_single_association():
+    """
+    One causal SNP with a perfect phenotype association and one SNP that isn't causal
+    Y = 0.5 * X1
+    """
+    # 4 samples
+    gens = _create_fake_gens(
+        np.array(
+            [
+                [[0, 0], [1, 1]],
+                [[0, 1], [1, 1]],
+                [[1, 0], [1, 1]],
+                [[1, 1], [1, 1]],
+            ],
+            dtype=np.bool_,
+        )
+    )
+    phens = _create_fake_phens(gens.data[:,0].sum(axis=2) * 0.5)
 
     # run the treebuilder and extract the haplotypes
     builder = TreeBuilder(gens, phens)
