@@ -107,7 +107,7 @@ class Haplotype:
         Returns
         -------
         npt.NDArray[np.bool_]
-            A haplotype matrix similar to the genotype matrix but with haplotypes
+            A 3D haplotype matrix similar to the genotype matrix but with haplotypes
             instead of variants in the columns. It will have the same shape except that
             the number of columns (second dimension) will have decreased by one.
         """
@@ -115,10 +115,8 @@ class Haplotype:
         gens = np.delete(genotypes.data, self.node_indices, axis=1)
         # add extra axes to match shape of gens
         hap_data = self.data[:, np.newaxis, np.newaxis]
-        if gens.shape[1]:
-            # use np.logical_and to superimpose the current haplotype onto the GT matrix
-            return np.logical_and(gens, hap_data)
-        return hap_data
+        # use np.logical_and to superimpose the current haplotype onto the GT matrix
+        return np.logical_and(gens, hap_data)
 
 
 class Haplotypes:

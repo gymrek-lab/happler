@@ -115,6 +115,9 @@ class TreeBuilder:
         """
         # step 1: transform the GT matrix into a haplotype matrix
         hap_matrix = parent.transform(self.gens)
+        if hap_matrix.shape[1] == 0:
+            # if there weren't any genotypes left, just return None
+            return None, None
         # step 2: run all association tests on all of the haplotypes
         results = self.method.run(hap_matrix.sum(axis=2), self.phens.data)
         p_values = results.data["pval"]

@@ -83,7 +83,36 @@ def test_treebuilder_one_snp_perfect():
     # one haplotype: with one SNP
     assert len(haps) == 1
     assert len(haps[0]) == 1
-    assert haps[0][0]["variant"].id == "snp1"
+    assert haps[0][0]["variant"].id == "snp0"
+
+
+def test_treebuilder_one_snp_not_causal():
+    """
+    One non-causal SNP with no phenotype association
+    """
+    # 4 samples
+    gens = _create_fake_gens(
+        np.array(
+            [
+                [[0, 0]],
+                [[0, 1]],
+                [[1, 0]],
+                [[1, 1]],
+            ],
+            dtype=np.bool_,
+        )
+    )
+    phens = _create_fake_phens(np.ones(gens.data.sum(axis=2).shape) * 0.5)
+
+    # run the treebuilder and extract the haplotypes
+    tree = TreeBuilder(gens, phens).run(root=0)
+    haps = tree.haplotypes()
+
+    # check: did the output turn out how we expected?
+    # one haplotype: with one SNP
+    assert len(haps) == 1
+    assert len(haps[0]) == 1
+    assert haps[0][0]["variant"].id == "snp0"
 
 
 def test_treebuilder_two_snps_single_association():
@@ -113,7 +142,7 @@ def test_treebuilder_two_snps_single_association():
     # one haplotype: with one SNP
     assert len(haps) == 1
     assert len(haps[0]) == 1
-    assert haps[0][0]["variant"].id == "snp1"
+    assert haps[0][0]["variant"].id == "snp0"
 
 
 def test_treebuilder_two_snps_independent_perfect():
@@ -166,8 +195,8 @@ def test_treebuilder_two_snps_one_branch_perfect():
     # one haplotype with both SNPs
     assert len(haps) == 1
     assert len(haps[0]) == 2
-    assert haps[0][1]["variant"].id == "snp1"
-    assert haps[0][2]["variant"].id == "snp2"
+    assert haps[0][1]["variant"].id == "snp0"
+    assert haps[0][2]["variant"].id == "snp1"
     assert haps[0][2]["allele"] == 1
 
 
@@ -202,8 +231,8 @@ def test_treebuilder_two_snps_two_branches_perfect():
     assert len(haps) == 2
     assert len(haps[0]) == 2
     for i in range(2):
-        assert haps[i][1]["variant"].id == "snp1"
-        assert haps[i][2]["variant"].id == "snp2"
+        assert haps[i][1]["variant"].id == "snp0"
+        assert haps[i][2]["variant"].id == "snp1"
         assert haps[i][2]["allele"] == 1
 
 
