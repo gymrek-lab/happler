@@ -112,11 +112,13 @@ class Haplotype:
             the number of columns (second dimension) will have decreased by one.
         """
         # first, remove any variants that are already in this haplotype using np.delete
-        # then, use a np.logical_and to impose the current haplotype onto the GT matrix
-        return np.logical_and(
-            np.delete(genotypes.data, self.node_indices, axis=1),
-            self.data[:, np.newaxis, np.newaxis],
-        )
+        gens = np.delete(genotypes.data, self.node_indices, axis=1)
+        # add extra axes to match shape of gens
+        hap_data = self.data[:, np.newaxis, np.newaxis]
+        if gens.shape[1]:
+            # use np.logical_and to superimpose the current haplotype onto the GT matrix
+            return np.logical_and(gens, hap_data)
+        return hap_data
 
 
 class Haplotypes:

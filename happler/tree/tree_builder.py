@@ -35,7 +35,7 @@ class TreeBuilder:
         self.tree = None
 
     def __repr__(self):
-        return self.gens, self.phens
+        return str((self.gens, self.phens))
 
     def run(self, root: int):
         """
