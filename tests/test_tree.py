@@ -11,7 +11,7 @@ from happler.tree import (
     Haplotypes,
     Tree,
     TreeBuilder,
-    TestAssocSimple,
+    AssocTestSimple,
 )
 
 

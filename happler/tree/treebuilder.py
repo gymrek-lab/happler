@@ -4,7 +4,7 @@ from .tree import Tree
 from ..data import Genotypes, Phenotypes
 from .variant import Variant
 from .haplotypes import Haplotype
-from .test_assoc import TestAssoc, TestAssocSimple
+from .assoc_test import AssocTest, AssocTestSimple
 
 
 class TreeBuilder:
@@ -19,7 +19,7 @@ class TreeBuilder:
         The genotypes from which the tree should be built
     phens: Phenotypes
         The phenotypes from which the tree should be built
-    method: TestAssoc, optional
+    method: AssocTest, optional
         The type of association test to perform at each node when constructing the tree
     """
 
@@ -27,7 +27,7 @@ class TreeBuilder:
         self,
         genotypes: Genotypes,
         phenotypes: Phenotypes,
-        method: TestAssoc = TestAssocSimple(),
+        method: AssocTest = AssocTestSimple(),
     ):
         self.gens = genotypes
         self.phens = phenotypes
@@ -112,7 +112,7 @@ class TreeBuilder:
         """
         # step 1: transform the GT matrix into a haplotype matrix
         hap_matrix = parent.transform(self.gens)
-        # step 2: test assoc
+        # step 2: run all association tests on all of the haplotypes
         results = self.method.run(hap_matrix.sum(axis=2), self.phens.data)
         p_values = results.data["pval"]
         # step 3: find the index of the best variant within the haplotype matrix

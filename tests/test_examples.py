@@ -3,7 +3,7 @@ import numpy as np
 from itertools import product
 
 from happler.data import Genotypes, Phenotypes
-from happler.tree import TreeBuilder, TestAssocSimple
+from happler.tree import TreeBuilder, AssocTestSimple
 
 
 def _create_fake_gens(data) -> Genotypes:
@@ -137,7 +137,7 @@ def test_treebuilder_two_snps_independent_perfect():
 
     # TODO: we need to handle this case, somehow
     # # run the treebuilder and extract the haplotypes
-    # builder = TreeBuilder(gens, phens, TestAssocSimple(pval_thresh=2))
+    # builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
     # builder.run(root=0)
     # tree = builder.tree
     # haps = tree.haplotypes()
@@ -236,7 +236,7 @@ def test_treebuilder_ppt_case():
     phens = _create_fake_phens(np.array([3, 6, 7], dtype=np.float64))
 
     # run the treebuilder and extract the haplotypes
-    builder = TreeBuilder(gens, phens, TestAssocSimple(pval_thresh=2))
+    builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
     builder.run(root=0)
     tree = builder.tree
     haps = tree.haplotypes()
