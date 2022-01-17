@@ -49,9 +49,54 @@ def test_tree():
 
     assert tree.num_nodes == 1
 
-    tree.add_node(Variant(idx=0, id="SNP1", pos=2), 0, 0)
+    tree.add_node(Variant(idx=1, id="SNP1", pos=2), 0, 0)
 
     assert tree.num_nodes == 2
+
+
+def test_tree_dot():
+    node = Variant(idx=0, id="SNP0", pos=1)
+    tree = Tree(root=node)
+    node_idx = tree.add_node(Variant(idx=1, id="SNP1", pos=2), 0, 0)
+    tree.add_node(Variant(idx=2, id="SNP2", pos=3), 0, 1)
+    tree.add_node(Variant(idx=3, id="SNP3", pos=4), node_idx, 0)
+    tree.add_node(Variant(idx=4, id="SNP4", pos=5), node_idx, 1)
+    assert (
+        tree.dot()
+        == "strict digraph  {\n0 [label=SNP0];\n1 [label=SNP1];\n2 [label=SNP2];\n3"
+        " [label=SNP3];\n4 [label=SNP4];\n0 -> 1  [label=0];\n0 -> 2  [label=1];\n1"
+        " -> 3  [label=0];\n1 -> 4  [label=1];\n}\n"
+    )
+
+
+def test_get_haplotypes_from_tree():
+    # create three new nodes
+    snp1 = Variant(idx=0, id="SNP1", pos=1)
+    snp2 = Variant(idx=1, id="SNP2", pos=2)
+    snp3 = Variant(idx=2, id="SNP3", pos=3)
+
+    # create a tree composed of just one node
+    tree = Tree(root=snp1)
+    haps = tree.haplotypes()
+    assert len(haps) == 1
+    assert haps[0][0]["variant"] == snp1
+
+    # add two child nodes
+    snp2_idx = tree.add_node(snp2, parent_idx=0, allele=0)
+    tree.add_node(snp2, parent_idx=0, allele=1)
+    haps = tree.haplotypes()
+    assert len(haps) == 2
+    assert tuple([len(hap) for hap in haps]) == (2, 2)
+    assert [haps[0][i]["variant"] for i in range(2)] == [snp1, snp2]
+    assert [haps[1][i]["variant"] for i in range(2)] == [snp1, snp2]
+
+    # add a single child to the first leaf
+    tree.add_node(snp3, parent_idx=snp2_idx, allele=1)
+    haps = tree.haplotypes()
+    assert len(haps) == 2
+    assert tuple([len(hap) for hap in haps]) == (3, 2)
+    assert [haps[0][i]["variant"] for i in range(3)] == [snp1, snp2, snp3]
+    assert [haps[1][i]["variant"] for i in range(2)] == [snp1, snp2]
 
 
 def test_tree_builder():
@@ -60,6 +105,7 @@ def test_tree_builder():
     tree_builder = TreeBuilder(gens, phens)
     root_node = 0
     tree_builder.run(root_node)
+    # TODO: assert that the tree looks correct
 
 
 def test_haplotype():
@@ -86,21 +132,6 @@ def test_haplotype_transform():
     hap = Haplotype.from_node(variant, allele_idx, variant_gts)
     gens_without_variant = gens.data[:, (variant_idx + 1) :, :]
     np.testing.assert_allclose(hap.transform(gens), gens_without_variant)
-
-
-def test_haplotypes():
-    gens = Genotypes.load(DATADIR.joinpath("simple.vcf"))
-    haps = Haplotypes(gens)
-
-    variant = Variant.from_np(gens.variants[0], 0)
-    haps.add_variant(variant, 0)
-    np.testing.assert_allclose(gens.data[:, 0, 0][:, np.newaxis], haps.data)
-
-    variant = Variant.from_np(gens.variants[1], 1)
-    haps.add_variant(variant, 0)
-    np.testing.assert_allclose(
-        np.logical_and(gens.data[:, 0, 0], gens.data[:, 1, 0])[:, np.newaxis], haps.data
-    )
 
 
 def test_simple_assoc():
