@@ -76,9 +76,7 @@ def test_treebuilder_one_snp_perfect():
     phens = _create_fake_phens(gens.data.sum(axis=2) * 0.5)
 
     # run the treebuilder and extract the haplotypes
-    builder = TreeBuilder(gens, phens)
-    builder.run(root=0)
-    tree = builder.tree
+    tree = TreeBuilder(gens, phens).run(root=0)
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
@@ -108,9 +106,7 @@ def test_treebuilder_two_snps_single_association():
     phens = _create_fake_phens(gens.data[:,0].sum(axis=2) * 0.5)
 
     # run the treebuilder and extract the haplotypes
-    builder = TreeBuilder(gens, phens)
-    builder.run(root=0)
-    tree = builder.tree
+    tree = TreeBuilder(gens, phens).run(root=0)
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
@@ -163,9 +159,7 @@ def test_treebuilder_two_snps_one_branch_perfect():
     phens = _create_fake_phens(0.5 * (gts[:, 0] & gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
-    builder = TreeBuilder(gens, phens)
-    builder.run(root=0)
-    tree = builder.tree
+    tree = TreeBuilder(gens, phens).run(root=0)
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
@@ -200,9 +194,7 @@ def test_treebuilder_two_snps_two_branches_perfect():
     phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
-    builder = TreeBuilder(gens, phens)
-    builder.run(root=0)
-    tree = builder.tree
+    tree = TreeBuilder(gens, phens).run(root=0)
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
@@ -236,9 +228,7 @@ def test_treebuilder_ppt_case():
     phens = _create_fake_phens(np.array([3, 6, 7], dtype=np.float64))
 
     # run the treebuilder and extract the haplotypes
-    builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
-    builder.run(root=0)
-    tree = builder.tree
+    tree = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2)).run(root=0)
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?

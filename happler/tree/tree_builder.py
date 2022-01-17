@@ -47,11 +47,14 @@ class TreeBuilder:
             The index of the variant to use at the root of tree. This should be an
             index into :py:attr:`~.TreeBuilder.gens.variants`
         """
+        if self.tree is not None:
+            raise AssertionError("A tree already exists for this TreeBuilder. Please create a new one.")
         # step one: initialize the tree
         root_node = Variant.from_np(self.gens.variants[root], idx=root)
         self.tree = Tree(root_node)
         # step two: create the tree
         self._create_tree(root_node)
+        return self.tree
 
     def _create_tree(
         self, parent: Variant, parent_hap: Haplotype = None, parent_idx: int = 0
