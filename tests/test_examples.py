@@ -140,9 +140,7 @@ def test_treebuilder_two_snps_single_association():
 
     # check: did the output turn out how we expected?
     # one haplotype: with one SNP
-    assert len(haps) == 1
-    assert len(haps[0]) == 1
-    assert haps[0][0]["variant"].id == "snp0"
+    assert len(haps) == 0
 
 
 def test_treebuilder_two_snps_independent_perfect():
