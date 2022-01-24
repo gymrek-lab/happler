@@ -24,7 +24,7 @@ class AssocResults:
     data: npt.NDArray[np.float64, np.float64]
 
 
-class TestAssoc(ABC):
+class AssocTest(ABC):
     """
     Abstract class for performing phenotype-haplotype association tests
 
@@ -62,12 +62,12 @@ class TestAssoc(ABC):
         pass
 
 
-class TestAssocSimple(TestAssoc):
+class AssocTestSimple(AssocTest):
     def run(
         self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
     ) -> AssocResults:
         """
-        Implement TestAssoc for a simple linear regression.
+        Implement AssocTest for a simple linear regression.
 
         Parameters
         ----------

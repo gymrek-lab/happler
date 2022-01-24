@@ -1,7 +1,8 @@
+import os
+from pathlib import Path
+
 import pytest
 import numpy as np
-
-from pathlib import Path
 
 from happler.data import Genotypes, Phenotypes
 from happler.tree import (
@@ -11,7 +12,7 @@ from happler.tree import (
     Haplotypes,
     Tree,
     TreeBuilder,
-    TestAssocSimple,
+    AssocTestSimple,
 )
 
 
@@ -132,6 +133,41 @@ def test_haplotype_transform():
     hap = Haplotype.from_node(variant, allele_idx, variant_gts)
     gens_without_variant = gens.data[:, (variant_idx + 1) :, :]
     np.testing.assert_allclose(hap.transform(gens), gens_without_variant)
+
+
+def test_haplotypes_write():
+    # create three new nodes
+    snp1 = Variant(idx=0, id="SNP1", pos=1)
+    snp2 = Variant(idx=1, id="SNP2", pos=2)
+    snp3 = Variant(idx=2, id="SNP3", pos=3)
+
+    # create a results object that all of the SNPs can share
+    res = np.array([(0.1, 0.1)], dtype=[("beta", np.float64), ("pval", np.float64)])[0]
+
+    # create a tree composed of these nodes
+    tree = Tree(root=snp1)
+    snp2_idx = tree.add_node(snp2, parent_idx=0, allele=0, results=res)
+    tree.add_node(snp2, parent_idx=0, allele=1, results=res)
+    tree.add_node(snp3, parent_idx=snp2_idx, allele=1, results=res)
+
+    # write the tree to a file
+    Haplotypes.from_tree(tree).write("test_write.haps")
+
+    # verify that the results appear as intended
+    with open("test_write.haps", "r") as file:
+        lines = [line.rstrip() for line in file.readlines()]
+        assert lines == [
+            "H\t0\t0\t0.00\t0.00\tnan",
+            "V\tSNP1\tnan\tnan",
+            "V\tSNP2\t0\t0.10",
+            "V\tSNP3\t1\t0.10",
+            "H\t1\t0\t0.00\t0.00\tnan",
+            "V\tSNP1\tnan\tnan",
+            "V\tSNP2\t1\t0.10",
+        ]
+
+    # remove the file
+    os.remove("test_write.haps")
 
 
 def test_simple_assoc():

@@ -4,7 +4,7 @@ from .tree import Tree
 from ..data import Genotypes, Phenotypes
 from .variant import Variant
 from .haplotypes import Haplotype
-from .test_assoc import TestAssoc, TestAssocSimple
+from .assoc_test import AssocTest, AssocTestSimple
 
 
 class TreeBuilder:
@@ -19,7 +19,7 @@ class TreeBuilder:
         The genotypes from which the tree should be built
     phens: Phenotypes
         The phenotypes from which the tree should be built
-    method: TestAssoc, optional
+    method: AssocTest, optional
         The type of association test to perform at each node when constructing the tree
     """
 
@@ -27,7 +27,7 @@ class TreeBuilder:
         self,
         genotypes: Genotypes,
         phenotypes: Phenotypes,
-        method: TestAssoc = TestAssocSimple(),
+        method: AssocTest = AssocTestSimple(),
     ):
         self.gens = genotypes
         self.phens = phenotypes
@@ -35,7 +35,7 @@ class TreeBuilder:
         self.tree = None
 
     def __repr__(self):
-        return self.gens, self.phens
+        return str((self.gens, self.phens))
 
     def run(self, root: int):
         """
@@ -47,11 +47,16 @@ class TreeBuilder:
             The index of the variant to use at the root of tree. This should be an
             index into :py:attr:`~.TreeBuilder.gens.variants`
         """
+        if self.tree is not None:
+            raise AssertionError(
+                "A tree already exists for this TreeBuilder. Please create a new one."
+            )
         # step one: initialize the tree
         root_node = Variant.from_np(self.gens.variants[root], idx=root)
         self.tree = Tree(root_node)
         # step two: create the tree
         self._create_tree(root_node)
+        return self.tree
 
     def _create_tree(
         self, parent: Variant, parent_hap: Haplotype = None, parent_idx: int = 0
@@ -112,7 +117,10 @@ class TreeBuilder:
         """
         # step 1: transform the GT matrix into a haplotype matrix
         hap_matrix = parent.transform(self.gens)
-        # step 2: test assoc
+        if hap_matrix.shape[1] == 0:
+            # if there weren't any genotypes left, just return None
+            return None, None
+        # step 2: run all association tests on all of the haplotypes
         results = self.method.run(hap_matrix.sum(axis=2), self.phens.data)
         p_values = results.data["pval"]
         # step 3: find the index of the best variant within the haplotype matrix

@@ -44,10 +44,10 @@ happler.tree.tree module
    :undoc-members:
    :show-inheritance:
 
-happler.tree.treebuilder module
+happler.tree.tree_builder module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: happler.tree.treebuilder
+.. automodule:: happler.tree.tree_builder
    :members:
    :undoc-members:
    :show-inheritance:
@@ -68,10 +68,10 @@ happler.tree.haplotypes module
    :undoc-members:
    :show-inheritance:
 
-happler.tree.test_assoc module
+happler.tree.assoc_test module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: happler.tree.test_assoc
+.. automodule:: happler.tree.assoc_test
    :members:
    :undoc-members:
    :show-inheritance:
