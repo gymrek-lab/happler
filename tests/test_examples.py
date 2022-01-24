@@ -211,14 +211,12 @@ def test_three_snps_independent_branches_perfect():
     split_list = lambda pair: [pair[:2], pair[2:4], pair[4:]]
     # 4 samples
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list, product([0, 1], repeat=6))), dtype=np.bool_
-        )
+        np.array(list(map(split_list, product([0, 1], repeat=6))), dtype=np.bool_)
     )
     gts = gens.data
     phens = _create_fake_phens(
-        0.5 * (gts[:, 0] & gts[:, 2]).sum(axis=1) +
-        0.5 * (gts[:, 1] & gts[:, 2]).sum(axis=1)
+        0.5 * (gts[:, 0] & gts[:, 2]).sum(axis=1)
+        + 0.5 * (gts[:, 1] & gts[:, 2]).sum(axis=1)
     )
 
     # TODO: we need to handle this case, somehow
