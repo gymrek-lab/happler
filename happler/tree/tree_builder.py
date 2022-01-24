@@ -48,7 +48,9 @@ class TreeBuilder:
             index into :py:attr:`~.TreeBuilder.gens.variants`
         """
         if self.tree is not None:
-            raise AssertionError("A tree already exists for this TreeBuilder. Please create a new one.")
+            raise AssertionError(
+                "A tree already exists for this TreeBuilder. Please create a new one."
+            )
         # step one: initialize the tree
         root_node = Variant.from_np(self.gens.variants[root], idx=root)
         self.tree = Tree(root_node)

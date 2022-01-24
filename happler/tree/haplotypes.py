@@ -125,8 +125,19 @@ class Haplotypes:
 
     Attributes
     ----------
-    data : npt.NDArray
-        An array describing the composition of a series of haplotypes
+    data : list[dict]
+        A list of dict describing the composition of a series of haplotypes
+        Each haplotype dictionary is composed of these items:
+            1) id (int): A haplotype ID
+            2) tree (int): A tree ID
+            3) beta (float): The effect size of the haplotype-phenotype association
+            4) pval (float): The p-value of the haplotype-phenotype association
+            5) pip (float): A PIP from running SuSiE or some other tool
+            6) variants (list[dict]): A list of dictionaries, one for each variant:
+        Each variants dictionary is composed of these items:
+            1) id (int): A variant ID
+            2) allele (bool): The allele for this variant
+            3) score (float): The score of this variant within its haplotype
 
     Examples
     --------
@@ -134,39 +145,79 @@ class Haplotypes:
     """
 
     def __init__(self):
-        self.data = np.array(
-            [],
-            dtype=[
-                ("hap", np.uint),
-                ("tree", np.uint),
-                ("variant", "U50"),
-                ("allele", np.bool_),
-                ("score", np.float64),
-            ],
+        self.format = {
+            "hap": {
+                "id": "H",
+                "val": ["id", "tree", "beta", "pval", "pip"],
+                "fmt": ["d", "d", ".2f", ".2f", ".2f"],
+            },
+            "var": {
+                "id": "V",
+                "val": ["id", "allele", "score"],
+                "fmt": ["s", "", ".2f"],
+            },
+        }
+        for val in self.format.keys():
+            self.format[val]["str"] = self._create_fmt_str(self.format[val])
+        self.data = []
+
+    def _create_fmt_str(self, fmts):
+        return (
+            fmts["id"]
+            + "\t"
+            + "\t".join(
+                [
+                    "{" + val + ":" + fmt + "}"
+                    for val, fmt in zip(fmts["val"], fmts["fmt"])
+                ]
+            )
+            + "\n"
         )
+
+    @staticmethod
+    def _handle_nan(val, key):
+        try:
+            if val[key] is not None:
+                return val[key]
+        except TypeError:
+            pass
+        return np.nan
 
     @classmethod
     def from_tree(cls, tree: Tree) -> Haplotypes:
         haps = cls()
         haplotypes = tree.haplotypes()
-        haps.data = np.array(
-            [
-                (
-                    hap_idx,
-                    0,
-                    node["variant"].id,
-                    node["allele"],
-                    node["results"]["pval"],
-                )
-                for hap_idx, haplotype in enumerate(haplotypes)
-                for node in haplotype
-            ],
-            dtype=[
-                ("hap", np.uint),
-                ("tree", np.uint),
-                ("variant", "U50"),
-                ("allele", np.bool_),
-                ("score", np.float64),
-            ],
-        )
+        haps.data = [
+            {
+                "id": hap_idx,
+                "tree": 0,
+                "beta": 0,
+                "pval": 0,
+                "pip": np.nan,
+                "variants": [
+                    {
+                        "id": node["variant"].id,
+                        "allele": cls._handle_nan(node, "allele"),
+                        "score": cls._handle_nan(node["results"], "pval"),
+                    }
+                    for node in haplotype
+                ],
+            }
+            for hap_idx, haplotype in enumerate(haplotypes)
+        ]
         return haps
+
+    def write(self, fname: Path):
+        """
+        Write the contents of this Haplotypes object to the file given by fname
+
+        Parameters
+        ----------
+        fname : Path
+            The path to the file to which this Haplotypes object should be written.
+        """
+        with open(fname, "w") as file:
+            for hap in self.data:
+                file.write(self.format["hap"]["str"].format(**hap))
+                for var in hap["variants"]:
+                    file.write(self.format["var"]["str"].format(**var))
