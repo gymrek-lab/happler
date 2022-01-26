@@ -1,4 +1,4 @@
-from .tree import Tree
+from .tree import Tree, NodeResults
 from .tree_builder import TreeBuilder
 from .variant import VariantType, Variant
 from .haplotypes import Haplotype, Haplotypes

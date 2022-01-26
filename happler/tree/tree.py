@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from collections.abc import Iterable
 from collections import defaultdict, deque
 
@@ -7,6 +8,37 @@ import numpy as np
 import networkx as nx
 
 from .variant import Variant
+
+
+# We declare this class to be a dataclass to automatically define __init__ and a few
+# other methods. We use frozen=True to make it immutable.
+@dataclass(frozen=True)
+class NodeResults:
+    """
+    The results of testing SNPs at a node in the tree
+
+    Attributes
+    ----------
+    beta : float
+        The best effect size among all of the SNPs tried
+    pval : float
+        The best p-value among all of the SNPs tried
+    """
+
+    beta: float
+    pval: float
+
+    def __getitem__(self, item):
+        """
+        Define a getter so that we can access elemeents like this:
+
+        ``obj['field_name']``
+
+        in addition to this:
+
+        ``obj.field_name``
+        """
+        return getattr(self, item)
 
 
 class Tree:
@@ -49,7 +81,7 @@ class Tree:
         )
 
     def add_node(
-        self, node: Variant, parent_idx: int, allele: int, results: np.void = None
+        self, node: Variant, parent_idx: int, allele: int, results: NodeResults = None
     ) -> int:
         """
         Add node to the tree

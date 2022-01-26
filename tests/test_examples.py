@@ -150,7 +150,6 @@ def test_two_snps_independent_perfect():
     Y = 0.5 * X1 + 0.5 * X2
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
-    # 4 samples
     gens = _create_fake_gens(
         np.array(
             list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
@@ -178,7 +177,6 @@ def test_two_snps_one_branch_perfect():
             return X2
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
-    # 4 samples
     gens = _create_fake_gens(
         np.array(
             list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
@@ -200,7 +198,35 @@ def test_two_snps_one_branch_perfect():
     assert haps[0][2]["allele"] == 1
 
 
-def test_three_snps_independent_branches_perfect():
+def test_four_snps_two_independent_trees_perfect():
+    """
+    Two independent causal SNPs each sharing a haplotype with another, different SNP
+    via perfect phenotype associations
+    Y = 0.5 * ( X1 && X3 ) + 0.5 * ( X2 && X4 )
+    This should yield two haplotypes from different trees, where X3 occurs in the first
+    and X4 occurs in the second
+    """
+    # a function for splitting a list into a list of pairs
+    split_list = lambda pair: [pair[i : i + 2] for i in range(0, len(pair), 2)]
+    gens = _create_fake_gens(
+        np.array(list(map(split_list, product([0, 1], repeat=8))), dtype=np.bool_)
+    )
+    gts = gens.data
+    phens = _create_fake_phens(
+        0.5 * (gts[:, 0] & gts[:, 2]).sum(axis=1)
+        + 0.5 * (gts[:, 1] & gts[:, 3]).sum(axis=1)
+    )
+
+    # TODO: we need to handle this case, somehow
+    # # run the treebuilder and extract the haplotypes
+    # builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
+    # builder.run(root=0)
+    # tree = builder.tree
+    # haps = tree.haplotypes()
+    assert False
+
+
+def test_three_snps_two_independent_trees_perfect():
     """
     Two independent causal SNPs each sharing a haplotype with the third SNP via
     perfect phenotype associations
@@ -209,7 +235,6 @@ def test_three_snps_independent_branches_perfect():
     X1 occurs only in one and X2 occurs only in the other
     """
     split_list = lambda pair: [pair[:2], pair[2:4], pair[4:]]
-    # 4 samples
     gens = _create_fake_gens(
         np.array(list(map(split_list, product([0, 1], repeat=6))), dtype=np.bool_)
     )
@@ -241,7 +266,6 @@ def test_two_snps_two_branches_perfect():
 
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
-    # 4 samples
     gens = _create_fake_gens(
         np.array(
             list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
