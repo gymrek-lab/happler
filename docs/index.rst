@@ -13,6 +13,14 @@ happler
    executing/inputs.rst
 
 .. toctree::
+   :caption: Outputs
+   :name: outputs
+   :hidden:
+   :maxdepth: 1
+
+   executing/outputs.rst
+
+.. toctree::
    :caption: API
    :name: api
    :hidden:
