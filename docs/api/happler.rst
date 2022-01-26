@@ -45,7 +45,7 @@ happler.tree.tree module
    :show-inheritance:
 
 happler.tree.tree_builder module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: happler.tree.tree_builder
    :members:
@@ -53,7 +53,7 @@ happler.tree.tree_builder module
    :show-inheritance:
 
 happler.tree.variant module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: happler.tree.variant
    :members:

@@ -5,8 +5,8 @@ happler
 =======
 
 .. toctree::
-   :caption: Execution
-   :name: executing
+   :caption: Inputs
+   :name: inputs
    :hidden:
    :maxdepth: 1
 
