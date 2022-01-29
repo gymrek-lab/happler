@@ -59,7 +59,7 @@ class TreeBuilder:
         return self.tree
 
     def _create_tree(
-        self, parent: Variant, parent_hap: Haplotype = None, parent_idx: int = 0
+        self, parent: Variant, parent_hap: Haplotype = None, parent_idx: int = 0, parent_res: NodeResults = None
     ):
         """
         Recursive helper to the run() function
@@ -88,12 +88,12 @@ class TreeBuilder:
             # find the best variant, add it to the tree, and then create a new subtree
             # under it
             best_variant, results = self._find_split(
-                new_parent_hap, parent_idx, allele, results
+                new_parent_hap, parent_idx, allele, parent_res
             )
             if best_variant is None:
                 continue
             new_node_idx = self.tree.add_node(best_variant, parent_idx, allele, results)
-            self._create_tree(best_variant, new_parent_hap, new_node_idx)
+            self._create_tree(best_variant, new_parent_hap, new_node_idx, results)
 
     def _find_split(
         self, parent: Haplotype, parent_idx: int, allele: int, parent_res: NodeResults
@@ -165,7 +165,16 @@ class TreeBuilder:
         bool
             True if the branch should be terminated, False otherwise
         """
-        pass  # TODO
+        if parent_res is None:
+            # TODO: think about how to handle this case
+            # this will happen when the parent node is the root node
+            # we can either redo the association test to obtain an effect size and p-value
+            # or we can choose not to terminate
+            # right now, we're just choosing not to terminate
+            return True
+        else:
+            # perform a two tailed, two-sample t-test using the difference of the effect sizes
+            pass
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
         # TODO: perform a likelihood ratio test?
