@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scipy.stats import t as t_dist
+
 from .tree import Tree, NodeResults
 from ..data import Genotypes, Phenotypes
 from .variant import Variant
@@ -59,7 +61,11 @@ class TreeBuilder:
         return self.tree
 
     def _create_tree(
-        self, parent: Variant, parent_hap: Haplotype = None, parent_idx: int = 0, parent_res: NodeResults = None
+        self,
+        parent: Variant,
+        parent_hap: Haplotype = None,
+        parent_idx: int = 0,
+        parent_res: NodeResults = None,
     ):
         """
         Recursive helper to the run() function
@@ -132,7 +138,9 @@ class TreeBuilder:
         best = results.data[best_p_idx]
         node_res = NodeResults(beta=best["beta"], pval=best["pval"])
         # step 4: check whether we should terminate the branch
-        if self.check_terminate_branch(parent_res, node_res):
+        if self.check_terminate_branch(
+            parent_res, node_res, hap_matrix.shape[1], len(p_values)
+        ):
             return None, best
         # step 5: find the index of the best variant within the genotype matrix
         # we need to account for indices that we removed when running transform()
@@ -148,7 +156,11 @@ class TreeBuilder:
         return best_variant, node_res
 
     def check_terminate_branch(
-        self, parent_res: NodeResults, node_res: NodeResults
+        self,
+        parent_res: NodeResults,
+        node_res: NodeResults,
+        num_samps: int,
+        num_tests: int,
     ) -> bool:
         """
         Check whether this branch should be terminated.
@@ -159,6 +171,9 @@ class TreeBuilder:
             The results of the tests performed on the parent node
         node_res : NodeResults
             The results of the tests performed on the current node
+        num_samps : int
+            The number of samples tested
+        num_tests : The number of haplotypes tested
 
         Returns
         -------
@@ -174,8 +189,14 @@ class TreeBuilder:
             return True
         else:
             # perform a two tailed, two-sample t-test using the difference of the effect sizes
-            pass
+            # first, we compute the standard error of the difference of the effect sizes
+            std_err = np.sqrt((node_res.stderr ** 2) + (parent_res.stderr ** 2))
+            # then, we compute the test statistic
+            t_stat = (node_res.beta - parent_res.beta) / std_err
+            # TODO: think about whether this should be a two-tailed test or a one-tailed test
+            # I think it could actually be a one-tailed test, but we might need to get the
+            # direction right?
+            pval = 2 * (t_dist.cdf(-np.abs(t_stat), df=(2 * (num_samps - 2))))
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
-        # TODO: perform a likelihood ratio test?
         return pval >= self.method.pval_thresh / num_tests
