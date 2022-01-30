@@ -13,6 +13,7 @@ from happler.tree import (
     Tree,
     TreeBuilder,
     AssocTestSimple,
+    NodeResults,
 )
 
 
@@ -142,7 +143,7 @@ def test_haplotypes_write():
     snp3 = Variant(idx=2, id="SNP3", pos=3)
 
     # create a results object that all of the SNPs can share
-    res = np.array([(0.1, 0.1)], dtype=[("beta", np.float64), ("pval", np.float64)])[0]
+    res = NodeResults(beta=0.1, pval=0.1)
 
     # create a tree composed of these nodes
     tree = Tree(root=snp1)

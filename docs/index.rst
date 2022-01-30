@@ -5,12 +5,20 @@ happler
 =======
 
 .. toctree::
-   :caption: Execution
-   :name: executing
+   :caption: Inputs
+   :name: inputs
    :hidden:
    :maxdepth: 1
 
    executing/inputs.rst
+
+.. toctree::
+   :caption: Outputs
+   :name: outputs
+   :hidden:
+   :maxdepth: 1
+
+   executing/outputs.rst
 
 .. toctree::
    :caption: API

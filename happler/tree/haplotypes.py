@@ -127,6 +127,7 @@ class Haplotypes:
     ----------
     data : list[dict]
         A list of dict describing the composition of a series of haplotypes
+
         Each haplotype dictionary is composed of these items:
             1) id (int): A haplotype ID
             2) tree (int): A tree ID
@@ -134,6 +135,7 @@ class Haplotypes:
             4) pval (float): The p-value of the haplotype-phenotype association
             5) pip (float): A PIP from running SuSiE or some other tool
             6) variants (list[dict]): A list of dictionaries, one for each variant:
+
         Each variants dictionary is composed of these items:
             1) id (int): A variant ID
             2) allele (bool): The allele for this variant

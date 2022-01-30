@@ -18,10 +18,10 @@ class AssocResults:
     Attributes
     ----------
     data : npt.NDArray[np.float64]
-        A numpy mixed array with fields: beta and pval
+        A numpy mixed array with fields: beta, pval, stderr
     """
 
-    data: npt.NDArray[np.float64, np.float64]
+    data: npt.NDArray[np.float64, np.float64, np.float64]
 
 
 class AssocTest(ABC):
@@ -82,7 +82,7 @@ class AssocTestSimple(AssocTest):
         npt.NDArray[np.float64]
             The p-values from testing each haplotype, with shape p x 1
         """
-        extract_vals = lambda linreg: (linreg.slope, linreg.pvalue)
+        extract_vals = lambda linreg: (linreg.slope, linreg.pvalue, linreg.stderr)
         # use ordinary least squares for a simple regression
         # return an array of p-values
         return AssocResults(
@@ -94,6 +94,7 @@ class AssocTestSimple(AssocTest):
                 dtype=[
                     ("beta", np.float64),
                     ("pval", np.float64),
+                    ("stderr", np.float64),
                 ],
             )
         )

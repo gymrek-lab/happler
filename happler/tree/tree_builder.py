@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from .tree import Tree
+from scipy.stats import t as t_dist
+
+from .tree import Tree, NodeResults
 from ..data import Genotypes, Phenotypes
 from .variant import Variant
 from .haplotypes import Haplotype
@@ -59,7 +61,11 @@ class TreeBuilder:
         return self.tree
 
     def _create_tree(
-        self, parent: Variant, parent_hap: Haplotype = None, parent_idx: int = 0
+        self,
+        parent: Variant,
+        parent_hap: Haplotype = None,
+        parent_idx: int = 0,
+        parent_res: NodeResults = None,
     ):
         """
         Recursive helper to the run() function
@@ -87,14 +93,16 @@ class TreeBuilder:
                 new_parent_hap = parent_hap.append(parent, allele, variant_gts)
             # find the best variant, add it to the tree, and then create a new subtree
             # under it
-            best_variant, results = self._find_split(new_parent_hap, parent_idx, allele)
+            best_variant, results = self._find_split(
+                new_parent_hap, parent_idx, allele, parent_res
+            )
             if best_variant is None:
                 continue
             new_node_idx = self.tree.add_node(best_variant, parent_idx, allele, results)
-            self._create_tree(best_variant, new_parent_hap, new_node_idx)
+            self._create_tree(best_variant, new_parent_hap, new_node_idx, results)
 
     def _find_split(
-        self, parent: Haplotype, parent_idx: int, allele: int
+        self, parent: Haplotype, parent_idx: int, allele: int, parent_res: NodeResults
     ) -> tuple[Variant, np.void]:
         """
         Find the variant that best fits under the parent_idx node with the allele edge
@@ -107,6 +115,8 @@ class TreeBuilder:
             The index of the parent node in the tree
         allele : int
             The allele of the parent node in the tree
+        parent_res : NodeResults
+            The results of the tests performed on the parent node
 
         Returns
         -------
@@ -126,8 +136,11 @@ class TreeBuilder:
         # step 3: find the index of the best variant within the haplotype matrix
         best_p_idx = p_values.argmin()
         best = results.data[best_p_idx]
+        node_res = NodeResults(beta=best["beta"], pval=best["pval"])
         # step 4: check whether we should terminate the branch
-        if self.check_terminate_branch(best["pval"], len(p_values)):
+        if self.check_terminate_branch(
+            parent_res, node_res, hap_matrix.shape[1], len(p_values)
+        ):
             return None, best
         # step 5: find the index of the best variant within the genotype matrix
         # we need to account for indices that we removed when running transform()
@@ -139,25 +152,51 @@ class TreeBuilder:
                 break
             best_p_idx += 1
         # step 6: return the Variant with the best p-value
-        return Variant.from_np(self.gens.variants[best_p_idx], best_p_idx), best
+        best_variant = Variant.from_np(self.gens.variants[best_p_idx], best_p_idx)
+        return best_variant, node_res
 
-    def check_terminate_branch(self, pval: float, num_tests: int) -> bool:
+    def check_terminate_branch(
+        self,
+        parent_res: NodeResults,
+        node_res: NodeResults,
+        num_samps: int,
+        num_tests: int,
+    ) -> bool:
         """
         Check whether this branch should be terminated.
 
         Parameters
         ----------
-        pval : float
-            The best p-value amongst all tests performed on this branch.
-        num_tests : int
-            The number of tests performed on this branch.
+        parent_res : NodeResults
+            The results of the tests performed on the parent node
+        node_res : NodeResults
+            The results of the tests performed on the current node
+        num_samps : int
+            The number of samples tested
+        num_tests : The number of haplotypes tested
 
         Returns
         -------
         bool
             True if the branch should be terminated, False otherwise
         """
+        if parent_res is None:
+            # TODO: think about how to handle this case
+            # this will happen when the parent node is the root node
+            # we can either redo the association test to obtain an effect size and p-value
+            # or we can choose not to terminate
+            # right now, we're just choosing not to terminate
+            return True
+        else:
+            # perform a two tailed, two-sample t-test using the difference of the effect sizes
+            # first, we compute the standard error of the difference of the effect sizes
+            std_err = np.sqrt((node_res.stderr ** 2) + (parent_res.stderr ** 2))
+            # then, we compute the test statistic
+            t_stat = (node_res.beta - parent_res.beta) / std_err
+            # TODO: think about whether this should be a two-tailed test or a one-tailed test
+            # I think it could actually be a one-tailed test, but we might need to get the
+            # direction right?
+            pval = 2 * (t_dist.cdf(-np.abs(t_stat), df=(2 * (num_samps - 2))))
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
-        # TODO: perform a likelihood ratio test?
         return pval >= self.method.pval_thresh / num_tests
