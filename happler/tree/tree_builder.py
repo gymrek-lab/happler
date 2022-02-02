@@ -102,7 +102,7 @@ class TreeBuilder:
             else:
                 # if parent is not defined, it means we're at the root of the tree, so
                 # we need to create a new empty haplotype
-                new_parent_hap = Haplotype(len(self.gens.samples))
+                new_parent_hap = Haplotype(num_samples=len(self.gens.samples))
             # find the best variant, add it to the tree, and then create a new subtree
             # under it
             best_variant, results = self._find_split(

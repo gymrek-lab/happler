@@ -1,6 +1,5 @@
 from __future__ import annotations
 from pathlib import Path
-from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
@@ -27,18 +26,35 @@ class Haplotype:
     nodes: tuple[tuple[Variant, int]]
     data: npt.NDArray[np.bool_]
 
-    def __init__(self, num_samples: int):
+    def __init__(
+        self,
+        nodes: tuple[tuple[Variant, int]] = tuple(),
+        data: npt.NDArray[np.bool_] = None,
+        num_samples: int = None,
+    ):
         """
         Initialize an empty haplotype
 
         Parameters
         ----------
+        nodes : tuple[tuple[Variant, int]]
+            An ordered collection of pairs, where each pair is a node and its allele
+        data : npt.NDArray[np.bool_]
+            A np array (with shape n x 1, the number of samples) denoting the presence
+            of this haplotype in each sample
         num_samples : int
             The number of samples in this haplotype
         """
-        self.nodes = tuple()
-        self.data = np.ones((num_samples, 1), dtype=np.bool_)
-
+        self.nodes = nodes
+        if num_samples and data is None:
+            self.data = np.ones(num_samples, dtype=np.bool_)
+        elif num_samples is None:
+            self.data = data
+        else:
+            raise ValueError(
+                "The data and num_samples arguments are mutually exclusive. Provide"
+                " either one or the other."
+            )
 
     @classmethod
     def from_node(
