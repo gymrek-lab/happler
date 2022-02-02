@@ -207,7 +207,7 @@ class TreeBuilder:
             # right now, we're handling this case by choosing not to terminate
             # this means that we are guaranteed to have at least one SNP in our tree
             # but we should probably do something more intelligent in the future
-            return True
+            return False
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
         return pval >= self.method.pval_thresh / num_tests

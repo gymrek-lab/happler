@@ -51,6 +51,8 @@ def _create_fake_phens(data) -> Phenotypes:
     """
     phens = Phenotypes(fname=None)
     phens.samples = tuple("samp" + str(i) for i in range(data.shape[0]))
+    if len(data.shape) > 1:
+        data = np.squeeze(data)
     phens.data = data
     phens.standardize()
     return phens
@@ -80,10 +82,14 @@ def test_one_snp_perfect():
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
-    # one haplotype: with one SNP
-    assert len(haps) == 1
+    # two haplotypes: with the same SNP but different alleles
+    assert len(haps) == 2
     assert len(haps[0]) == 1
     assert haps[0][0]["variant"].id == "snp0"
+    assert haps[0][0]["allele"] == 0
+    assert len(haps[1]) == 1
+    assert haps[1][0]["variant"].id == "snp0"
+    assert haps[1][0]["allele"] == 1
 
 
 def test_one_snp_not_causal():
