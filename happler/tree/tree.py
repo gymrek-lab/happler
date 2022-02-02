@@ -56,29 +56,25 @@ class Tree:
         The indices of each variant within the tree's list of nodes
     """
 
-    def __init__(self, root: None):
+    def __init__(self):
         self.graph = nx.DiGraph()
         self.variant_locs = defaultdict(set)
-        self._add_root_node(root)
+        self._add_root_node()
 
     @property
     def num_nodes(self):
         return self.graph.number_of_nodes()
 
-    def _add_root_node(self, root: Variant):
-        """
-        Initialize the tree with a root node
+    @property
+    def num_variants(self):
+        return len(self.variant_locs)
 
-        Parameters
-        ----------
-        root : Variant
-            See :py:attr:`_.Tree.root`
+    def _add_root_node(self):
         """
-        # TODO: consider reducing code duplication between this method and add_node()
-        self.variant_locs[root].add(self.num_nodes)
-        self.graph.add_node(
-            self.num_nodes, variant=root, label=root.id, allele=None, results=None
-        )
+        Initialize the tree with a special root node
+        Note that this node does not represent a variant of any kind
+        """
+        self.graph.add_node(0, variant=None, label=None, allele=None, results=None)
 
     def add_node(
         self, node: Variant, parent_idx: int, allele: int, results: NodeResults = None
@@ -103,6 +99,11 @@ class Tree:
         int
             The index of the new node within the tree
         """
+        if self.graph.out_degree(parent_idx) >= 2:
+            raise ValueError(
+                "This parent node has reached its capacity already. It cannot take"
+                " more children."
+            )
         new_node_idx = self.num_nodes
         self.graph.add_node(
             new_node_idx, variant=node, label=node.id, allele=allele, results=results
@@ -113,7 +114,7 @@ class Tree:
 
     def haplotypes(self, root: int = 0) -> list[deque[dict]]:
         """
-        Return the haplotypes at the leaves of this tree
+        Return the haplotypes at the leaves of the tree rooted at the index "root"
 
         Returns
         -------
@@ -122,7 +123,13 @@ class Tree:
 
             Each dictionary contains the node and all of its attributes.
         """
-        root_node = deque([self.graph.nodes[root]])
+        # check: is the root index 0 or some other int?
+        if root:
+            root_node = deque([self.graph.nodes[root]])
+        else:
+            # this root is actually the absolute root, which doesn't represent a real
+            # variant, so we just use an empty deque in that case
+            root_node = deque([])
         # first, check that this node is not a leaf
         if self.graph.out_degree(root):
             return [
@@ -146,8 +153,14 @@ class Tree:
             Nodes are labeled by their variant ID and edges are labeled by their allele
         """
         dot = nx.drawing.nx_pydot.to_pydot(self.graph)
+        # iterate through all of the nodes, treating the root specially
         for node in dot.get_nodes():
             # node.set_name(node.get('label'))
             attrs = node.get_attributes()
-            node.obj_dict["attributes"] = {"label": attrs["label"]}
+            # check: does this node have a valid variant attached to it?
+            if attrs["variant"] == 'None':
+                # treat the root node specially, since it isn't a real variant
+                node.obj_dict["attributes"] = {"label": "root"}
+            else:
+                node.obj_dict["attributes"] = {"label": attrs["label"]}
         return dot.to_string()
