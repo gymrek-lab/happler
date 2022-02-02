@@ -10,9 +10,6 @@ from ..data import Genotypes
 from .variant import Variant
 
 
-# We declare this class to be a dataclass to automatically define __init__ and a few
-# other methods. We use frozen=True to make it immutable.
-@dataclass(frozen=True)
 class Haplotype:
     """
     A haplotype within the tree
@@ -29,6 +26,19 @@ class Haplotype:
     # TODO: consider using a named tuple?
     nodes: tuple[tuple[Variant, int]]
     data: npt.NDArray[np.bool_]
+
+    def __init__(self, num_samples: int):
+        """
+        Initialize an empty haplotype
+
+        Parameters
+        ----------
+        num_samples : int
+            The number of samples in this haplotype
+        """
+        self.nodes = tuple()
+        self.data = np.ones((num_samples, 1), dtype=np.bool_)
+
 
     @classmethod
     def from_node(
