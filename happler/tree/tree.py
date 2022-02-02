@@ -158,7 +158,7 @@ class Tree:
             # node.set_name(node.get('label'))
             attrs = node.get_attributes()
             # check: does this node have a valid variant attached to it?
-            if attrs["variant"] == 'None':
+            if attrs["variant"] == "None":
                 # treat the root node specially, since it isn't a real variant
                 node.obj_dict["attributes"] = {"label": "root"}
             else:

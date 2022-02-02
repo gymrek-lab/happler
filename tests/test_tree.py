@@ -73,7 +73,10 @@ def test_tree_dot():
     tree.add_node(snp3, node_idx, 1)
     assert (
         tree.dot()
-        == 'strict digraph  {\n0 [label=root];\n1 [label=SNP0];\n2 [label=SNP1];\n3 [label=SNP2];\n4 [label=SNP3];\n5 [label=SNP3];\n0 -> 1  [label=0];\n1 -> 2  [label=0];\n2 -> 3  [label=1];\n3 -> 4  [label=0];\n3 -> 5  [label=1];\n}\n'
+        == "strict digraph  {\n0 [label=root];\n1 [label=SNP0];\n2 [label=SNP1];\n3"
+        " [label=SNP2];\n4 [label=SNP3];\n5 [label=SNP3];\n0 -> 1  [label=0];\n1 ->"
+        " 2  [label=0];\n2 -> 3  [label=1];\n3 -> 4  [label=0];\n3 -> 5 "
+        " [label=1];\n}\n"
     )
 
 
