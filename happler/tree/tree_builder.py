@@ -23,6 +23,12 @@ class TreeBuilder:
         The phenotypes from which the tree should be built
     method: AssocTest, optional
         The type of association test to perform at each node when constructing the tree
+
+    Examples
+    --------
+    >>> gens = Genotypes.load('tests/data/simple.vcf')
+    >>> phens = Phenotypes.load('tests/data/simple.tsv')
+    >>> tree = TreeBuilder(gens, phens).run()
     """
 
     def __init__(
@@ -39,13 +45,13 @@ class TreeBuilder:
     def __repr__(self):
         return str((self.gens, self.phens))
 
-    def run(self, root: int):
+    def run(self):
         """
         Run the tree builder and create a tree rooted at the provided variant
 
         Parameters
         ----------
-        root : int
+        root : int, optional
             The index of the variant to use at the root of tree. This should be an
             index into :py:attr:`~.TreeBuilder.gens.variants`
         """
@@ -54,15 +60,14 @@ class TreeBuilder:
                 "A tree already exists for this TreeBuilder. Please create a new one."
             )
         # step one: initialize the tree
-        root_node = Variant.from_np(self.gens.variants[root], idx=root)
-        self.tree = Tree(root_node)
+        self.tree = Tree()
         # step two: create the tree
-        self._create_tree(root_node)
+        self._create_tree()
         return self.tree
 
     def _create_tree(
         self,
-        parent: Variant,
+        parent: Variant = None,
         parent_hap: Haplotype = None,
         parent_idx: int = 0,
         parent_res: NodeResults = None,
@@ -80,17 +85,24 @@ class TreeBuilder:
             The haplotype containing all variants up to (but NOT including) the parent
         parent_idx : int
             The index of the parent node in the tree
+        parent_res : NodeResults
+            The results of the association test for the parent node
         """
         # we consider two possible alleles
         alleles = (0, 1)
         for allele in alleles:
-            variant_gts = self.gens.data[:, parent.idx, allele]
-            # create a new Haplotype if we don't have on yet
-            # else, create a new one with parent added
-            if parent_hap is None:
-                new_parent_hap = Haplotype.from_node(parent, allele, variant_gts)
+            if parent:
+                variant_gts = self.gens.data[:, parent.idx, allele]
+                # create a new Haplotype if we don't have on yet
+                # else, create a new one with parent added
+                if parent_hap is None:
+                    new_parent_hap = Haplotype.from_node(parent, allele, variant_gts)
+                else:
+                    new_parent_hap = parent_hap.append(parent, allele, variant_gts)
             else:
-                new_parent_hap = parent_hap.append(parent, allele, variant_gts)
+                # if parent is not defined, it means we're at the root of the tree, so
+                # we need to create a new empty haplotype
+                new_parent_hap = Haplotype(len(self.gens.samples))
             # find the best variant, add it to the tree, and then create a new subtree
             # under it
             best_variant, results = self._find_split(
@@ -180,14 +192,7 @@ class TreeBuilder:
         bool
             True if the branch should be terminated, False otherwise
         """
-        if parent_res is None:
-            # TODO: think about how to handle this case
-            # this will happen when the parent node is the root node
-            # we can either redo the association test to obtain an effect size and p-value
-            # or we can choose not to terminate
-            # right now, we're just choosing not to terminate
-            return True
-        else:
+        if parent_res:
             # perform a two tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
             std_err = np.sqrt((node_res.stderr ** 2) + (parent_res.stderr ** 2))
@@ -197,6 +202,12 @@ class TreeBuilder:
             # I think it could actually be a one-tailed test, but we might need to get the
             # direction right?
             pval = 2 * (t_dist.cdf(-np.abs(t_stat), df=(2 * (num_samps - 2))))
+        else:
+            # this will happen when the parent node is the root node
+            # right now, we're handling this case by choosing not to terminate
+            # this means that we are guaranteed to have at least one SNP in our tree
+            # but we should probably do something more intelligent in the future
+            return True
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
         return pval >= self.method.pval_thresh / num_tests

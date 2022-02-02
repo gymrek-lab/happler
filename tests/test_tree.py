@@ -112,7 +112,7 @@ def test_tree_builder():
     gens = Genotypes.load(DATADIR.joinpath("simple.vcf"))
     phens = Phenotypes.load(DATADIR.joinpath("simple.tsv"))
     tree_builder = TreeBuilder(gens, phens)
-    tree_builder.run()
+    tree = tree_builder.run()
     # TODO: assert that the tree looks correct
     assert False
 
