@@ -23,10 +23,13 @@ class NodeResults:
         The best effect size among all of the SNPs tried
     pval : float
         The best p-value among all of the SNPs tried
+    stderr: float
+        The standard error of beta
     """
 
     beta: float
     pval: float
+    stderr: float
 
     def __getitem__(self, item):
         """
@@ -39,6 +42,14 @@ class NodeResults:
         ``obj.field_name``
         """
         return getattr(self, item)
+
+    @classmethod
+    def from_np(cls, np_mixed_arr_var: np.void) -> NodeResults:
+        class_attributes = cls.__dict__['__dataclass_fields__'].keys()
+        return cls(**dict(zip(
+            class_attributes,
+            np_mixed_arr_var
+        )))
 
 
 class Tree:

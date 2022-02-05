@@ -148,7 +148,7 @@ class TreeBuilder:
         # step 3: find the index of the best variant within the haplotype matrix
         best_p_idx = p_values.argmin()
         best = results.data[best_p_idx]
-        node_res = NodeResults(beta=best["beta"], pval=best["pval"])
+        node_res = NodeResults.from_np(best)
         # step 4: check whether we should terminate the branch
         if self.check_terminate_branch(
             parent_res, node_res, hap_matrix.shape[1], len(p_values)
