@@ -45,11 +45,8 @@ class NodeResults:
 
     @classmethod
     def from_np(cls, np_mixed_arr_var: np.void) -> NodeResults:
-        class_attributes = cls.__dict__['__dataclass_fields__'].keys()
-        return cls(**dict(zip(
-            class_attributes,
-            np_mixed_arr_var
-        )))
+        class_attributes = cls.__dict__["__dataclass_fields__"].keys()
+        return cls(**dict(zip(class_attributes, np_mixed_arr_var)))
 
 
 class Tree:
