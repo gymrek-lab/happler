@@ -54,7 +54,12 @@ def _create_fake_phens(data) -> Phenotypes:
     if len(data.shape) > 1:
         data = np.squeeze(data)
     phens.data = data
-    phens.standardize()
+    # check: are all of the phenotype values the same?
+    if np.all(phens.data == phens.data[0]):
+        # if they're all the same, don't standardize b/c then we'll end up with NAs
+        phens.data = np.zeros(phens.data.shape)
+    else:
+        phens.standardize()
     return phens
 
 
@@ -108,10 +113,9 @@ def test_one_snp_not_causal():
             dtype=np.bool_,
         )
     )
-    phens = _create_fake_phens(np.ones(gens.data.sum(axis=2).shape) * 0.5)
+    phens = _create_fake_phens(np.ones(gens.data.sum(axis=2).shape))
 
     # run the treebuilder and extract the haplotypes
-    # TODO: figure out how to handle this case
     tree = TreeBuilder(gens, phens).run()
     haps = tree.haplotypes()
 
