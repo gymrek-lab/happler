@@ -148,10 +148,14 @@ def test_two_snps_single_association():
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
-    # one haplotype: with one SNP
-    assert len(haps) == 1
+    # two haplotypes: one for each allele of the first SNP
+    assert len(haps) == 2
     assert len(haps[0]) == 1
+    assert len(haps[1]) == 1
     assert haps[0][0]["variant"].id == "snp0"
+    assert haps[1][0]["variant"].id == "snp0"
+    assert haps[0][0]["allele"] == 0
+    assert haps[1][0]["allele"] == 1
 
 
 def test_two_snps_independent_perfect():

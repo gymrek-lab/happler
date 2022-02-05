@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 from scipy.stats import t as t_dist
 
 from .tree import Tree, NodeResults
@@ -150,8 +151,8 @@ class TreeBuilder:
         best = results.data[best_p_idx]
         node_res = NodeResults.from_np(best)
         # step 4: check whether we should terminate the branch
-        if self.check_terminate_branch(
-            parent_res, node_res, hap_matrix.shape[1], len(p_values)
+        if self.check_terminate(
+            parent_res, node_res, hap_matrix.shape[0], len(p_values)
         ):
             return None, best
         # step 5: find the index of the best variant within the genotype matrix
@@ -167,7 +168,7 @@ class TreeBuilder:
         best_variant = Variant.from_np(self.gens.variants[best_p_idx], best_p_idx)
         return best_variant, node_res
 
-    def check_terminate_branch(
+    def check_terminate(
         self,
         parent_res: NodeResults,
         node_res: NodeResults,
@@ -201,13 +202,14 @@ class TreeBuilder:
             # TODO: think about whether this should be a two-tailed test or a one-tailed test
             # I think it could actually be a one-tailed test, but we might need to get the
             # direction right?
-            pval = 2 * (t_dist.cdf(-np.abs(t_stat), df=(2 * (num_samps - 2))))
+            pval = 2 * t_dist.cdf(-np.abs(t_stat), df=(2 * (num_samps - 2)))
         else:
             # this will happen when the parent node is the root node
             # right now, we're handling this case by choosing not to terminate
             # this means that we are guaranteed to have at least one SNP in our tree
             # but we should probably do something more intelligent in the future
-            return False
+            pval = node_res.pval
+        assert not np.isnan(pval)
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
         return pval >= self.method.pval_thresh / num_tests
