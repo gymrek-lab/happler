@@ -134,15 +134,21 @@ class Tree:
 
             Each dictionary contains the node and all of its attributes.
         """
+        # how many children does this node have?
+        num_children = self.graph.out_degree(root)
         # check: is the root index 0 or some other int?
         if root:
             root_node = deque([self.graph.nodes[root]])
-        else:
+        elif num_children:
             # this root is actually the absolute root, which doesn't represent a real
             # variant, so we just use an empty deque in that case
             root_node = deque([])
+        else:
+            # if the root is actually the absolute root and there aren't any children,
+            # just return an empty list
+            return []
         # first, check that this node is not a leaf
-        if self.graph.out_degree(root):
+        if num_children:
             return [
                 root_node + path
                 for child in self.graph.successors(root)
