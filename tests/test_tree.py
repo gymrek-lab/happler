@@ -111,11 +111,12 @@ def test_get_haplotypes_from_tree():
     assert [haps[1][i]["variant"] for i in range(2)] == [snp1, snp2]
 
 
+@pytest.mark.skip(reason="test not completely written yet")
 def test_tree_builder():
     gens = Genotypes.load(DATADIR.joinpath("simple.vcf"))
     phens = Phenotypes.load(DATADIR.joinpath("simple.tsv"))
     tree_builder = TreeBuilder(gens, phens)
-    tree = tree_builder.run()
+    # tree = tree_builder.run()
     # TODO: assert that the tree looks correct
     assert False
 
@@ -153,7 +154,7 @@ def test_haplotypes_write():
     snp3 = Variant(idx=2, id="SNP3", pos=3)
 
     # create a results object that all of the SNPs can share
-    res = NodeResults(beta=0.1, pval=0.1)
+    res = NodeResults(beta=0.1, pval=0.1, stderr=0.1)
 
     # create a tree composed of these nodes
     tree = Tree()
@@ -164,7 +165,8 @@ def test_haplotypes_write():
     snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=0, results=res)
 
     # write the tree to a file
-    Haplotypes.from_tree(tree).write("test_write.haps")
+    with open("test_write.haps", "w") as file:
+        Haplotypes.from_tree(tree).write(file)
 
     # verify that the results appear as intended
     with open("test_write.haps", "r") as file:

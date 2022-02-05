@@ -1,4 +1,6 @@
 from __future__ import annotations
+import sys
+from typing import TextIO
 from pathlib import Path
 
 import numpy as np
@@ -235,17 +237,16 @@ class Haplotypes:
         ]
         return haps
 
-    def write(self, fname: Path):
+    def write(self, file: TextIO):
         """
         Write the contents of this Haplotypes object to the file given by fname
 
         Parameters
         ----------
-        fname : Path
-            The path to the file to which this Haplotypes object should be written.
+        file : TextIO
+            A file-like object to which this Haplotypes object should be written.
         """
-        with open(fname, "w") as file:
-            for hap in self.data:
-                file.write(self.format["hap"]["str"].format(**hap))
-                for var in hap["variants"]:
-                    file.write(self.format["var"]["str"].format(**var))
+        for hap in self.data:
+            file.write(self.format["hap"]["str"].format(**hap))
+            for var in hap["variants"]:
+                file.write(self.format["var"]["str"].format(**var))
