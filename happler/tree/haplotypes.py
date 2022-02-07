@@ -215,6 +215,7 @@ class Haplotypes:
 
     @classmethod
     def from_tree(cls, tree: Tree) -> Haplotypes:
+        # TODO: check whether allele is correct; I think it's actually the parent's
         haps = cls()
         haplotypes = tree.haplotypes()
         haps.data = [

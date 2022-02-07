@@ -97,7 +97,7 @@ class Tree:
         parent_idx : int
             The index of the node under which to place the new node
         allele : int
-            The allele for the edge from parent to node
+            The allele for the edge from a parent node to this node
         results : np.void, optional
             The results (beta, pval) of the association test for this haplotype once
             this variant is included
