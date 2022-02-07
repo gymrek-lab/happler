@@ -64,12 +64,23 @@ def _create_fake_phens(data) -> Phenotypes:
     return phens
 
 
+def _view_tree_helper(haplotype):
+    skip_first = True
+    for node in haplotype:
+        prev_node = node["variant"].id
+        if skip_first:
+            skip_first = False
+            continue
+        yield (prev_node, node["allele"])
+    yield (prev_node, None)
+
+
 def _view_tree_haps(tree) -> list:
     """
     Return the haplotype contents of a tree in an easily viewable form
     """
     return [
-        [(node["variant"].id, node["allele"]) for node in haplotype]
+        list(_view_tree_helper(haplotype))
         for haplotype in tree.haplotypes()
     ]
 
@@ -182,12 +193,13 @@ def test_two_snps_independent_perfect():
     gts = gens.data.sum(axis=2)
     phens = _create_fake_phens(gts[:, 0] * 0.5 + gts[:, 1] * 0.5)
 
+    # run the treebuilder and extract the haplotypes
+    builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
+    builder.run()
+    tree = builder.tree
+    haps = tree.haplotypes()
+
     # TODO: we need to handle this case, somehow
-    # # run the treebuilder and extract the haplotypes
-    # builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
-    # builder.run()
-    # tree = builder.tree
-    # haps = tree.haplotypes()
     assert False
 
 
@@ -202,18 +214,42 @@ def test_two_snps_one_branch_perfect():
         return 0
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
+    gens = np.array(
+        list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
+    )
+    gens = _create_fake_gens(gens)
+    gts = gens.data
+    phens = _create_fake_phens(0.5 * (gts[:, 0] & ~gts[:, 1]).sum(axis=1))
+
+    # run the treebuilder and extract the haplotypes
+    tree = TreeBuilder(gens, phens).run()
+    haps = _view_tree_haps(tree)
+
+    # check: did the output turn out how we expected?
+    # one haplotype with both SNPs
+    assert len(haps) == 1
+    assert len(haps[0]) == 2
+    assert haps[0][0] == ("snp0", 1)
+    assert haps[0][1] == ("snp1", 0)
+
+
+def test_two_snps_one_branch_perfect_opposite_direction():
+    """
+    This is the same as test_two_snps_one_branch_perfect except that the phenotype is
+    associated in the opposite direction (ie a negative effect size) this time
+    """
+    split_list_in_half = lambda pair: [pair[:2], pair[2:]]
     gens = _create_fake_gens(
         np.array(
             list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
         )
     )
     gts = gens.data
-    phens = _create_fake_phens(0.5 * (gts[:, 0] & gts[:, 1]).sum(axis=1))
+    phens = _create_fake_phens(-0.5 * (gts[:, 0] & ~gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
     tree = TreeBuilder(gens, phens).run()
     haps = _view_tree_haps(tree)
-    breakpoint()
 
     # check: did the output turn out how we expected?
     # one haplotype with both SNPs
@@ -232,6 +268,7 @@ def test_three_snps_one_branch_one_snp_not_causal():
     The psuedocode looks like:
         if X1:
             return X2
+        return 0
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:], [1, 1]]
     gens = _create_fake_gens(
