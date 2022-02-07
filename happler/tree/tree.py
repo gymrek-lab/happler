@@ -113,8 +113,11 @@ class Tree:
                 " more children."
             )
         new_node_idx = self.num_nodes
+        label = ''
+        if node is not None:
+            label = node.id
         self.graph.add_node(
-            new_node_idx, variant=node, label=node.id, allele=allele, results=results
+            new_node_idx, variant=node, label=label, allele=allele, results=results
         )
         self.variant_locs[node].add(new_node_idx)
         self.graph.add_edge(parent_idx, new_node_idx, label=allele)

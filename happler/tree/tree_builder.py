@@ -96,13 +96,13 @@ class TreeBuilder:
         """
         # find the variant that gives the best haplotype
         variant, results = self._find_split(parent_hap, parent_res)
-        if variant is None:
-            # there were no significant variants!
-            return
         # add the best variant to the tree
         new_node_idx = self.tree.add_node(
             variant, parent_idx, allele, results=results
         )
+        if variant is None:
+            # there were no significant variants!
+            return
         # we consider two possible alleles for the best variant
         alleles = (0, 1)
         for allele in alleles:
@@ -148,7 +148,7 @@ class TreeBuilder:
         if self.check_terminate(
             parent_res, node_res, hap_matrix.shape[0], len(p_values)
         ):
-            return None, best
+            return None, node_res
         # step 5: find the index of the best variant within the genotype matrix
         # we need to account for indices that we removed when running transform()
         # There might be a faster way of doing this but for now we're just going to
@@ -188,6 +188,11 @@ class TreeBuilder:
             True if the branch should be terminated, False otherwise
         """
         if parent_res:
+            # # before we do any calculations, check whether the effect sizes have the
+            # # same sign and return True if they do
+            # if np.sign(node_res.beta) != np.sign(parent_res.beta):
+            #     # terminate if they have different signs
+            #     return True
             # perform a two tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
             std_err = np.sqrt(((node_res.stderr ** 2) + (parent_res.stderr ** 2)) / 2)

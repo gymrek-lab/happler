@@ -65,14 +65,13 @@ def _create_fake_phens(data) -> Phenotypes:
 
 
 def _view_tree_helper(haplotype):
-    skip_first = True
+    prev_node = ''
     for node in haplotype:
-        prev_node = node["variant"].id
-        if skip_first:
-            skip_first = False
-            continue
-        yield (prev_node, node["allele"])
-    yield (prev_node, None)
+        if prev_node:
+            yield (prev_node, node["allele"])
+        prev_node = node["label"]
+    if prev_node:
+        yield (prev_node, None)
 
 
 def _view_tree_haps(tree) -> list:
