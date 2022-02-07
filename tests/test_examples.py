@@ -1,6 +1,7 @@
-import numpy as np
-
 from itertools import product
+
+import pytest
+import numpy as np
 
 from happler.data import Genotypes, Phenotypes
 from happler.tree import TreeBuilder, AssocTestSimple
@@ -51,9 +52,36 @@ def _create_fake_phens(data) -> Phenotypes:
     """
     phens = Phenotypes(fname=None)
     phens.samples = tuple("samp" + str(i) for i in range(data.shape[0]))
+    if len(data.shape) > 1:
+        data = np.squeeze(data)
     phens.data = data
-    phens.standardize()
+    # check: are all of the phenotype values the same?
+    if np.all(phens.data == phens.data[0]):
+        # if they're all the same, don't standardize b/c then we'll end up with NAs
+        phens.data = np.zeros(phens.data.shape)
+    else:
+        phens.standardize()
     return phens
+
+
+def _view_tree_helper(haplotype):
+    prev_node = ''
+    for node in haplotype:
+        if prev_node:
+            yield (prev_node, node["allele"])
+        prev_node = node["label"]
+    if prev_node:
+        yield (prev_node, None)
+
+
+def _view_tree_haps(tree) -> list:
+    """
+    Return the haplotype contents of a tree in an easily viewable form
+    """
+    return [
+        list(_view_tree_helper(haplotype))
+        for haplotype in tree.haplotypes()
+    ]
 
 
 def test_one_snp_perfect():
@@ -76,14 +104,18 @@ def test_one_snp_perfect():
     phens = _create_fake_phens(gens.data.sum(axis=2) * 0.5)
 
     # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(gens, phens).run(root=0)
+    tree = TreeBuilder(gens, phens).run()
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
-    # one haplotype: with one SNP
-    assert len(haps) == 1
+    # two haplotypes: with the same SNP but different alleles
+    assert len(haps) == 2
     assert len(haps[0]) == 1
     assert haps[0][0]["variant"].id == "snp0"
+    assert haps[0][0]["allele"] == 0
+    assert len(haps[1]) == 1
+    assert haps[1][0]["variant"].id == "snp0"
+    assert haps[1][0]["allele"] == 1
 
 
 def test_one_snp_not_causal():
@@ -102,15 +134,14 @@ def test_one_snp_not_causal():
             dtype=np.bool_,
         )
     )
-    phens = _create_fake_phens(np.ones(gens.data.sum(axis=2).shape) * 0.5)
+    phens = _create_fake_phens(np.ones(gens.data.sum(axis=2).shape))
 
     # run the treebuilder and extract the haplotypes
-    # TODO: figure out how to handle this case
-    tree = TreeBuilder(gens, phens).run(root=0)
+    tree = TreeBuilder(gens, phens).run()
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
-    # one haplotype: with one SNP
+    # no haplotypes!
     assert len(haps) == 0
 
 
@@ -134,16 +165,19 @@ def test_two_snps_single_association():
     phens = _create_fake_phens(gens.data.sum(axis=2)[:, 0] * 0.5)
 
     # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(gens, phens).run(root=0)
-    haps = tree.haplotypes()
+    tree = TreeBuilder(gens, phens).run()
+    haps = _view_tree_haps(tree)
 
     # check: did the output turn out how we expected?
-    # one haplotype: with one SNP
-    assert len(haps) == 1
+    # two haplotypes: one for each allele of the first SNP
+    assert len(haps) == 2
     assert len(haps[0]) == 1
-    assert haps[0][0]["variant"].id == "snp0"
+    assert len(haps[1]) == 1
+    assert haps[0][0] == ("snp0", 0)
+    assert haps[1][0] == ("snp0", 1)
 
 
+@pytest.mark.xfail(reason="not implemented yet")
 def test_two_snps_independent_perfect():
     """
     Two independent causal SNPs with perfect phenotype associations
@@ -158,12 +192,13 @@ def test_two_snps_independent_perfect():
     gts = gens.data.sum(axis=2)
     phens = _create_fake_phens(gts[:, 0] * 0.5 + gts[:, 1] * 0.5)
 
+    # run the treebuilder and extract the haplotypes
+    builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
+    builder.run()
+    tree = builder.tree
+    haps = tree.haplotypes()
+
     # TODO: we need to handle this case, somehow
-    # # run the treebuilder and extract the haplotypes
-    # builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
-    # builder.run(root=0)
-    # tree = builder.tree
-    # haps = tree.haplotypes()
     assert False
 
 
@@ -171,10 +206,36 @@ def test_two_snps_one_branch_perfect():
     """
     Two causal SNPs on a single haplotype with perfect phenotype associations
     Y = 0.5 * ( X1 && X2 )
-    This should yield a single haplotype with both SNPs having the same allele.
+    This should yield two haplotype with both SNPs having the same allele.
     The psuedocode looks like:
         if X1:
             return X2
+        return 0
+    """
+    split_list_in_half = lambda pair: [pair[:2], pair[2:]]
+    gens = np.array(
+        list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
+    )
+    gens = _create_fake_gens(gens)
+    gts = gens.data
+    phens = _create_fake_phens(0.5 * (gts[:, 0] & ~gts[:, 1]).sum(axis=1))
+
+    # run the treebuilder and extract the haplotypes
+    tree = TreeBuilder(gens, phens).run()
+    haps = _view_tree_haps(tree)
+
+    # check: did the output turn out how we expected?
+    # one haplotype with both SNPs
+    assert len(haps) == 1
+    assert len(haps[0]) == 2
+    assert haps[0][0] == ("snp0", 1)
+    assert haps[0][1] == ("snp1", 0)
+
+
+def test_two_snps_one_branch_perfect_opposite_direction():
+    """
+    This is the same as test_two_snps_one_branch_perfect except that the phenotype is
+    associated in the opposite direction (ie a negative effect size) this time
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
     gens = _create_fake_gens(
@@ -183,11 +244,11 @@ def test_two_snps_one_branch_perfect():
         )
     )
     gts = gens.data
-    phens = _create_fake_phens(0.5 * (gts[:, 0] & gts[:, 1]).sum(axis=1))
+    phens = _create_fake_phens(-0.5 * (gts[:, 0] & ~gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(gens, phens).run(root=0)
-    haps = tree.haplotypes()
+    tree = TreeBuilder(gens, phens).run()
+    haps = _view_tree_haps(tree)
 
     # check: did the output turn out how we expected?
     # one haplotype with both SNPs
@@ -206,6 +267,7 @@ def test_three_snps_one_branch_one_snp_not_causal():
     The psuedocode looks like:
         if X1:
             return X2
+        return 0
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:], [1, 1]]
     gens = _create_fake_gens(
@@ -217,7 +279,7 @@ def test_three_snps_one_branch_one_snp_not_causal():
     phens = _create_fake_phens(0.5 * (gts[:, 0] & gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(gens, phens).run(root=0)
+    tree = TreeBuilder(gens, phens).run()
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
@@ -229,6 +291,7 @@ def test_three_snps_one_branch_one_snp_not_causal():
     assert haps[0][2]["allele"] == 1
 
 
+@pytest.mark.xfail(reason="not implemented yet")
 def test_four_snps_two_independent_trees_perfect():
     """
     Two independent causal SNPs each sharing a haplotype with another, different SNP
@@ -251,12 +314,13 @@ def test_four_snps_two_independent_trees_perfect():
     # TODO: we need to handle this case, somehow
     # # run the treebuilder and extract the haplotypes
     # builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
-    # builder.run(root=0)
+    # builder.run()
     # tree = builder.tree
     # haps = tree.haplotypes()
     assert False
 
 
+@pytest.mark.xfail(reason="not implemented yet")
 def test_four_snps_two_independent_trees_perfect_one_snp_not_causal():
     """
     Two independent causal SNPs each sharing a haplotype with another, different SNP
@@ -281,12 +345,13 @@ def test_four_snps_two_independent_trees_perfect_one_snp_not_causal():
     # TODO: we need to handle this case, somehow
     # # run the treebuilder and extract the haplotypes
     # builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
-    # builder.run(root=0)
+    # builder.run()
     # tree = builder.tree
     # haps = tree.haplotypes()
     assert False
 
 
+@pytest.mark.xfail(reason="not implemented yet")
 def test_four_snps_two_independent_trees_perfect_two_snps_not_causal():
     """
     Two independent causal SNPs each sharing a haplotype with another, different SNP
@@ -312,12 +377,13 @@ def test_four_snps_two_independent_trees_perfect_two_snps_not_causal():
     # TODO: we need to handle this case, somehow
     # # run the treebuilder and extract the haplotypes
     # builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
-    # builder.run(root=0)
+    # builder.run()
     # tree = builder.tree
     # haps = tree.haplotypes()
     assert False
 
 
+@pytest.mark.xfail(reason="not implemented yet")
 def test_three_snps_two_independent_trees_perfect():
     """
     Two independent causal SNPs each sharing a haplotype with the third SNP via
@@ -339,12 +405,13 @@ def test_three_snps_two_independent_trees_perfect():
     # TODO: we need to handle this case, somehow
     # # run the treebuilder and extract the haplotypes
     # builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
-    # builder.run(root=0)
+    # builder.run()
     # tree = builder.tree
     # haps = tree.haplotypes()
     assert False
 
 
+@pytest.mark.xfail(reason="not implemented yet")
 def test_three_snps_two_independent_trees_perfect_one_snp_not_causal():
     """
     Two independent causal SNPs each sharing a haplotype with the third SNP via
@@ -366,7 +433,7 @@ def test_three_snps_two_independent_trees_perfect_one_snp_not_causal():
     # TODO: we need to handle this case, somehow
     # # run the treebuilder and extract the haplotypes
     # builder = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2))
-    # builder.run(root=0)
+    # builder.run()
     # tree = builder.tree
     # haps = tree.haplotypes()
     assert False
@@ -393,7 +460,7 @@ def test_two_snps_two_branches_perfect():
     phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(gens, phens).run(root=0)
+    tree = TreeBuilder(gens, phens).run()
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
@@ -428,7 +495,7 @@ def test_two_snps_two_branches_perfect_one_snp_not_causal():
     phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(gens, phens).run(root=0)
+    tree = TreeBuilder(gens, phens).run()
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
@@ -475,7 +542,7 @@ def test_ppt_case():
     )
 
     # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2)).run(root=0)
+    tree = TreeBuilder(gens, phens, AssocTestSimple(pval_thresh=2)).run()
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?

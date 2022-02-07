@@ -1,6 +1,7 @@
 from __future__ import annotations
+import sys
+from typing import TextIO
 from pathlib import Path
-from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
@@ -10,9 +11,6 @@ from ..data import Genotypes
 from .variant import Variant
 
 
-# We declare this class to be a dataclass to automatically define __init__ and a few
-# other methods. We use frozen=True to make it immutable.
-@dataclass(frozen=True)
 class Haplotype:
     """
     A haplotype within the tree
@@ -29,6 +27,36 @@ class Haplotype:
     # TODO: consider using a named tuple?
     nodes: tuple[tuple[Variant, int]]
     data: npt.NDArray[np.bool_]
+
+    def __init__(
+        self,
+        nodes: tuple[tuple[Variant, int]] = tuple(),
+        data: npt.NDArray[np.bool_] = None,
+        num_samples: int = None,
+    ):
+        """
+        Initialize an empty haplotype
+
+        Parameters
+        ----------
+        nodes : tuple[tuple[Variant, int]]
+            An ordered collection of pairs, where each pair is a node and its allele
+        data : npt.NDArray[np.bool_]
+            A np array (with shape n x 1, the number of samples) denoting the presence
+            of this haplotype in each sample
+        num_samples : int
+            The number of samples in this haplotype
+        """
+        self.nodes = nodes
+        if num_samples and data is None:
+            self.data = np.ones(num_samples, dtype=np.bool_)
+        elif num_samples is None:
+            self.data = data
+        else:
+            raise ValueError(
+                "The data and num_samples arguments are mutually exclusive. Provide"
+                " either one or the other."
+            )
 
     @classmethod
     def from_node(
@@ -187,6 +215,7 @@ class Haplotypes:
 
     @classmethod
     def from_tree(cls, tree: Tree) -> Haplotypes:
+        # TODO: check whether allele is correct; I think it's actually the parent's
         haps = cls()
         haplotypes = tree.haplotypes()
         haps.data = [
@@ -209,17 +238,16 @@ class Haplotypes:
         ]
         return haps
 
-    def write(self, fname: Path):
+    def write(self, file: TextIO):
         """
         Write the contents of this Haplotypes object to the file given by fname
 
         Parameters
         ----------
-        fname : Path
-            The path to the file to which this Haplotypes object should be written.
+        file : TextIO
+            A file-like object to which this Haplotypes object should be written.
         """
-        with open(fname, "w") as file:
-            for hap in self.data:
-                file.write(self.format["hap"]["str"].format(**hap))
-                for var in hap["variants"]:
-                    file.write(self.format["var"]["str"].format(**var))
+        for hap in self.data:
+            file.write(self.format["hap"]["str"].format(**hap))
+            for var in hap["variants"]:
+                file.write(self.format["var"]["str"].format(**var))

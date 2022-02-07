@@ -97,7 +97,7 @@ def run(
     # load data
     gt = data.Genotypes.load(genotypes, region=region, samples=samples)
     ph = data.Phenotypes.load(phenotypes, samples=samples)
-    hap_tree = tree.TreeBuilder(gt, ph)
+    hap_tree = tree.TreeBuilder(gt, ph).run()
 
 
 if __name__ == "__main__":
