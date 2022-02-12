@@ -66,15 +66,13 @@ class TreeBuilder:
         # we're at the root of tree, so we need to create a new, empty haplotype
         parent_hap = Haplotype(num_samples=len(self.gens.samples))
         # step three: create the rest of the tree
-        parent_idx = 0
-        self._create_tree(parent_hap, parent_idx)
+        self._create_tree(parent_hap, parent_idx=0)
         return self.tree
 
     def _create_tree(
         self,
         parent_hap: Haplotype,
         parent_idx: int,
-        allele: int = None,
         parent_res: NodeResults = None,
     ):
         """
@@ -89,34 +87,26 @@ class TreeBuilder:
             The haplotype containing all variants up to (but NOT including) the parent
         parent_idx : int
             The index of the parent node in the tree
-        allele: int
-            The allele of the parent node in the tree
         parent_res : NodeResults
             The results of the association test for the parent node
         """
-        # find the variant that gives the best haplotype
-        variant, results = self._find_split(parent_hap, parent_res)
-        # add the best variant to the tree
-        new_node_idx = self.tree.add_node(
-            variant, parent_idx, allele, results=results
-        )
-        if variant is None:
-            # there were no significant variants!
-            return
-        # we consider two possible alleles for the best variant
-        alleles = (0, 1)
-        for allele in alleles:
+        # find the variant-allele pairs that give the best haplotype
+        for variant, allele, results in self._find_split(parent_hap, parent_res):
+            if variant is None:
+                # there were no significant variants!
+                continue
             # add the best variant as a node in the tree
-            variant_gts = self.gens.data[:, variant.idx, allele]
-            # create a new Haplotype with variant added
+            new_node_idx = self.tree.add_node(variant, parent_idx, allele, results)
+            # create a new Haplotype with the variant-allele pair added
+            variant_gts = self.gens.data[:, variant.idx, :] == allele
             new_parent_hap = parent_hap.append(variant, allele, variant_gts)
-            self._create_tree(new_parent_hap, new_node_idx, allele, results)
+            self._create_tree(new_parent_hap, new_node_idx, results)
 
     def _find_split(
         self, parent: Haplotype, parent_res: NodeResults = None
     ) -> tuple[Variant, np.void]:
         """
-        Find the variant that best fits under the parent_idx node with the allele edge
+        Find the variant/allele that best fits under the parent_idx node
 
         Parameters
         ----------
@@ -132,35 +122,52 @@ class TreeBuilder:
             the results (ex: beta, pval) of the haplotype association test after
             incorporating that variant
         """
-        # step 1: transform the GT matrix into a haplotype matrix
-        hap_matrix = parent.transform(self.gens)
-        if hap_matrix.shape[1] == 0:
-            # if there weren't any genotypes left, just return None
-            return None, None
-        # step 2: run all association tests on all of the haplotypes
-        results = self.method.run(hap_matrix.sum(axis=2), self.phens.data)
-        p_values = results.data["pval"]
+        num_samps = len(self.gens.samples)
+        results = {}
+        best_p_idx = {}
+        # iterate through the two possible alleles and try all SNPs with that allele
+        alleles = (0, 1)
+        for allele in alleles:
+            # step 1: transform the GT matrix into a haplotype matrix
+            hap_matrix = parent.transform(self.gens, allele)
+            if hap_matrix.shape[1] == 0:
+                # if there weren't any genotypes left, just return None
+                yield None, allele, None
+                continue
+            # step 2: run all association tests on all of the haplotypes
+            results[allele] = self.method.run(hap_matrix.sum(axis=2), self.phens.data)
+            # also, record the best p-value among all the SNPs with this allele
+            best_p_idx[allele] = results[allele].data["pval"].argmin()
+        # exit if neither of the alleles worked
+        if not len(best_p_idx):
+            return
         # step 3: find the index of the best variant within the haplotype matrix
-        best_p_idx = p_values.argmin()
-        best = results.data[best_p_idx]
-        node_res = NodeResults.from_np(best)
-        # step 4: check whether we should terminate the branch
-        if self.check_terminate(
-            parent_res, node_res, hap_matrix.shape[0], len(p_values)
-        ):
-            return None, node_res
-        # step 5: find the index of the best variant within the genotype matrix
+        best_allele = min(
+            best_p_idx, key=lambda a: results[a].data["pval"][best_p_idx[a]]
+        )
+        best_var_idx = best_p_idx[best_allele]
+        num_snps_tested = len(results[best_allele].data)
+        # step 4: find the index of the best variant within the genotype matrix
         # we need to account for indices that we removed when running transform()
         # There might be a faster way of doing this but for now we're just going to
         # live with it
         for gt_idx in sorted(parent.node_indices):
             # add each idx back in, so long as they are less than the target idx
-            if gt_idx > best_p_idx:
+            if gt_idx > best_var_idx:
                 break
-            best_p_idx += 1
-        # step 6: return the Variant with the best p-value
-        best_variant = Variant.from_np(self.gens.variants[best_p_idx], best_p_idx)
-        return best_variant, node_res
+            best_var_idx += 1
+        # step 5: retrieve the Variant with the best p-value
+        best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
+        # iterate through all of the alleles of the best variant and check if they're
+        # significant
+        for allele in alleles:
+            best_results = results[allele].data[best_p_idx[best_allele]]
+            node_res = NodeResults.from_np(best_results)
+            # step 6: check whether we should terminate the branch
+            if self.check_terminate(parent_res, node_res, num_samps, num_snps_tested):
+                yield None, allele, node_res
+                continue
+            yield best_variant, allele, node_res
 
     def check_terminate(
         self,
