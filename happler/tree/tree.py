@@ -33,7 +33,7 @@ class NodeResults:
 
     def __getitem__(self, item):
         """
-        Define a getter so that we can access elemeents like this:
+        Define a getter so that we can access elements like this:
 
         ``obj['field_name']``
 
@@ -42,6 +42,9 @@ class NodeResults:
         ``obj.field_name``
         """
         return getattr(self, item)
+
+    def __repr__(self):
+        return "{"+", ".join("{}={:.2e}".format(*i) for i in self.__dict__.items())+"}"
 
     @classmethod
     def from_np(cls, np_mixed_arr_var: np.void) -> NodeResults:
