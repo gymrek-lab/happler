@@ -197,12 +197,20 @@ class TreeBuilder:
         if parent_res:
             # before we do any calculations, check whether the effect sizes have
             # improved and return True if they haven't
-            if (np.abs(node_res.beta) - np.abs(parent_res.beta)) > 0:
-                # terminate if they have different signs
+            if (
+                np.isnan(node_res.beta)
+                or (np.abs(node_res.beta) - np.abs(parent_res.beta)) >= 0
+            ):
+                # terminate if the effect sizes have gone in the opposite direction
                 return True
             # perform a two tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
             std_err = np.sqrt(((node_res.stderr ** 2) + (parent_res.stderr ** 2)) / 2)
+            if std_err == 0:
+                # if we have a standard error of 0, then we already know the result is
+                # significant! It doesn't matter what the effect sizes are b/c t_stat
+                # will be inf
+                return False
             # then, we compute the test statistic
             # use np.abs to account for the directions that the effect size may take
             t_stat = np.abs(node_res.beta - parent_res.beta) / std_err
@@ -212,7 +220,10 @@ class TreeBuilder:
         else:
             # parent_res = None when the parent node is the root node
             pval = node_res.pval
-        assert not np.isnan(pval)
+        if np.isnan(pval):
+            raise ValueError(
+                "Encountered a p-value of 0! Check your data for irregularities."
+            )
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
         return pval >= (self.method.pval_thresh / num_tests)
