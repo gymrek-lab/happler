@@ -195,25 +195,22 @@ class TreeBuilder:
             True if the branch should be terminated, False otherwise
         """
         if parent_res:
-            # # before we do any calculations, check whether the effect sizes have the
-            # # same sign and return True if they do
-            # if np.sign(node_res.beta) != np.sign(parent_res.beta):
-            #     # terminate if they have different signs
-            #     return True
+            # before we do any calculations, check whether the effect sizes have
+            # improved and return True if they haven't
+            if (np.abs(node_res.beta) - np.abs(parent_res.beta)) > 0:
+                # terminate if they have different signs
+                return True
             # perform a two tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
             std_err = np.sqrt(((node_res.stderr ** 2) + (parent_res.stderr ** 2)) / 2)
             # then, we compute the test statistic
             # use np.abs to account for the directions that the effect size may take
-            t_stat = np.abs(np.abs(node_res.beta) - np.abs(parent_res.beta)) / std_err
+            t_stat = np.abs(node_res.beta - parent_res.beta) / std_err
             # use a one-tailed test here b/c either the effect size becomes more
             # negative or it becomes more positive
             pval = t_dist.cdf(-t_stat, df=2 * (num_samps - 2))
         else:
-            # this will happen when the parent node is the root node
-            # right now, we're handling this case by choosing not to terminate
-            # this means that we are guaranteed to have at least one SNP in our tree
-            # but we should probably do something more intelligent in the future
+            # parent_res = None when the parent node is the root node
             pval = node_res.pval
         assert not np.isnan(pval)
         # correct for multiple hypothesis testing
