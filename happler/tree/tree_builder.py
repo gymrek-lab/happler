@@ -49,12 +49,6 @@ class TreeBuilder:
     def run(self):
         """
         Run the tree builder and create a tree rooted at the provided variant
-
-        Parameters
-        ----------
-        root : int, optional
-            The index of the variant to use at the root of tree. This should be an
-            index into :py:attr:`~.TreeBuilder.gens.variants`
         """
         if self.tree is not None:
             raise AssertionError(

@@ -208,6 +208,39 @@ def test_two_snps_one_branch_perfect():
     )
     gens = _create_fake_gens(gens)
     gts = gens.data
+    phens = _create_fake_phens(0.5 * (gts[:, 0] & gts[:, 1]).sum(axis=1))
+
+    # run the treebuilder and extract the haplotypes
+    tree = TreeBuilder(gens, phens).run()
+    haps = _view_tree_haps(tree)
+
+    # check: did the output turn out how we expected?
+    # one haplotype with just the minor allele of the first SNP
+    # and one haplotype with both major alleles of both SNPs
+    assert len(haps) == 2
+    assert len(haps[0]) == 1
+    assert haps[0][0] == ("snp0", 0)
+    assert len(haps[1]) == 2
+    assert haps[1][0] == ("snp0", 1)
+    assert haps[1][1] == ("snp1", 1)
+
+
+def test_two_snps_one_branch_perfect_opposite_allele():
+    """
+    Two causal SNPs on a single haplotype with perfect phenotype associations
+    Y = 0.5 * ( X1 && X2 )
+    This should yield two haplotype with both SNPs having the same allele.
+    The psuedocode looks like:
+        if X1:
+            return X2
+        return 0
+    """
+    split_list_in_half = lambda pair: [pair[:2], pair[2:]]
+    gens = np.array(
+        list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
+    )
+    gens = _create_fake_gens(gens)
+    gts = gens.data
     phens = _create_fake_phens(0.5 * (gts[:, 0] & ~gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
@@ -215,11 +248,14 @@ def test_two_snps_one_branch_perfect():
     haps = _view_tree_haps(tree)
 
     # check: did the output turn out how we expected?
-    # one haplotype with both SNPs
-    assert len(haps) == 1
-    assert len(haps[0]) == 2
-    assert haps[0][0] == ("snp0", 1)
-    assert haps[0][1] == ("snp1", 0)
+    # one haplotype with just the minor allele of the first SNP
+    # and one haplotype with a mix of alleles of both SNPs
+    assert len(haps) == 2
+    assert len(haps[0]) == 1
+    assert haps[0][0] == ("snp0", 0)
+    assert len(haps[1]) == 2
+    assert haps[1][0] == ("snp0", 1)
+    assert haps[1][1] == ("snp1", 0)
 
 
 def test_two_snps_one_branch_perfect_opposite_direction():
@@ -241,12 +277,14 @@ def test_two_snps_one_branch_perfect_opposite_direction():
     haps = _view_tree_haps(tree)
 
     # check: did the output turn out how we expected?
-    # one haplotype with both SNPs
-    assert len(haps) == 1
-    assert len(haps[0]) == 2
-    assert haps[0][1]["variant"].id == "snp0"
-    assert haps[0][2]["variant"].id == "snp1"
-    assert haps[0][2]["allele"] == 1
+    # one haplotype with just the minor allele of the first SNP
+    # and one haplotype with a mix of alleles of both SNPs
+    assert len(haps) == 2
+    assert len(haps[0]) == 1
+    assert haps[0][0] == ("snp0", 0)
+    assert len(haps[1]) == 2
+    assert haps[1][0] == ("snp0", 1)
+    assert haps[1][1] == ("snp1", 0)
 
 
 def test_three_snps_one_branch_one_snp_not_causal():
