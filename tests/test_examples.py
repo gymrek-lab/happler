@@ -64,22 +64,12 @@ def _create_fake_phens(data) -> Phenotypes:
     return phens
 
 
-def _view_tree_helper(haplotype):
-    prev_node = ''
-    for node in haplotype:
-        if prev_node:
-            yield (prev_node, node["allele"])
-        prev_node = node["label"]
-    if prev_node:
-        yield (prev_node, None)
-
-
 def _view_tree_haps(tree) -> list:
     """
     Return the haplotype contents of a tree in an easily viewable form
     """
     return [
-        list(_view_tree_helper(haplotype))
+        [(node["label"], node["allele"]) for node in haplotype]
         for haplotype in tree.haplotypes()
     ]
 
