@@ -19,6 +19,8 @@ class AssocResults:
     ----------
     data : npt.NDArray[np.float64]
         A numpy mixed array with fields: beta, pval, stderr
+
+        It has shape num_variants x num_fields
     """
 
     data: npt.NDArray[np.float64, np.float64, np.float64]

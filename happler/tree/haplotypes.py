@@ -123,7 +123,7 @@ class Haplotype:
         """
         return tuple(node[0].idx for node in self.nodes)
 
-    def transform(self, genotypes: Genotypes) -> npt.NDArray[np.bool_]:
+    def transform(self, genotypes: Genotypes, allele: int) -> npt.NDArray[np.bool_]:
         """
         Transform a genotypes matrix via the current haplotype:
 
@@ -134,6 +134,8 @@ class Haplotype:
         ----------
         genotypes : Genotypes
             The genotypes which to transform using the current haplotype
+        allele : int
+            The allele (either 0 or 1) of the SNPs we're adding
 
         Returns
         -------
@@ -149,7 +151,7 @@ class Haplotype:
         # add extra axes to match shape of gens
         hap_data = self.data[:, np.newaxis]
         # use np.logical_and to superimpose the current haplotype onto the GT matrix
-        return np.logical_and(gens, hap_data)
+        return np.logical_and(gens == allele, hap_data)
 
 
 class Haplotypes:
