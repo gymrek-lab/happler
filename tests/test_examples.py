@@ -196,7 +196,7 @@ def test_two_snps_one_branch_perfect():
     """
     Two causal SNPs on a single haplotype with perfect phenotype associations
     Y = 0.5 * ( X1 && X2 )
-    This should yield two haplotype with both SNPs having the same allele.
+    This should yield two haplotypes with both SNPs having the same allele.
     The psuedocode looks like:
         if X1:
             return X2
@@ -229,7 +229,7 @@ def test_two_snps_one_branch_perfect_opposite_allele():
     """
     Two causal SNPs on a single haplotype with perfect phenotype associations
     Y = 0.5 * ( X1 && X2 )
-    This should yield two haplotype with both SNPs having the same allele.
+    This should yield two haplotypes with the SNPs having different alleles.
     The psuedocode looks like:
         if X1:
             return X2

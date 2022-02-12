@@ -1,4 +1,5 @@
 from __future__ import annotations
+from logging import getLogger, Logger
 
 import numpy as np
 from scipy.stats import t as t_dist
@@ -24,6 +25,8 @@ class TreeBuilder:
         The phenotypes from which the tree should be built
     method: AssocTest, optional
         The type of association test to perform at each node when constructing the tree
+    log: Logger
+        A logging instance for recording debug statements.
 
     Examples
     --------
@@ -37,11 +40,13 @@ class TreeBuilder:
         genotypes: Genotypes,
         phenotypes: Phenotypes,
         method: AssocTest = AssocTestSimple(),
+        log: Logger = None,
     ):
         self.gens = genotypes
         self.phens = phenotypes
         self.method = method
         self.tree = None
+        self.log = log or getLogger(self.__class__.__name__)
 
     def __repr__(self):
         return str((self.gens, self.phens))
@@ -84,12 +89,21 @@ class TreeBuilder:
         parent_res : NodeResults
             The results of the association test for the parent node
         """
+        if len(parent_hap.nodes):
+            parent = parent_hap.nodes[-1]
+            # add the best variant as a node in the tree
+        self.log.debug(
+            "Adding variants to " + (
+                "parent {} with allele {}".format(parent[0].id, parent[1])
+                if len(parent_hap.nodes)
+                else "root"
+            )
+        )
         # find the variant-allele pairs that give the best haplotype
         for variant, allele, results in self._find_split(parent_hap, parent_res):
             if variant is None:
                 # there were no significant variants!
                 continue
-            # add the best variant as a node in the tree
             new_node_idx = self.tree.add_node(variant, parent_idx, allele, results)
             # create a new Haplotype with the variant-allele pair added
             variant_gts = self.gens.data[:, variant.idx, :] == allele
@@ -152,12 +166,20 @@ class TreeBuilder:
             best_var_idx += 1
         # step 5: retrieve the Variant with the best p-value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
+        self.log.debug(
+            "Chose variant {}".format(best_variant.id)
+        )
         # iterate through all of the alleles of the best variant and check if they're
         # significant
         for allele in alleles:
             best_results = results[allele].data[best_p_idx[best_allele]]
             node_res = NodeResults.from_np(best_results)
             # step 6: check whether we should terminate the branch
+            self.log.debug(
+                "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
+                    best_variant.id, allele, parent_res, node_res
+                )
+            )
             if self.check_terminate(parent_res, node_res, num_samps, num_snps_tested):
                 yield None, allele, node_res
                 continue
@@ -188,6 +210,7 @@ class TreeBuilder:
         bool
             True if the branch should be terminated, False otherwise
         """
+        t_stat = None
         if parent_res:
             # before we do any calculations, check whether the effect sizes have
             # improved and return True if they haven't
@@ -196,6 +219,7 @@ class TreeBuilder:
                 or (np.abs(node_res.beta) - np.abs(parent_res.beta)) >= 0
             ):
                 # terminate if the effect sizes have gone in the opposite direction
+                self.log.debug("Terminated b/c effect size went in wrong direction")
                 return True
             # perform a two tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
@@ -216,8 +240,12 @@ class TreeBuilder:
             pval = node_res.pval
         if np.isnan(pval):
             raise ValueError(
-                "Encountered a p-value of 0! Check your data for irregularities."
+                "Encountered an nan p-value! Check your data for irregularities."
             )
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
-        return pval >= (self.method.pval_thresh / num_tests)
+        if pval >= (self.method.pval_thresh / num_tests):
+            self.log.debug("Terminated with t-stat {} and p-value {}".format(t_stat, pval))
+            return True
+        self.log.debug("Significant with t-stat {} and p-value {}".format(t_stat, pval))
+        return False
