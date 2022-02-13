@@ -160,6 +160,9 @@ class Haplotypes:
 
     Attributes
     ----------
+    format : dict
+        A dictionary describing the types of lines in the file format as well as
+        their format and data types
     data : list[dict]
         A list of dict describing the composition of a series of haplotypes
 
@@ -173,8 +176,12 @@ class Haplotypes:
 
         Each variants dictionary is composed of these items:
             1) id (int): A variant ID
-            2) allele (bool): The allele for this variant
-            3) score (float): The score of this variant within its haplotype
+            2) hap (int): A haplotype ID
+            3) tree (int): A tree ID
+            4) allele (bool): The allele for this variant
+            5) score (float): The score of this variant within its haplotype
+    version : str
+        A string denoting the current file format version
 
     Examples
     --------
@@ -183,6 +190,11 @@ class Haplotypes:
 
     def __init__(self):
         self.format = {
+            "meta": {
+                "id": "M",
+                "val": ["version"],
+                "fmt": ["s"],
+            },
             "hap": {
                 "id": "H",
                 "val": ["id", "tree", "beta", "pval", "pip"],
@@ -190,10 +202,11 @@ class Haplotypes:
             },
             "var": {
                 "id": "V",
-                "val": ["id", "allele", "score"],
-                "fmt": ["s", "", ".2f"],
+                "val": ["id", "hap", "tree", "allele", "score"],
+                "fmt": ["s", "d", "d", "", ".2f"],
             },
         }
+        self.version = "0.0.1"
         for val in self.format.keys():
             self.format[val]["str"] = self._create_fmt_str(self.format[val])
         self.data = []
@@ -222,7 +235,6 @@ class Haplotypes:
 
     @classmethod
     def from_tree(cls, tree: Tree) -> Haplotypes:
-        # TODO: check whether allele is correct; I think it's actually the parent's
         haps = cls()
         haplotypes = tree.haplotypes()
         haps.data = [
@@ -235,6 +247,8 @@ class Haplotypes:
                 "variants": [
                     {
                         "id": node["variant"].id,
+                        "hap": hap_idx,
+                        "tree": 0,
                         "allele": cls._handle_nan(node, "allele"),
                         "score": cls._handle_nan(node["results"], "pval"),
                     }
@@ -254,6 +268,7 @@ class Haplotypes:
         file : TextIO
             A file-like object to which this Haplotypes object should be written.
         """
+        file.write(self.format["meta"]["str"].format(version=self.version))
         for hap in self.data:
             file.write(self.format["hap"]["str"].format(**hap))
             for var in hap["variants"]:

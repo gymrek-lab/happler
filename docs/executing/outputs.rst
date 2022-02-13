@@ -83,10 +83,18 @@ Variant lines must follow the haplotype to which they belong. They contain the f
      - string
      - The unique ID for this variant, as defined in the genotypes file
    * - 2
+     - Haplotype ID
+     - int
+     - Identifies a haplotype within a tree; unique across other haplotypes in the tree
+   * - 3
+     - Tree ID
+     - int
+     - A unique identifier for the tree that this haplotype belongs to
+   * - 4
      - Allele
      - bool
      - The allele of this variant within the haplotype
-   * - 3
+   * - 5
      - Score
      - float
      - The importance of including this variant within the haplotype

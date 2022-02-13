@@ -155,9 +155,9 @@ def test_haplotype_transform():
     variant = Variant.from_np(gens.variants[variant_idx], variant_idx)
     hap = Haplotype.from_node(variant, allele, variant_gts)
     gens_without_variant = (
-        gens.data[:, (variant_idx + 1) :, :] & variant_gts[:, np.newaxis]
+        (gens.data[:, (variant_idx + 1) :, :] == allele) & variant_gts[:, np.newaxis]
     )
-    np.testing.assert_allclose(hap.transform(gens), gens_without_variant)
+    np.testing.assert_allclose(hap.transform(gens, allele), gens_without_variant)
 
 
 def test_haplotypes_write():
@@ -185,13 +185,14 @@ def test_haplotypes_write():
     with open("test_write.haps", "r") as file:
         lines = [line.rstrip() for line in file.readlines()]
         assert lines == [
+            "M\t0.0.1",
             "H\t0\t0\t0.00\t0.00\tnan",
-            "V\tSNP1\t0\t0.10",
-            "V\tSNP2\t1\t0.10",
-            "V\tSNP3\t1\t0.10",
+            "V\tSNP1\t0\t0\t0\t0.10",
+            "V\tSNP2\t0\t0\t1\t0.10",
+            "V\tSNP3\t0\t0\t1\t0.10",
             "H\t1\t0\t0.00\t0.00\tnan",
-            "V\tSNP1\t1\t0.10",
-            "V\tSNP2\t0\t0.10",
+            "V\tSNP1\t1\t0\t1\t0.10",
+            "V\tSNP2\t1\t0\t0\t0.10",
         ]
 
     # remove the file
