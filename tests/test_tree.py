@@ -123,28 +123,41 @@ def test_tree_builder():
 
 def test_haplotype():
     node = Variant(idx=0, id="SNP0", pos=1)
-    gts = np.array([0, 1, 1], dtype=np.bool_)
-    hap = Haplotype(((node, 0),), gts)
+    gts = np.array(
+        [
+            [[0, 0], [1, 1], [1, 0]],
+            [[0, 1], [1, 0], [0, 0]],
+            [[1, 0], [0, 0], [1, 1]],
+            [[1, 1], [0, 1], [0, 0]],
+        ],
+        dtype=np.bool_,
+    )
+    node_allele = 0
+    hap_data = gts[:, node.idx, :] == node_allele
+    hap = Haplotype(((node, node_allele),), hap_data)
     assert hap.nodes == Haplotype.from_node(node, 0, hap.data).nodes
 
     new_node = Variant(idx=1, id="SNP1", pos=1)
-    new_gts = np.array([1, 0, 1], dtype=np.bool_)
-    hap = hap.append(new_node, 0, new_gts)
-    nodes = ((node, 0), (new_node, 0))
+    new_node_allele = 1
+    new_hap_data = gts[:, new_node.idx, :] == new_node_allele
+    hap = hap.append(new_node, new_node_allele, new_hap_data)
+    nodes = ((node, node_allele), (new_node, new_node_allele))
     assert hap.nodes == Haplotype(nodes, hap.data).nodes
-    np.testing.assert_allclose(hap.data, np.array([0, 0, 1], np.bool_))
+    np.testing.assert_allclose(hap.data, hap_data & new_hap_data)
 
 
 def test_haplotype_transform():
     gens = Genotypes.load(DATADIR.joinpath("simple.vcf"))
     variant_idx = 0
-    allele_idx = 0
-    gens.data[:, variant_idx, allele_idx] = 1
-    variant_gts = gens.data[:, variant_idx, allele_idx]
+    allele = 0
+    gens.data[:, variant_idx, allele] = 1
+    variant_gts = gens.data[:, variant_idx, :] == allele
     variant = Variant.from_np(gens.variants[variant_idx], variant_idx)
-    hap = Haplotype.from_node(variant, allele_idx, variant_gts)
-    gens_without_variant = gens.data[:, (variant_idx + 1) :, :]
-    np.testing.assert_allclose(hap.transform(gens), gens_without_variant)
+    hap = Haplotype.from_node(variant, allele, variant_gts)
+    gens_without_variant = (
+        (gens.data[:, (variant_idx + 1) :, :] == allele) & variant_gts[:, np.newaxis]
+    )
+    np.testing.assert_allclose(hap.transform(gens, allele), gens_without_variant)
 
 
 def test_haplotypes_write():
@@ -172,13 +185,14 @@ def test_haplotypes_write():
     with open("test_write.haps", "r") as file:
         lines = [line.rstrip() for line in file.readlines()]
         assert lines == [
+            "M\t0.0.1",
             "H\t0\t0\t0.00\t0.00\tnan",
-            "V\tSNP1\t0\t0.10",
-            "V\tSNP2\t1\t0.10",
-            "V\tSNP3\t1\t0.10",
+            "V\tSNP1\t0\t0\t0\t0.10",
+            "V\tSNP2\t0\t0\t1\t0.10",
+            "V\tSNP3\t0\t0\t1\t0.10",
             "H\t1\t0\t0.00\t0.00\tnan",
-            "V\tSNP1\t1\t0.10",
-            "V\tSNP2\t0\t0.10",
+            "V\tSNP1\t1\t0\t1\t0.10",
+            "V\tSNP2\t1\t0\t0\t0.10",
         ]
 
     # remove the file

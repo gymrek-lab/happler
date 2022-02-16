@@ -33,7 +33,7 @@ class NodeResults:
 
     def __getitem__(self, item):
         """
-        Define a getter so that we can access elemeents like this:
+        Define a getter so that we can access elements like this:
 
         ``obj['field_name']``
 
@@ -42,6 +42,9 @@ class NodeResults:
         ``obj.field_name``
         """
         return getattr(self, item)
+
+    def __repr__(self):
+        return "{"+", ".join("{}={:.2e}".format(*i) for i in self.__dict__.items())+"}"
 
     @classmethod
     def from_np(cls, np_mixed_arr_var: np.void) -> NodeResults:
@@ -68,6 +71,9 @@ class Tree:
         self.graph = nx.DiGraph()
         self.variant_locs = defaultdict(set)
         self._add_root_node()
+
+    def __repr__(self):
+        return self.dot()
 
     @property
     def num_nodes(self):
@@ -113,7 +119,7 @@ class Tree:
                 " more children."
             )
         new_node_idx = self.num_nodes
-        label = ''
+        label = ""
         if node is not None:
             label = node.id
         self.graph.add_node(
@@ -171,11 +177,11 @@ class Tree:
         """
         dot = nx.drawing.nx_pydot.to_pydot(self.graph)
         # iterate through all of the nodes, treating the root specially
-        for node in dot.get_nodes():
+        for idx, node in enumerate(dot.get_nodes()):
             # node.set_name(node.get('label'))
             attrs = node.get_attributes()
             # check: does this node have a valid variant attached to it?
-            if attrs["variant"] == "None":
+            if attrs["variant"] == "None" and idx == 0:
                 # treat the root node specially, since it isn't a real variant
                 node.obj_dict["attributes"] = {"label": "root"}
             else:
