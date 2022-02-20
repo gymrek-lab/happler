@@ -1,7 +1,9 @@
+![Snakemake](https://img.shields.io/badge/snakemake-�~I�6.7.0-brightgreen.svg?style=flat-square)](https://snakemake.bitbucket.io)
+
 # download
 Execute the following command.
 ```
-git clone https://github.com/aryarm/simulate_gwas
+git clone https://github.com/aryarm/happler
 ```
 You can also download example data for the pipeline. See [the config file](config/config.yml) for links and instructions.
 

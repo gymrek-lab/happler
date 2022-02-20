@@ -65,19 +65,21 @@ rule plink2vcf:
         start=lambda wildcards: wildcards.locus.split('-')[0],
         end=lambda wildcards: wildcards.locus.split('-')[1],
         chrom=lambda wildcards: wildcards.chr,
-        log=lambda wildcards, output: Path(output.bcf).with_suffix('log').name,
     output:
         vcf=temp(out + "/{chr}_{locus}/unphased.vcf.gz"),
         bcf=out + "/{chr}_{locus}/unphased.bcf",
         bcf_idx=out + "/{chr}_{locus}/unphased.bcf.csi",
+        log=temp(out + "/{chr}_{locus}/unphased.log"),
     log:
         logs + "/{chr}_{locus}/plink2vcf"
+    benchmark:
+        bench + "/{chr}_{locus}/plink2vcf"
     conda:
         "envs/default.yml"
     shell:
-        "{ plink2 --pfile {params.pfile} --out {params.out} --from-bp {params.start} "
+        "plink2 --pfile {params.pfile} --out {params.out} --from-bp {params.start} "
         "--to-bp {params.end} --chr {params.chrom} "
-        "--export vcf bgz id-paste=iid &>{log}; rm {params.log}; } && "
+        "--export vcf bgz id-paste=iid &>{log} && "
         "bcftools view -Ob -o {output.bcf} {output.vcf} &>>{log} && "
         "tabix -p bcf {output.bcf} &>>{log}"
 
@@ -97,17 +99,20 @@ rule phase_gt:
         locus=lambda wildcards: loci[wildcards.chr + "_" + wildcards.locus]["locus"],
     output:
         phased=out + "/{chr}_{locus}/phased.bcf",
-        phased_idx=out + "/{chr}_{locus}/phased.bcf.idx",
+        phased_idx=out + "/{chr}_{locus}/phased.bcf.csi",
     resources:
-        runtime: "1:30:00"
-    threads: 4
+        runtime="1:30:00"
+    threads: 3
     log:
         logs + "/{chr}_{locus}/phase_gt"
+    benchmark:
+        bench + "/{chr}_{locus}/phase_gt"
     conda:
         "envs/shapeit.yml"
     shell:
         "shapeit4 --input {input.unphased} --map {input.map} --region {params.locus} "
-        "--output {output.phased} --thread {threads} --log {log} &>>{log}"
+        "--output {output.phased} --thread {threads} --log {log} &>>{log} && "
+        "tabix -p bcf {output.phased} &>>{log}"
 
 rule vcf2gt:
     """ convert a VCF into a genotype matrix (cols are vars and rows are samples) """
