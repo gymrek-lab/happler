@@ -45,7 +45,7 @@ To create a pull request you need to do these steps:
         - Or, if you had already forked the repository a while ago, `sync your fork <https://docs.github.com/en/github/collaborating-with-pull-requests/working-with-forks/syncing-a-fork>`_ to make sure you're working with the latest version of happler
     3. `Clone your fork locally <https://docs.github.com/en/get-started/quickstart/fork-a-repo#cloning-your-forked-repository>`_
     4. :code:`cd happler` into the new directory
-    5. Create a new branch off of master with :code:`git checkout -b <descriptive_branch_name>`. Please follow best practices when naming your branch
+    5. Create a new branch off of master with :code:`git checkout -b <descriptive_branch_name>`. Please follow `these best practices <https://stackoverflow.com/a/6065944>`_ when naming your branch
     6. Setup our development environment by following the instructions in :ref:`dev-setup-instructions` below
     7. Make your changes to the code
     8. Add additional tests to the :code:`tests/` directory and add comments to the documentation to explain how to use your new code. We use pytest for testing and sphinx/numpydoc for documentation
@@ -64,11 +64,11 @@ Dev Setup
 
 Follow these steps to set up a development environment.
 
-1. Create a conda environment with ``python``
+1. Create a conda environment with ``poetry``
 
     .. code-block:: bash
 
-        conda create -n happler-dev 'conda-forge::poetry==1.1.11'
+        conda create -y -n happler-dev -c conda-forge/label/poetry_dev -c conda-forge/label/cleo_dev -c conda-forge python=3.7 poetry=1.2.0a2
 2. Activate the environment
 
     .. code-block:: bash
