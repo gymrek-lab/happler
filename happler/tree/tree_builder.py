@@ -93,7 +93,8 @@ class TreeBuilder:
             parent = parent_hap.nodes[-1]
             # add the best variant as a node in the tree
         self.log.debug(
-            "Adding variants to " + (
+            "Adding variants to "
+            + (
                 "parent {} with allele {}".format(parent[0].id, parent[1])
                 if len(parent_hap.nodes)
                 else "root"
@@ -166,9 +167,7 @@ class TreeBuilder:
             best_var_idx += 1
         # step 5: retrieve the Variant with the best p-value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
-        self.log.debug(
-            "Chose variant {}".format(best_variant.id)
-        )
+        self.log.debug("Chose variant {}".format(best_variant.id))
         # iterate through all of the alleles of the best variant and check if they're
         # significant
         for allele in alleles:
@@ -176,9 +175,8 @@ class TreeBuilder:
             node_res = NodeResults.from_np(best_results)
             # step 6: check whether we should terminate the branch
             self.log.debug(
-                "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
-                    best_variant.id, allele, parent_res, node_res
-                )
+                "Testing variant {} / allele {} with parent_res {} and node_res {}"
+                .format(best_variant.id, allele, parent_res, node_res)
             )
             if self.check_terminate(parent_res, node_res, num_samps, num_snps_tested):
                 yield None, allele, node_res
@@ -245,7 +243,9 @@ class TreeBuilder:
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
         if pval >= (self.method.pval_thresh / num_tests):
-            self.log.debug("Terminated with t-stat {} and p-value {}".format(t_stat, pval))
+            self.log.debug(
+                "Terminated with t-stat {} and p-value {}".format(t_stat, pval)
+            )
             return True
         self.log.debug("Significant with t-stat {} and p-value {}".format(t_stat, pval))
         return False

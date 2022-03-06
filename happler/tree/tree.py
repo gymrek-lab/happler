@@ -44,7 +44,9 @@ class NodeResults:
         return getattr(self, item)
 
     def __repr__(self):
-        return "{"+", ".join("{}={:.2e}".format(*i) for i in self.__dict__.items())+"}"
+        return (
+            "{" + ", ".join("{}={:.2e}".format(*i) for i in self.__dict__.items()) + "}"
+        )
 
     @classmethod
     def from_np(cls, np_mixed_arr_var: np.void) -> NodeResults:

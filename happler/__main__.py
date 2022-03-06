@@ -58,9 +58,7 @@ def main():
     "--output",
     type=click.File("w"),
     show_default=sys.stdout,
-    help=(
-        "A .hap file describing the extracted haplotypes."
-    )
+    help="A .hap file describing the extracted haplotypes.",
 )
 def run(
     genotypes: Path,
