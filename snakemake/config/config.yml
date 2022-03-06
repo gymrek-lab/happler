@@ -14,13 +14,12 @@
 # The variant IDs of STRs must have 'STR_' prepended
 # required!
 # ref_panel: "/projects/ps-gymreklab/resources/datasets/snpstr/1kg.snp.str.chr{chr}.vcf.gz"
-ref_panel: "/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
+snp_panel: "/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
+str_panel: "/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
 
-# Path to a 1000G samples TSV file
-# You can get this file by clicking "Download the list" here:
-# https://www.internationalgenome.org/data-portal/sample
-# required!
-samples: /projects/ps-gymreklab/resources/datasets/snpstr/igsr_samples.tsv
+# Path to a list of samples to exclude from the analysis
+# There should be one sample ID per line
+exclude_samples: data/ukb_withdrawals.tsv
 
 # If variants are unphased, provide the path to a SHAPEIT4 map file like these:
 # https://github.com/odelaneau/shapeit4/tree/master/maps
@@ -39,23 +38,18 @@ phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required!
 loci:
-#  - locus: 1:98001984-99001984
-#    str: 1:98506615
-#    snp: 1:98501984
+ - locus: 1:98001984-99001984
+   str: 1:98506615
+   snp: 1:98501984
 #  - locus: 10:104457618-105457618
 #    str: 10:104639652
 #    snp: 10:104612335
-   - locus: 16:56927279-57084844
+   # - locus: 16:56927279-57084844
 
 # Generates phenotypes for either SNP or STR ("snp" or "str")
 # If you want to run multiple modes, just provide them in a list.
 # defaults to "snp"
-mode: [snp, str]
-
-# Which 1000G superpopulation should be used?
-# Please provide a three letter code, corresponding to the symbol in the samples file
-# This will default to EUR (aka european ancestry), if not specified
-superpop: EUR
+mode: [str]
 
 # Discard rare variants with a MAF below this number
 # Defaults to 0 if not specified
@@ -64,7 +58,8 @@ min_maf: 0.1
 # The strength of association between the chosen STR or SNP and the simulated phenotype
 # Defaults to 0.1 if not specified
 # You can also provide a list of floats, if you want to test several beta values
-beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5]
+# beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
+beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
 
 # Whether to include the causal variant in the set of genotypes provided to the
 # finemapping methods. Set this to true if you're interested in seeing how the

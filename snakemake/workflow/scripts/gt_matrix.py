@@ -101,13 +101,16 @@ def create_str_gt_matrix(str_gt):
 
 
 def main(args):
+    print('reading matrix', file=sys.stderr)
     gt = pd.read_csv(args.gt_matrix, sep="\t", index_col=0)
+    print('finished reading matrix', file=sys.stderr)
 
     # split the matrix into STRs and SNPs and drop SNPs that aren't bi-allelic
     gt["ID"] = gt["ID"].str.startswith("STR_")
     snp_gt = gt.loc[(~gt["ID"]) & (gt.alleles.str.len() > 2)]
 
     # convert to proper genotype values
+    print('converting to genotypes', file=sys.stderr)
     gt = pd.concat(
         [
             create_snp_gt_matrix(snp_gt, args.min_maf),
@@ -116,11 +119,15 @@ def main(args):
     ).sort_index()
 
     # convert ID column to snp_status and remove unnecessary alleles col
+    print('removing alleles', file=sys.stderr)
     gt.index = gt.index.astype(str) + ":" + gt["ID"].astype("uint8").astype(str)
     gt.drop(OTHER_COLS, axis=1, inplace=True)
 
+    print('transposing matrix', file=sys.stderr)
     gt = gt.transpose()
     gt.index.rename("sample", inplace=True)
+
+    print('writing matrix to output', file=sys.stderr)
     gt.to_csv(args.out, sep="\t")
 
 

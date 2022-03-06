@@ -66,7 +66,7 @@ pip_plot = function(pips, X, b, susie_cs=NULL) {
     data = data.frame(
         pip = pips,
         b = as.character(b),
-        pos = as.integer(sub("X(\\S+)\\.", "\\1", names(b))),
+        pos = as.integer(sub("\\.(0|1)", "", sub("X(\\S+)", "\\1", names(b)))),
         ld_causal = as.vector(cor(causal_var, X))^2
     )
     if (!is.null(susie_cs)) {

@@ -41,7 +41,7 @@ def get_vcf_chrs(vcf_path):
     return []
 
 
-chrs = get_vcf_chrs(config["ref_panel"])
+chrs = get_vcf_chrs(config["snp_panel"])
 
 
 rule all:
@@ -58,7 +58,7 @@ rule all:
 rule plink2vcf:
     """ convert a PLINK file to VCF """
     input:
-        pgen=config["ref_panel"],
+        pgen=config["snp_panel"],
     params:
         pfile=lambda wildcards, input: str(Path(input.pgen).with_suffix('')),
         out=lambda wildcards, output: str(Path(output.bcf).with_suffix('')),
@@ -83,14 +83,16 @@ rule plink2vcf:
         "bcftools view -Ob -o {output.bcf} {output.vcf} &>>{log} && "
         "tabix -p bcf {output.bcf} &>>{log}"
 
+
 def phase_gt_input(wildcards):
     input_files = { 'map': config['phase_map'] }
-    if config["ref_panel"].endswith('.pgen'):
+    if config["snp_panel"].endswith('.pgen'):
         input_files['unphased'] = rules.plink2vcf.output.bcf
     else:
-        input_files['unphased'] = config["ref_panel"]
+        input_files['unphased'] = config["snp_panel"]
     input_files['unphased_idx'] = input_files['unphased'] + ".csi"
     return input_files
+
 
 rule phase_gt:
     """ phase an unphased set of genotypes """
@@ -101,8 +103,8 @@ rule phase_gt:
         phased=out + "/{chr}_{locus}/phased.bcf",
         phased_idx=out + "/{chr}_{locus}/phased.bcf.csi",
     resources:
-        runtime="1:30:00"
-    threads: 3
+        runtime="3:00:00"
+    threads: 8
     log:
         logs + "/{chr}_{locus}/phase_gt"
     benchmark:
@@ -114,38 +116,71 @@ rule phase_gt:
         "--output {output.phased} --thread {threads} --log {log} &>>{log} && "
         "tabix -p bcf {output.phased} &>>{log}"
 
-rule vcf2gt:
-    """ convert a VCF into a genotype matrix (cols are vars and rows are samples) """
+
+rule keep_samps:
+    """ create a list of the samples that we should keep """
     input:
-        vcf=lambda wildcards: rules.phase_gt.output.phased if check_config('phase_map')
-            else config["ref_panel"],
-        vcf_idx=lambda wildcards: rules.phase_gt.output.phased_idx if check_config('phase_map')
-            else config["ref_panel"] + ".tbi",
-        samps=config["samples"],
-    params:
-        popn=config["superpop"],
-        locus=lambda wildcards: loci[wildcards.chr + "_" + wildcards.locus]["locus"],
+        snp_vcf=lambda wildcards: rules.phase_gt.output.phased if check_config('phase_map')
+            else config["snp_panel"],
+        snp_vcf_idx=lambda wildcards: rules.phase_gt.output.phased_idx if check_config('phase_map')
+            else config["snp_panel"] + ".tbi",
+        str_vcf=config["str_panel"],
+        str_vcf_idx=config["str_panel"],
+        samp=config["exclude_samples"],
     output:
-        matrix=out + "/{chr}_{locus}/matrix.tsv.gz",
+        samples=out+"/{chr}_{locus}/samples.tsv.gz"
     log:
-        logs + "/{chr}_{locus}/vcf2gt",
+        logs+"/{chr}_{locus}/keep_samps"
     conda:
         "envs/default.yml"
     shell:
-        "workflow/scripts/matrix.bash {params.popn} '{params.locus}' "
-        "{input.vcf} {input.samps} 2>{log} | gzip > {output.matrix}"
+        "workflow/scripts/keep_samps.bash {input.snp_vcf} {input.str_vcf} {input.samp}"
+        " | gzip > {output.samples} 2>{log}"
+
+
+rule vcf2gt:
+    """ convert a VCF into a genotype matrix (cols are vars and rows are samples) """
+    input:
+        snp_vcf=lambda wildcards: rules.phase_gt.output.phased if check_config('phase_map')
+            else config["snp_panel"],
+        snp_vcf_idx=lambda wildcards: rules.phase_gt.output.phased_idx if check_config('phase_map')
+            else config["snp_panel"] + ".tbi",
+        str_vcf=config["str_panel"],
+        str_vcf_idx=config["str_panel"],
+        samples=rules.keep_samps.output.samples,
+    params:
+        locus=lambda wildcards: loci[wildcards.chr + "_" + wildcards.locus]["locus"],
+    output:
+        temp_snp=temp(out + "/{chr}_{locus}/snps.bcf"),
+        temp_str=temp(out + "/{chr}_{locus}/strs.bcf"),
+        matrix=out + "/{chr}_{locus}/matrix.tsv.gz",
+    resources:
+        runtime="2:00:00"
+    log:
+        logs + "/{chr}_{locus}/vcf2gt",
+    benchmark:
+        bench + "/{chr}_{locus}/vcf2gt",
+    conda:
+        "envs/default.yml"
+    shell:
+        "workflow/scripts/matrix.bash '{params.locus}' {input.snp_vcf} {input.str_vcf}"
+        " {input.samples} {output.temp_snp} {output.temp_str} 2>{log} | gzip > {output.matrix}"
 
 
 rule str2gt:
     """ sum the difference of each allele length from the reference allele length """
     input:
-        matrix=out + "/{locus}/matrix.tsv.gz",
+        matrix=out + "/{locus}/matrix-10.tsv.gz",
     params:
         maf=config["min_maf"],
     output:
         matrix=out + "/{locus}/gt_matrix.tsv.gz",
+    resources:
+        runtime="2:00:00"
     log:
         logs + "/{locus}/str2gt",
+    benchmark:
+        bench + "/{locus}/str2gt",
     conda:
         "envs/default.yml"
     shell:
