@@ -29,6 +29,7 @@ networkx = ">=2.6.3"
 bgen-reader = ">=4.0.8"
 scipy = ">=1.7.3"
 pydot = ">=1.4.2"
+haptools = { git = "https://github.com/aryarm/haptools.git", rev = "8c84401" }
 
 # docs
 # these belong in the docs group only, but RTD doesn't support that yet -- see
@@ -75,6 +76,5 @@ log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(linen
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.1.0a6"]
 build-backend = "poetry.core.masonry.api"
-
