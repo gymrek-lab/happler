@@ -4,8 +4,21 @@ version = "0.0.1"
 description = "A haplotype-based fine-mapping method"
 authors = ["Arya Massarat"]
 license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "happler" }
+]
+include = [
+    { path = "tests", format = "sdist" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
 repository = "https://github.com/aryarm/happler"
 homepage = "https://github.com/aryarm/happler"
+documentation = "https://happler.readthedocs.io"
 
 [tool.poetry.dependencies]
 python = ">=3.7,<3.11"
@@ -18,7 +31,7 @@ scipy = ">=1.7.3"
 pydot = ">=1.4.2"
 
 # docs
-# these belong in dev-dependencies, but RTD doesn't support that yet -- see
+# these belong in the docs group only, but RTD doesn't support that yet -- see
 # https://github.com/readthedocs/readthedocs.org/issues/4912
 sphinx = { version = ">=4.2.0", optional = true }
 sphinx-autodoc-typehints = { version = ">=1.12.0", optional = true }
@@ -26,30 +39,28 @@ sphinx-rtd-theme = { version = ">=1.0.0", optional = true }
 numpydoc = { version = ">=1.1.0", optional = true }
 sphinx-click = {version = ">=3.0.2", optional = true}
 
-[tool.poetry.dev-dependencies]
-pytest = ">=6.2.5"
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
 black = ">=21.10b0"
 ipython = ">=7.29.0"
 
-# docs
-sphinx = { version = ">=4.2.0", optional = true }
-sphinx-autodoc-typehints = { version = ">=1.12.0", optional = true }
-sphinx-rtd-theme = { version = ">=1.0.0", optional = true }
-numpydoc = { version = ">=1.1.0", optional = true }
-sphinx-click = {version = ">=3.0.2", optional = true}
+[tool.poetry.group.test]
+optional = true
 
-[tool.poetry.extras]
-docs = [
-    "sphinx",
-    "sphinx-autodoc-typehints",
-    "sphinx-rtd-theme",
-    "numpydoc",
-    "sphinx-click"
-]
+[tool.poetry.group.test.dependencies]
+pytest = ">=6.2.5"
 
-test = [
-    "pytest"
-]
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+sphinx = ">=4.2.0"
+sphinx-autodoc-typehints = ">=1.12.0"
+sphinx-rtd-theme = ">=1.0.0"
+numpydoc = ">=1.1.0"
+sphinx-click = ">=3.0.2"
 
 [tool.poetry.scripts]
 happler = 'happler.__main__:main'

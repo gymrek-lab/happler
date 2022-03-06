@@ -78,12 +78,14 @@ Follow these steps to set up a development environment.
 
     .. code-block:: bash
 
-        poetry install -E docs -E test
+        poetry install --with dev,test,docs
+
+Now, try importing ``happler`` or running it on the command line.
 
 ---------------------
 Managing Dependencies
 ---------------------
-Run ``poetry help`` to read about the suite of commands it offers for managing dependencies.
+Run ``poetry help`` to read about the suite of commands it offers for keeping track of dependencies.
 
 For example, to add a pypi dependency to our list and install it, just run
 
