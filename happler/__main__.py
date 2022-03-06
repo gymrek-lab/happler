@@ -5,7 +5,8 @@ import click
 from pathlib import Path
 from typing import Union, Tuple
 
-from . import data, tree
+from . import tree
+from haptools import data
 
 
 @click.group()

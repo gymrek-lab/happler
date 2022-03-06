@@ -2,10 +2,10 @@ from __future__ import annotations
 from logging import getLogger, Logger
 
 import numpy as np
+from haptools.data import Genotypes, Phenotypes
 from scipy.stats import t as t_dist
 
 from .tree import Tree, NodeResults
-from ..data import Genotypes, Phenotypes
 from .variant import Variant
 from .haplotypes import Haplotype
 from .assoc_test import AssocTest, AssocTestSimple

@@ -2,8 +2,8 @@ from itertools import product
 
 import pytest
 import numpy as np
+from haptools.data import Genotypes, Phenotypes
 
-from happler.data import Genotypes, Phenotypes
 from happler.tree import TreeBuilder, AssocTestSimple
 
 
