@@ -54,6 +54,11 @@ class NodeResults:
         return cls(**dict(zip(class_attributes, np_mixed_arr_var)))
 
 
+@dataclass(frozen=True)
+class NodeResultsExtra(NodeResults):
+    bic: float
+
+
 class Tree:
     """
     A tree where

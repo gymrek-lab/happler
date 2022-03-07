@@ -65,8 +65,42 @@ class AssocTest(ABC):
 
 
 class AssocTestSimple(AssocTest):
+    def bic(self, n, residuals) -> float:
+        """
+        Return the BIC (Bayesian Information Criterion) for an OLS test
+
+        This function follows the implementatin in https://stackoverflow.com/a/58984868
+
+        Parameters
+        ----------
+        n : int
+            The number of observations
+        residuals : npt.NDArray[np.float64]
+            The residuals
+
+        Returns
+        -------
+        float
+            The Bayesian Information Criterion
+        """
+        k = 2
+        ll = -(n / 2) * (1 + np.log(2 * np.pi)) - (n / 2) * np.log(
+            residuals.dot(residuals) / n
+        )
+        return (-2 * ll) + ((k + 1) * np.log(n))
+
+    def perform_test(X, y, with_bic=False):
+        res = stats.linregress(X, y)
+        if with_bic:
+            y_hat = res.intercept + res.slope * X
+            residuals = y - y_hat
+            bic = self.bic(y.shape[0], residuals)
+            return res.slope, res.pvalue, res.stderr, bic
+        else:
+            return res.slope, res.pvalue, res.stderr
+
     def run(
-        self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
+        self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64], with_bic=False
     ) -> AssocResults:
         """
         Implement AssocTest for a simple linear regression.
@@ -82,21 +116,21 @@ class AssocTestSimple(AssocTest):
         Returns
         -------
         npt.NDArray[np.float64]
-            The p-values from testing each haplotype, with shape p x 1
+            The results from testing each haplotype, with shape p x 3
         """
-        extract_vals = lambda linreg: (linreg.slope, linreg.pvalue, linreg.stderr)
         # use ordinary least squares for a simple regression
         # return an array of p-values
         return AssocResults(
             np.array(
                 [
-                    extract_vals(stats.linregress(X[:, variant_idx], y))
+                    self.perform_test(X[:, variant_idx], y, with_bic)
                     for variant_idx in range(X.shape[1])
                 ],
                 dtype=[
                     ("beta", np.float64),
                     ("pval", np.float64),
                     ("stderr", np.float64),
-                ],
+                ]
+                + ([("bic", np.float64)] if with_bic else []),
             )
         )
