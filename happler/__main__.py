@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
+import sys
 import click
 from pathlib import Path
 from typing import Union, Tuple
 
-from . import data, tree
+from . import tree
+from haptools import data
 
 
 @click.group()
@@ -52,12 +54,20 @@ def main():
         " subset from the genotypes file"
     ),
 )
+@click.option(
+    "-o",
+    "--output",
+    type=click.File("w"),
+    show_default="stdout",
+    help="A .hap file describing the extracted haplotypes.",
+)
 def run(
     genotypes: Path,
     phenotypes: Path,
     region: str = None,
     samples: Tuple[str] = tuple(),
     samples_file: Path = None,
+    output: Path = sys.stdout,
 ):
     """
     Use the tool to find trait-associated haplotypes
@@ -97,7 +107,8 @@ def run(
     # load data
     gt = data.Genotypes.load(genotypes, region=region, samples=samples)
     ph = data.Phenotypes.load(phenotypes, samples=samples)
-    hap_tree = tree.TreeBuilder(gt, ph).run()
+    hap_tree = tree.TreeBuilder(gt, ph, tree.AssocTestSimple(pval_thresh=100)).run()
+    tree.Haplotypes.from_tree(hap_tree).write(output)
 
 
 if __name__ == "__main__":

@@ -2,12 +2,13 @@ from __future__ import annotations
 from logging import getLogger, Logger
 
 import numpy as np
+from haptools.data import Genotypes, Phenotypes
 from scipy.stats import t as t_dist
 
 from .tree import Tree, NodeResults
-from ..data import Genotypes, Phenotypes
 from .variant import Variant
 from .haplotypes import Haplotype
+from .terminator import Terminator, TTestTerminator
 from .assoc_test import AssocTest, AssocTestSimple
 
 
@@ -40,11 +41,13 @@ class TreeBuilder:
         genotypes: Genotypes,
         phenotypes: Phenotypes,
         method: AssocTest = AssocTestSimple(),
+        terminator: Terminator = TTestTerminator(),
         log: Logger = None,
     ):
         self.gens = genotypes
         self.phens = phenotypes
         self.method = method
+        self.terminator = terminator
         self.tree = None
         self.log = log or getLogger(self.__class__.__name__)
 
@@ -93,7 +96,8 @@ class TreeBuilder:
             parent = parent_hap.nodes[-1]
             # add the best variant as a node in the tree
         self.log.debug(
-            "Adding variants to " + (
+            "Adding variants to "
+            + (
                 "parent {} with allele {}".format(parent[0].id, parent[1])
                 if len(parent_hap.nodes)
                 else "root"
@@ -166,9 +170,7 @@ class TreeBuilder:
             best_var_idx += 1
         # step 5: retrieve the Variant with the best p-value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
-        self.log.debug(
-            "Chose variant {}".format(best_variant.id)
-        )
+        self.log.debug("Chose variant {}".format(best_variant.id))
         # iterate through all of the alleles of the best variant and check if they're
         # significant
         for allele in alleles:
@@ -176,76 +178,12 @@ class TreeBuilder:
             node_res = NodeResults.from_np(best_results)
             # step 6: check whether we should terminate the branch
             self.log.debug(
-                "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
-                    best_variant.id, allele, parent_res, node_res
-                )
+                "Testing variant {} / allele {} with parent_res {} and node_res {}"
+                .format(best_variant.id, allele, parent_res, node_res)
             )
-            if self.check_terminate(parent_res, node_res, num_samps, num_snps_tested):
+            if terminator.check(
+                parent_res, node_res, num_samps, num_snps_tested, self.log
+            ):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res
-
-    def check_terminate(
-        self,
-        parent_res: NodeResults,
-        node_res: NodeResults,
-        num_samps: int,
-        num_tests: int,
-    ) -> bool:
-        """
-        Check whether this branch should be terminated.
-
-        Parameters
-        ----------
-        parent_res : NodeResults
-            The results of the tests performed on the parent node
-        node_res : NodeResults
-            The results of the tests performed on the current node
-        num_samps : int
-            The number of samples tested
-        num_tests : The number of haplotypes tested
-
-        Returns
-        -------
-        bool
-            True if the branch should be terminated, False otherwise
-        """
-        t_stat = None
-        if parent_res:
-            # before we do any calculations, check whether the effect sizes have
-            # improved and return True if they haven't
-            if (
-                np.isnan(node_res.beta)
-                or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
-            ):
-                # terminate if the effect sizes have gone in the opposite direction
-                self.log.debug("Terminated b/c effect size went in wrong direction")
-                return True
-            # perform a two tailed, two-sample t-test using the difference of the effect sizes
-            # first, we compute the standard error of the difference of the effect sizes
-            std_err = np.sqrt(((node_res.stderr ** 2) + (parent_res.stderr ** 2)) / 2)
-            if std_err == 0:
-                # if we have a standard error of 0, then we already know the result is
-                # significant! It doesn't matter what the effect sizes are b/c t_stat
-                # will be inf
-                return False
-            # then, we compute the test statistic
-            # use np.abs to account for the directions that the effect size may take
-            t_stat = np.abs(node_res.beta - parent_res.beta) / std_err
-            # use a one-tailed test here b/c either the effect size becomes more
-            # negative or it becomes more positive
-            pval = t_dist.cdf(-t_stat, df=2 * (num_samps - 2))
-        else:
-            # parent_res = None when the parent node is the root node
-            pval = node_res.pval
-        if np.isnan(pval):
-            raise ValueError(
-                "Encountered an nan p-value! Check your data for irregularities."
-            )
-        # correct for multiple hypothesis testing
-        # For now, we use the Bonferroni correction
-        if pval >= (self.method.pval_thresh / num_tests):
-            self.log.debug("Terminated with t-stat {} and p-value {}".format(t_stat, pval))
-            return True
-        self.log.debug("Significant with t-stat {} and p-value {}".format(t_stat, pval))
-        return False

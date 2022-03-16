@@ -4,10 +4,10 @@ from typing import TextIO
 from pathlib import Path
 
 import numpy as np
+from haptools.data import Genotypes
 import numpy.typing as npt
 
 from .tree import Tree
-from ..data import Genotypes
 from .variant import Variant
 
 
