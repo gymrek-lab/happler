@@ -87,7 +87,7 @@ class AssocTestSimple(AssocTest):
         sse = residuals.dot(residuals)
         if sse == 0:
             # if this is 0, then we already know that the BIC should be inf
-            return float('inf')
+            return float("inf")
         likelihood = -(n / 2) * (1 + np.log(2 * np.pi)) - (n / 2) * np.log(sse / n)
         return (-2 * likelihood) + ((k + 1) * np.log(n))
 

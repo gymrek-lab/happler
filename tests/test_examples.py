@@ -79,7 +79,7 @@ def _view_tree_haps(tree) -> list:
         [(node["label"], node["allele"]) for node in haplotype]
         for haplotype in tree.haplotypes()
     ]
-    getLogger('test_examples').debug("haps were "+str(haps))
+    getLogger("test_examples").debug("haps were " + str(haps))
     return haps
 
 
@@ -645,9 +645,7 @@ def test_ppt_case():
     split_list = lambda pair: [pair[i : i + 2] for i in range(0, len(pair), 2)]
     # create genotypes for 3 samples, 4 SNPs
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list, product([0, 1], repeat=4 * 2))), dtype=np.bool_
-        )
+        np.array(list(map(split_list, product([0, 1], repeat=4 * 2))), dtype=np.bool_)
     )
     gts = gens.data
     # create phenotypes for 3 samples, excluding the last
