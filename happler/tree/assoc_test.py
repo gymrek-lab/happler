@@ -36,10 +36,6 @@ class AssocTest(ABC):
         The threshold of significance
     """
 
-    def __init__(self, pval_thresh: float = 0.05):
-        self.pval_thresh = pval_thresh
-        super().__init__()
-
     @abstractmethod
     def run(
         self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
@@ -65,6 +61,10 @@ class AssocTest(ABC):
 
 
 class AssocTestSimple(AssocTest):
+    def __init__(self, with_bic=False):
+        self.with_bic = with_bic
+        super().__init__()
+
     def bic(self, n, residuals) -> float:
         """
         Return the BIC (Bayesian Information Criterion) for an OLS test
@@ -84,14 +84,16 @@ class AssocTestSimple(AssocTest):
             The Bayesian Information Criterion
         """
         k = 2
-        ll = -(n / 2) * (1 + np.log(2 * np.pi)) - (n / 2) * np.log(
-            residuals.dot(residuals) / n
-        )
-        return (-2 * ll) + ((k + 1) * np.log(n))
+        sse = residuals.dot(residuals)
+        if sse == 0:
+            # if this is 0, then we already know that the BIC should be inf
+            return float("inf")
+        likelihood = -(n / 2) * (1 + np.log(2 * np.pi)) - (n / 2) * np.log(sse / n)
+        return (-2 * likelihood) + ((k + 1) * np.log(n))
 
-    def perform_test(X, y, with_bic=False):
+    def perform_test(self, X, y):
         res = stats.linregress(X, y)
-        if with_bic:
+        if self.with_bic:
             y_hat = res.intercept + res.slope * X
             residuals = y - y_hat
             bic = self.bic(y.shape[0], residuals)
@@ -100,7 +102,7 @@ class AssocTestSimple(AssocTest):
             return res.slope, res.pvalue, res.stderr
 
     def run(
-        self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64], with_bic=False
+        self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
     ) -> AssocResults:
         """
         Implement AssocTest for a simple linear regression.
@@ -123,7 +125,7 @@ class AssocTestSimple(AssocTest):
         return AssocResults(
             np.array(
                 [
-                    self.perform_test(X[:, variant_idx], y, with_bic)
+                    self.perform_test(X[:, variant_idx], y)
                     for variant_idx in range(X.shape[1])
                 ],
                 dtype=[
@@ -131,6 +133,6 @@ class AssocTestSimple(AssocTest):
                     ("pval", np.float64),
                     ("stderr", np.float64),
                 ]
-                + ([("bic", np.float64)] if with_bic else []),
+                + ([("bic", np.float64)] if self.with_bic else []),
             )
         )

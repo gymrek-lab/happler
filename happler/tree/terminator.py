@@ -1,7 +1,11 @@
 from __future__ import annotations
+from logging import Logger
 from abc import ABC, abstractmethod
 
-from logging import Logger
+import numpy as np
+from scipy.stats import t as t_dist
+
+from .tree import NodeResults, NodeResultsExtra
 
 
 class Terminator(ABC):
@@ -11,12 +15,12 @@ class Terminator(ABC):
 
     Attributes
     ----------
-    pval_thresh : float, optional
+    thresh : float, optional
         The threshold of significance
     """
 
-    def __init__(self, pval_thresh: float = 0.05):
-        self.pval_thresh = pval_thresh
+    def __init__(self, thresh: float = 0.05):
+        self.thresh = thresh
         super().__init__()
 
     @abstractmethod
@@ -95,7 +99,7 @@ class TTestTerminator(Terminator):
             )
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
-        if pval >= (self.method.pval_thresh / num_tests):
+        if pval >= (self.thresh / num_tests):
             logger.debug(
                 "Terminated with t-stat {} and p-value {}".format(t_stat, pval)
             )
@@ -105,10 +109,14 @@ class TTestTerminator(Terminator):
 
 
 class BICTerminator(Terminator):
+    def __init__(self, thresh: float = 10):
+        super().__init__()
+        self.thresh = thresh
+
     def check(
         self,
-        parent_res: NodeResults,
-        node_res: NodeResults,
+        parent_res: NodeResultsExtra,
+        node_res: NodeResultsExtra,
         num_samps: int,
         num_tests: int,
         logger: Logger,
@@ -125,20 +133,20 @@ class BICTerminator(Terminator):
                 logger.debug("Terminated b/c effect size went in wrong direction")
                 return True
             stat = node_res.bic - parent_res.bic
-            # TODO: compute pval
+            # just choose an arbitrary threshold
+            if stat < self.thresh:
+                logger.debug("Terminated with delta BIC {}".format(stat))
+                return True
         else:
             # parent_res = None when the parent node is the root node
             pval = node_res.pval
-        if np.isnan(pval):
-            raise ValueError(
-                "Encountered an nan p-value! Check your data for irregularities."
-            )
-        # correct for multiple hypothesis testing
-        # For now, we use the Bonferroni correction
-        if pval >= (self.method.pval_thresh / num_tests):
-            logger.debug(
-                "Terminated with BIC difference {} and p-value {}".format(stat, pval)
-            )
-            return True
-        logger.debug("Significant with t-stat {} and p-value {}".format(stat, pval))
+            # correct for multiple hypothesis testing
+            # For now, we use the Bonferroni correction
+            if pval >= (self.thresh / num_tests):
+                logger.debug("Terminated with p-value {}".format(pval))
+                return True
+        logger.debug(
+            "Significant with "
+            + ("delta BIC {}".format(stat) if parent_res else "pval {}".format(pval))
+        )
         return False

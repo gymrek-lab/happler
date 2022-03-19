@@ -3,13 +3,12 @@ from logging import getLogger, Logger
 
 import numpy as np
 from haptools.data import Genotypes, Phenotypes
-from scipy.stats import t as t_dist
 
-from .tree import Tree, NodeResults
 from .variant import Variant
 from .haplotypes import Haplotype
-from .terminator import Terminator, TTestTerminator
+from .tree import Tree, NodeResults
 from .assoc_test import AssocTest, AssocTestSimple
+from .terminator import Terminator, TTestTerminator, BICTerminator
 
 
 class TreeBuilder:
@@ -26,6 +25,10 @@ class TreeBuilder:
         The phenotypes from which the tree should be built
     method: AssocTest, optional
         The type of association test to perform at each node when constructing the tree
+    terminator: Terminator, optional
+        The type of test to use for deciding whether to terminate a branch
+    results: type[NodeResults]
+        The class to use when instantiating the results of a node association test
     log: Logger
         A logging instance for recording debug statements.
 
@@ -42,12 +45,14 @@ class TreeBuilder:
         phenotypes: Phenotypes,
         method: AssocTest = AssocTestSimple(),
         terminator: Terminator = TTestTerminator(),
+        results_type: type[NodeResults] = NodeResults,
         log: Logger = None,
     ):
         self.gens = genotypes
         self.phens = phenotypes
         self.method = method
         self.terminator = terminator
+        self.results_type = results_type
         self.tree = None
         self.log = log or getLogger(self.__class__.__name__)
 
@@ -175,13 +180,13 @@ class TreeBuilder:
         # significant
         for allele in alleles:
             best_results = results[allele].data[best_p_idx[best_allele]]
-            node_res = NodeResults.from_np(best_results)
+            node_res = self.results_type.from_np(best_results)
             # step 6: check whether we should terminate the branch
             self.log.debug(
                 "Testing variant {} / allele {} with parent_res {} and node_res {}"
                 .format(best_variant.id, allele, parent_res, node_res)
             )
-            if terminator.check(
+            if self.terminator.check(
                 parent_res, node_res, num_samps, num_snps_tested, self.log
             ):
                 yield None, allele, node_res
