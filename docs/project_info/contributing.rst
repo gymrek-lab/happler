@@ -74,7 +74,7 @@ Follow these steps to set up a development environment.
     .. code-block:: bash
 
         conda activate happler-dev
-3. Install our development, testing, and documentation dependencies
+3. Install our dependencies
 
     .. code-block:: bash
 
@@ -92,6 +92,12 @@ For example, to add a pypi dependency to our list and install it, just run
     .. code-block:: bash
 
         poetry add <dependency>
+
+You should specify a `version constraint <https://python-poetry.org/docs/master/dependency-specification>`_ when adding a dependency. Use the oldest version compatible with your code. Don't worry if you're not sure at first -- you can (and should!) always update it later. For example, to specify a version of ``click`` >= 8.0.4:
+
+    .. code-block:: bash
+
+        poetry add 'click>=8.0.4'
 
 .. _code-check-instructions:
 
