@@ -68,13 +68,13 @@ Follow these steps to set up a development environment.
 
     .. code-block:: bash
 
-        conda create -y -n happler-dev -c conda-forge/label/poetry_dev -c conda-forge/label/cleo_dev -c conda-forge python=3.7 poetry>=1.2.0a2 poetry-core>=1.1.0a6
+        conda env create -n happler-dev -f dev-env.yml
 2. Activate the environment
 
     .. code-block:: bash
 
         conda activate happler-dev
-3. Install our dependencies
+3. Install our development, testing, and documentation dependencies
 
     .. code-block:: bash
 
