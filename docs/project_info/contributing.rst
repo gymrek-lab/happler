@@ -64,23 +64,25 @@ Dev Setup
 
 Follow these steps to set up a development environment.
 
-1. Create a conda environment with ``poetry``
+1. Install ``poetry`` via `their recommended installer <https://python-poetry.org/docs/master/#installation>`_
 
     .. code-block:: bash
 
-        conda env create -n happler-dev -f dev-env.yml
-2. Activate the environment
-
-    .. code-block:: bash
-
-        conda activate happler-dev
-3. Install our dependencies
+        curl -sSL https://install.python-poetry.org | python3 - --version 1.2.0b1
+2. Install our dependencies
 
     .. code-block:: bash
 
         poetry install --with dev,test,docs
+3. Activate the ``happler`` development environment
+
+    .. code-block:: bash
+
+        poetry shell
 
 Now, try importing ``happler`` or running it on the command line.
+
+That's it! When you're done, type ``exit`` to deactivate the environment.
 
 ---------------------
 Managing Dependencies
@@ -93,11 +95,11 @@ For example, to add a pypi dependency to our list and install it, just run
 
         poetry add <dependency>
 
-You should specify a `version constraint <https://python-poetry.org/docs/master/dependency-specification>`_ when adding a dependency. Use the oldest version compatible with your code. Don't worry if you're not sure at first -- you can (and should!) always update it later. For example, to specify a version of ``click`` >= 8.0.4:
+You should specify a `version constraint <https://python-poetry.org/docs/master/dependency-specification>`_ when adding a dependency. Use the oldest version compatible with your code. Don't worry if you're not sure what that is at first -- you can start with something really old and update it later. For example, to specify that ``click`` 8.0.4 is required:
 
     .. code-block:: bash
 
-        poetry add 'click>=8.0.4'
+        poetry add 'click^8.0.4'
 
 .. _code-check-instructions:
 
