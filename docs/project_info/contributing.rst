@@ -128,6 +128,7 @@ Code
 
     1. Please type-hint all function parameters
     2. Please adhere to PEP8 whenever possible. :code:`black` will help you with this.
+    3. Please use relative imports whenever importing modules from the code base
 
 ~~~~~~~~~~~~~~~~~~~
 Git commit messages

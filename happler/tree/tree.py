@@ -54,7 +54,7 @@ class NodeResults:
         return cls(**dict(zip(class_attributes, np_mixed_arr_var)))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class NodeResultsExtra(NodeResults):
     bic: float
 

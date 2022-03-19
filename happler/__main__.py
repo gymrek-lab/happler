@@ -107,7 +107,7 @@ def run(
     # load data
     gt = data.Genotypes.load(genotypes, region=region, samples=samples)
     ph = data.Phenotypes.load(phenotypes, samples=samples)
-    hap_tree = tree.TreeBuilder(gt, ph, tree.AssocTestSimple(pval_thresh=100)).run()
+    hap_tree = tree.TreeBuilder(gt, ph).run()
     tree.Haplotypes.from_tree(hap_tree).write(output)
 
 
