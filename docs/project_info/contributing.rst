@@ -68,7 +68,7 @@ Follow these steps to set up a development environment.
 
     .. code-block:: bash
 
-        conda env create -n happler-dev -f dev-env.yml
+        conda create -y -n happler-dev -c conda-forge 'poetry==1.1.13' 'python=3.7'
 2. Activate the environment
 
     .. code-block:: bash
@@ -78,7 +78,7 @@ Follow these steps to set up a development environment.
 
     .. code-block:: bash
 
-        poetry install --with dev,test,docs
+        poetry install -E docs -E test
 
 Now, try importing ``happler`` or running it on the command line.
 
