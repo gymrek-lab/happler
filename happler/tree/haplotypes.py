@@ -1,11 +1,11 @@
 from __future__ import annotations
 import sys
-from typing import TextIO
 from pathlib import Path
+from typing import TextIO, Generator
 
 import numpy as np
-from haptools.data import Genotypes
 import numpy.typing as npt
+from haptools.data import Genotypes
 
 from .tree import Tree
 from .variant import Variant
@@ -259,6 +259,24 @@ class Haplotypes:
         ]
         return haps
 
+    def to_str(self) -> Generator[str, None, None]:
+        """
+        Create a string representation of this Haplotype
+
+        Yields
+        ------
+        Generator[str, None, None]
+            A list of lines (strings) to include in the output
+        """
+        yield self.format["meta"]["str"].format(version=self.version)
+        for hap in self.data:
+            yield self.format["hap"]["str"].format(**hap)
+            for var in hap["variants"]:
+                yield self.format["var"]["str"].format(**var)
+
+    def __repr__(self):
+        return "\n".join(self.to_str())
+
     def write(self, file: TextIO):
         """
         Write the contents of this Haplotypes object to the file given by fname
@@ -268,8 +286,5 @@ class Haplotypes:
         file : TextIO
             A file-like object to which this Haplotypes object should be written.
         """
-        file.write(self.format["meta"]["str"].format(version=self.version))
-        for hap in self.data:
-            file.write(self.format["hap"]["str"].format(**hap))
-            for var in hap["variants"]:
-                file.write(self.format["var"]["str"].format(**var))
+        for line in self.to_str():
+            file.write(line)
