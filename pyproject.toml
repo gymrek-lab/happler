@@ -29,6 +29,7 @@ networkx = "^2.6.3"
 scipy = "^1.7.3"
 pydot = "^1.4.2"
 haptools = { git = "https://github.com/gymrek-lab/haptools.git", rev = "ee62fa04" }
+statsmodels = "^0.12.0"
 
 # docs
 # these belong in the docs group only, but RTD doesn't support that yet -- see
