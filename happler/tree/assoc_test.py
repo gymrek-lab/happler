@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from scipy import stats
 import numpy.typing as npt
+import statsmodels.api as sm
 
 
 # We declare this class to be a dataclass to automatically define __init__ and a few
@@ -91,10 +92,26 @@ class AssocTestSimple(AssocTest):
         likelihood = -(n / 2) * (1 + np.log(2 * np.pi)) - (n / 2) * np.log(sse / n)
         return (-2 * likelihood) + ((k + 1) * np.log(n))
 
-    def perform_test(self, X, y):
-        res = stats.linregress(X, y)
+    def perform_test(self, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> tuple:
+        """
+        Perform the test for a single haplotype.
+
+        Parameters
+        ----------
+        x : npt.NDArray[np.float64]
+            The genotypes with shape n x 1 (for a single haplotype)
+        y : npt.NDArray[np.float64]
+            The phenotypes, with shape n x 1
+
+        Returns
+        -------
+        tuple
+            The slope, p-value, and stderr obtained from the test. The delta BIC is
+            appended to the end if ``self.with_bic`` is True.
+        """
+        res = stats.linregress(x, y)
         if self.with_bic:
-            y_hat = res.intercept + res.slope * X
+            y_hat = res.intercept + res.slope * x
             residuals = y - y_hat
             bic = self.bic(y.shape[0], residuals)
             return res.slope, res.pvalue, res.stderr, bic
@@ -111,7 +128,7 @@ class AssocTestSimple(AssocTest):
         ----------
         X : npt.NDArray[np.float64]
             The genotypes, with shape n x p. There are only two dimensions.
-            Each column is a haplotype and each row is a sample.
+            Each row is a sample and each column is a haplotype.
         y : npt.NDArray[np.float64]
             The phenotypes, with shape n x 1
 
@@ -136,3 +153,48 @@ class AssocTestSimple(AssocTest):
                 + ([("bic", np.float64)] if self.with_bic else []),
             )
         )
+
+
+class AssocTestSimpleCovariates(AssocTestSimple):
+    def __init__(self, covars: npt.NDArray[np.float64], with_bic=False):
+        """
+        Implement a subclass of AssocTestSimple with covariates.
+
+        Parameters
+        ----------
+        covars : npt.NDArray[np.float64]
+            Covariates to be included in the linear model. This should have shape
+            n x m where each row (n) is sample and each column (m) is a covariate.
+        """
+        self.covars = covars
+        super().__init__(with_bic=with_bic)
+
+    def perform_test(self, x, y):
+        """
+        Perform the test for a single haplotype.
+
+        Parameters
+        ----------
+        x : npt.NDArray[np.float64]
+            The genotypes with shape n x 1 (for a single haplotype)
+        y : npt.NDArray[np.float64]
+            The phenotypes, with shape n x 1
+
+        Returns
+        -------
+        tuple
+            The slope, p-value, and stderr obtained from the test.
+        """
+        # the independent variables consist of this haplotype and the covariates
+        X = np.hstack(x, self.covars)
+        # initialize and create a multi-linear regression model
+        mlr = sm.OLS(X, y)
+        fit = mlr.fit()
+        params = fit.params
+        stderr = fit.bse
+        pvals = fit.pvalues
+        bic = fit.bic
+        if self.with_bic:
+            return params[0], pvals[0], stderr[0], bic
+        else:
+            return params[0], pvals[0], stderr[0]
