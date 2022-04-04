@@ -7,7 +7,7 @@ docs/_build/
 # poetry
 dist/
 # snakemake
-snakemake/data
-snakemake/out
+analysis/data
+analysis/out
 .snakemake
 .ipynb_checkpoints
