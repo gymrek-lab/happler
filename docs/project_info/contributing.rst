@@ -68,7 +68,7 @@ Follow these steps to set up a development environment.
 
     .. code-block:: bash
 
-        conda env create -n happler-dev -f environment.yml --experimental-solver=libmamba
+        conda env create -n happler-dev -f environment.yml
 2. Activate the environment
 
     .. code-block:: bash
