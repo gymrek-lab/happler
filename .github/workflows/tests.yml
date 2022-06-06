@@ -12,38 +12,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
-        with:
-          fetch-depth: 1
+      - uses: actions/checkout@v2
 
       - name: Set up Python 3.7
-        uses: actions/setup-python@v1
+        id: setup-python
+        uses: actions/setup-python@v2
         with:
           python-version: 3.7
 
       - name: Install Poetry
-        uses: dschep/install-poetry-action@v1.2
+        uses: snok/install-poetry@v1
 
-      - name: Cache Poetry virtualenv
-        uses: actions/cache@v1
-        id: cache
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v2
         with:
-          path: ~/.virtualenvs
-          key: poetry-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            poetry-${{ hashFiles('**/poetry.lock') }}
+          path: .venv
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
 
-      - name: Set Poetry config
-        run: |
-          poetry config settings.virtualenvs.in-project false
-          poetry config settings.virtualenvs.path ~/.virtualenvs
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
 
-      - name: Install Dependencies
-        run: poetry install
-        if: steps.cache.outputs.cache-hit != 'true'
+      - name: Install our library
+        run: poetry install --no-interaction
 
       - name: Code Quality
         run: poetry run black . --check
 
-      - name: Test with pytest
-        run: poetry run pytest --cov ${{ github.repository }}/
+      - name: Run tests
+        run: |
+          source .venv/bin/activate
+          pytest --cov tests/
