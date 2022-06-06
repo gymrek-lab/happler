@@ -14,15 +14,21 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Set up Python 3.7
+      - name: Set up Python 3.7 and conda
         id: setup-python
-        uses: actions/setup-python@v2
+        uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: 3.7
+          auto-activate-base: true
+     
+      - name: Install conda dependencies
+        id: conda-dependencies
+        run: conda install -c conda-forge statsmodels==0.13.2
 
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
+          version: 1.1.13
           virtualenvs-create: true
           virtualenvs-in-project: true
           installer-parallel: true
@@ -32,7 +38,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+          key: venv-${{ hashFiles('**/poetry.lock') }}
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
