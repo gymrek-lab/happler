@@ -28,7 +28,7 @@ cyvcf2 = "^0.30.12"
 networkx = "^2.6.3"
 scipy = "^1.7.3"
 pydot = "^1.4.2"
-haptools = { git = "https://github.com/gymrek-lab/haptools.git", rev = "dc7cad0" }
+haptools = { git = "https://github.com/gymrek-lab/haptools.git", rev = "6d3b5984" }
 
 # docs
 # these belong in the docs group only, but RTD doesn't support that yet -- see
