@@ -37,9 +37,6 @@ jobs:
       - name: Install our library
         run: poetry install --no-interaction
 
-      - name: Code Quality
-        run: poetry run black . --check
-
       - name: Run tests
         run: |
           source .venv/bin/activate
