@@ -144,6 +144,7 @@ def run(
         gt.check_phase()
     else:
         gt = data.Genotypes.load(genotypes, region=region, samples=samples)
+    log.info("There are {} samples and {} variants".format(*gt.data.shape))
     log.info("Loading phenotypes")
     ph = data.Phenotypes.load(phenotypes, samples=samples)
     log.info("Running tree builder")

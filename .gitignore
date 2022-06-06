@@ -9,5 +9,6 @@ dist/
 # snakemake
 analysis/data
 analysis/out
+analysis/log
 .snakemake
 .ipynb_checkpoints
