@@ -60,6 +60,12 @@ def main():
     ),
 )
 @click.option(
+    "--discard-multiallelic",
+    is_flag=True,
+    show_default="do not discard multi-allelic variants",
+    help="Whether to discard multi-allelic variants or just complain about them."
+)
+@click.option(
     "-o",
     "--output",
     type=click.File("w"),
@@ -81,6 +87,7 @@ def run(
     region: str = None,
     samples: Tuple[str] = tuple(),
     samples_file: Path = None,
+    discard_multiallelic: bool = False,
     output: TextIO = sys.stdout,
     verbosity: str = 'CRITICAL',
 ):
@@ -129,7 +136,15 @@ def run(
         samples = None
     # load data
     log.info("Loading genotypes")
-    gt = data.Genotypes.load(genotypes, region=region, samples=samples)
+    if discard_multiallelic:
+        gt = data.Genotypes(genotypes)
+        gt.read(region=region, samples=samples)
+        log.info("Discarding multiallelic variants")
+        gt.check_biallelic(discard_also=True)
+        gt.check_phase()
+    else:
+        gt = data.Genotypes.load(genotypes, region=region, samples=samples)
+    log.info("There are {} samples and {} variants".format(*gt.data.shape))
     log.info("Loading phenotypes")
     ph = data.Phenotypes.load(phenotypes, samples=samples)
     log.info("Running tree builder")

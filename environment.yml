@@ -1,0 +1,7 @@
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - poetry==1.1.13
+  - python=3.7
+  - statsmodels==0.13.2 # this belongs in pyproject.toml but we've pinned it here for now b/c of https://github.com/statsmodels/statsmodels/issues/8200
