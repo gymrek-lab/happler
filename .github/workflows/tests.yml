@@ -18,7 +18,6 @@ jobs:
         id: setup-python
         uses: conda-incubator/setup-miniconda@v2
         with:
-          python-version: 3.7
           channels: conda-forge
           channel-priority: strict
           activate-environment: ""
