@@ -19,15 +19,14 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: 3.7
-          mamba-version: "*"
           channels: conda-forge
           channel-priority: strict
-          activate-environment: test
-          auto-activate-base: false
+          activate-environment: ""
+          auto-activate-base: true
      
       - name: Install conda dependencies
         id: conda-dependencies
-        run: conda install -c conda-forge statsmodels==0.13.2
+        run: conda install -n base -c conda-forge python=3.7 statsmodels==0.13.2
 
       - name: Install Poetry
         uses: snok/install-poetry@v1
