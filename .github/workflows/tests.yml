@@ -13,12 +13,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-     
+
       - name: Build conda package
         uses: BEFH/anaconda-publish@v1.5.1
         id: conda-build
         with:
-          subDir: '.'
+          subDir: 'recipe'
           channels: 'conda-forge -c bioconda'
           publish: false
           test_all: true

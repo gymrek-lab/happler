@@ -3,9 +3,7 @@ package:
   version: v0.0.0
 
 source:
-  url: https://github.com/gymrek-lab/happler/archive/main.tar.gz
-  sha256: f3832918bc3c66617f92e35f5d70729187676313caa60c187eb0f28b8fe5e3b5
-
+  path: '..'
 
 build:
   number: 0
@@ -18,16 +16,25 @@ requirements:
   host:
     - pip >=19.0.3
     - python >=3.7
-    - poetry >=1.1.13
+    - poetry-core >=1.0.0
   run:
     - python >=3.7
     - statsmodels >=0.13.2
+    - click >=8.0.4
+    - networkx >=2.6.3
+    - scipy >=1.7.3
+    - pydot >=1.4.2
 
 test:
+  source_files:
+    - tests/
+  requires:
+    - pytest >=6.2.5
+    - pytest-cov >=3.0.0
   imports:
     - happler
   commands:
-    - happler --help
+    - pytest tests/
 
 about:
   home: https://github.com/gymrek-lab/happler
