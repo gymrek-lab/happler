@@ -17,12 +17,13 @@ jobs:
       - name: Build conda package
         uses: BEFH/anaconda-publish@v1.5.1
         id: conda-build
-        subDir: '.'
-        channels: 'conda-forge -c ccpi -c paskino'
-        publish: false
-        test_all: true
-        convert_win: false
-        convert_osx: false
+        with:
+          subDir: '.'
+          channels: 'conda-forge -c ccpi -c paskino'
+          publish: false
+          test_all: true
+          convert_win: false
+          convert_osx: false
 
       - name: Load cached venv
         id: cached-poetry-dependencies
