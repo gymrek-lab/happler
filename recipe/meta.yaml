@@ -25,17 +25,6 @@ requirements:
     - scipy >=1.7.3
     - pydot >=1.4.2
 
-test:
-  source_files:
-    - tests/
-  requires:
-    - pytest >=6.2.5
-    - pytest-cov >=3.0.0
-  imports:
-    - happler
-  commands:
-    - pytest tests/
-
 about:
   home: https://github.com/gymrek-lab/happler
   license: MIT
