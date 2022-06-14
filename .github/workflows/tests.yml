@@ -9,14 +9,20 @@ on:
 
 jobs:
   test:
-    runs-on: quay.io/bioconda/bioconda-utils-build-env-cos7:latest
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
      
       - name: Build conda package
+        uses: BEFH/anaconda-publish@v1.5.1
         id: conda-build
-        run: conda build -c conda-forge .
+        subDir: '.'
+        channels: 'conda-forge -c ccpi -c paskino'
+        publish: false
+        test_all: true
+        convert_win: false
+        convert_osx: false
 
       - name: Load cached venv
         id: cached-poetry-dependencies
