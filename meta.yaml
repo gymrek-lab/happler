@@ -1,0 +1,38 @@
+package:
+  name: happler
+  version: v0.0.0
+
+source:
+  url: https://github.com/gymrek-lab/happler/archive/main.tar.gz
+  sha256: f3832918bc3c66617f92e35f5d70729187676313caa60c187eb0f28b8fe5e3b5
+
+
+build:
+  number: 0
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed --no-cache-dir -vvv"
+  entry_points:
+    - happler = happler.__main__:main
+  noarch: python
+
+requirements:
+  host:
+    - pip >=19.0.3
+    - python >= 3.7
+    - poetry >= 1.1.13
+  run:
+    - python >=3.7
+    - statsmodels >= 0.13.2
+
+test:
+  imports:
+    - happler
+  commands:
+    - happler --help
+
+about:
+  home: https://github.com/gymrek-lab/happler
+  license: MIT
+  summary: 'A haplotype-based fine-mapping method'
+  dev_url: https://github.com/gymrek-lab/happler
+  doc_url: https://happler.readthedocs.io/
+  doc_source_url: https://github.com/shibukawa/imagesize_py/blob/master/README.rst
