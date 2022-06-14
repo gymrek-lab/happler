@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches_ignore: []
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build conda package
+        uses: BEFH/anaconda-publish@v1.5.1
+        id: conda-build
+        with:
+          subDir: 'recipe'
+          channels: 'conda-forge -c bioconda'
+          publish: false
+          test_all: true
+          convert_win: false
+          convert_osx: false
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v2
+        with:
+          path: .venv
+          key: venv-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install our library
+        run: poetry install --no-interaction
+
+      - name: Run tests
+        run: |
+          source .venv/bin/activate
+          pytest --cov ${{ github.repository }} tests/

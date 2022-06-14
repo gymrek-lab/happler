@@ -623,6 +623,7 @@ def test_two_snps_two_branches_perfect_one_snp_not_causal():
     assert haps[1][0] == ("snp0", 1)
 
 
+@pytest.mark.xfail(reason="not finished crafting this test yet")
 def test_ppt_case():
     """
     Test the example case from my powerpoint slides
