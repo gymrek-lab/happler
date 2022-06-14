@@ -19,7 +19,7 @@ jobs:
         id: conda-build
         with:
           subDir: '.'
-          channels: 'conda-forge -c ccpi -c paskino'
+          channels: 'conda-forge -c bioconda'
           publish: false
           test_all: true
           convert_win: false
