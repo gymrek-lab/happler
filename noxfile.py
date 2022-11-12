@@ -26,6 +26,8 @@ def docs(session: Session) -> None:
     if not session.posargs and "FORCE_COLOR" in os.environ:
         args.insert(0, "--color")
 
+    session.install("statsmodels=0.13.2")
+
     build_dir = Path("docs", "_build")
     if build_dir.exists():
         shutil.rmtree(build_dir)
@@ -51,7 +53,7 @@ if os.getenv("CONDA_EXE"):
     def tests(session: Session) -> None:
         """Run the test suite."""
         session.conda_install(
-            "coverage[toml]", "pytest", "numpy>=1.20.0", channel="conda-forge"
+            "coverage[toml]", "pytest", "statsmodels=0.13.2", channel="conda-forge"
         )
         # TODO: change this to ".[files]" once plink-ng Alpha 3.8 is released
         # https://github.com/chrchang/plink-ng/releases
@@ -59,7 +61,7 @@ if os.getenv("CONDA_EXE"):
 
         try:
             session.run(
-                "coverage", "run", "--parallel", "-m", "pytest", *session.posargs
+                "coverage", "run", "--parallel", "-m", "pytest", "tests/"
             )
         finally:
             if session.interactive:
@@ -70,14 +72,14 @@ else:
     @session(python=python_versions)
     def tests(session: Session) -> None:
         """Run the test suite."""
-        session.install("coverage[toml]", "pytest")
+        session.install("coverage[toml]", "pytest", "statsmodels=0.13.2")
         # TODO: change this to ".[files]" once plink-ng Alpha 3.8 is released
         # https://github.com/chrchang/plink-ng/releases
         session.install(".")
 
         try:
             session.run(
-                "coverage", "run", "--parallel", "-m", "pytest", *session.posargs
+                "coverage", "run", "--parallel", "-m", "pytest", "tests/"
             )
         finally:
             if session.interactive:
