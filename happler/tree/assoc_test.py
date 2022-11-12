@@ -92,7 +92,9 @@ class AssocTestSimple(AssocTest):
         likelihood = -(n / 2) * (1 + np.log(2 * np.pi)) - (n / 2) * np.log(sse / n)
         return (-2 * likelihood) + ((k + 1) * np.log(n))
 
-    def perform_test(self, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> tuple:
+    def perform_test(
+        self, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
+    ) -> tuple:
         """
         Perform the test for a single haplotype.
 

@@ -60,9 +60,7 @@ if os.getenv("CONDA_EXE"):
         session.install(".")
 
         try:
-            session.run(
-                "coverage", "run", "--parallel", "-m", "pytest", "tests/"
-            )
+            session.run("coverage", "run", "--parallel", "-m", "pytest", "tests/")
         finally:
             if session.interactive:
                 session.notify("coverage", posargs=[])
@@ -78,9 +76,7 @@ else:
         session.install(".")
 
         try:
-            session.run(
-                "coverage", "run", "--parallel", "-m", "pytest", "tests/"
-            )
+            session.run("coverage", "run", "--parallel", "-m", "pytest", "tests/")
         finally:
             if session.interactive:
                 session.notify("coverage", posargs=[])
