@@ -63,7 +63,7 @@ def main():
     "--discard-multiallelic",
     is_flag=True,
     show_default="do not discard multi-allelic variants",
-    help="Whether to discard multi-allelic variants or just complain about them."
+    help="Whether to discard multi-allelic variants or just complain about them.",
 )
 @click.option(
     "-o",
@@ -89,7 +89,7 @@ def run(
     samples_file: Path = None,
     discard_multiallelic: bool = False,
     output: TextIO = sys.stdout,
-    verbosity: str = 'CRITICAL',
+    verbosity: str = "CRITICAL",
 ):
     """
     Use the tool to find trait-associated haplotypes

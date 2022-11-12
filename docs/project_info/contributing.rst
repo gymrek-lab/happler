@@ -45,14 +45,14 @@ To create a pull request you need to do these steps:
         - Or, if you had already forked the repository a while ago, `sync your fork <https://docs.github.com/en/github/collaborating-with-pull-requests/working-with-forks/syncing-a-fork>`_ to make sure you're working with the latest version of happler
     3. `Clone your fork locally <https://docs.github.com/en/get-started/quickstart/fork-a-repo#cloning-your-forked-repository>`_
     4. :code:`cd happler` into the new directory
-    5. Create a new branch off of master with :code:`git checkout -b <descriptive_branch_name>`. Please follow `these best practices <https://stackoverflow.com/a/6065944>`_ when naming your branch
+    5. Create a new branch off of the :code:`main` branch with :code:`git checkout -b <descriptive_branch_name>`. Please follow `best practices <https://www.conventionalcommits.org/>`_ when naming your branch
     6. Setup our development environment by following the instructions in :ref:`dev-setup-instructions` below
     7. Make your changes to the code
     8. Add additional tests to the :code:`tests/` directory and add comments to the documentation to explain how to use your new code. We use pytest for testing and sphinx/numpydoc for documentation
     9. Run the automated code-checking steps detailed in :ref:`code-check-instructions` below
     10. Commit your changes. Please use informative commit messages and do your best to ensure the commit history is clean and easy to interpret
     11. Now you can push your changes to your Github copy of happler by running :code:`git push origin <descriptive_branch_name>`
-    12. Go to your Github copy of happler in your browser and create a pull request. Be sure to change the pull request target branch to :code:`main` on this original repository!
+    12. Go to your Github copy of happler in your browser and create a pull request. `conventional commits spec <https://www.conventionalcommits.org/>`_. Be sure to change the pull request target branch to :code:`main` on this original repository.
     13. Please write an informative pull request detailing the changes you have made and why you made them. Tag any related issues by referring to them by a hashtag followed by their ID
 
 
@@ -78,14 +78,14 @@ Follow these steps to set up a development environment.
 
     .. code-block:: bash
 
-        poetry install -E docs -E test
+        poetry install -E docs -E tests
 
 Now, try importing ``happler`` or running it on the command line.
 
 ---------------------
 Managing Dependencies
 ---------------------
-Run ``poetry help`` to read about the suite of commands it offers for keeping track of dependencies.
+Run ``poetry help`` to read about the suite of commands it offers for managing dependencies.
 
 For example, to add a pypi dependency to our list and install it, just run
 
@@ -104,7 +104,7 @@ You should specify a `version constraint <https://python-poetry.org/docs/master/
 -----------
 Code Checks
 -----------
-Before creating your pull request, please do the following.
+Before creating your pull request, please run each of our code checks.
 
 1. Format the code correctly
 
@@ -116,7 +116,7 @@ Before creating your pull request, please do the following.
 
     .. code-block:: bash
 
-        ( cd docs && sphinx-build -M html . _build )
+        sphinx-build docs docs/_build
         open docs/_build/html/index.html
 
 3. Run all of the tests
@@ -124,6 +124,12 @@ Before creating your pull request, please do the following.
     .. code-block:: bash
 
         pytest tests/
+
+    You can also build the package and run the tests from the built version using ``nox``. This will fully simulate installing the package from PyPI.
+
+    .. code-block:: bash
+
+        nox --session=tests
 
 -----
 Style
@@ -135,6 +141,10 @@ Code
     1. Please type-hint all function parameters
     2. Please adhere to PEP8 whenever possible. :code:`black` will help you with this.
     3. Please use relative imports whenever importing modules from the code base
+    4. For readability, please separate imports into three paragraph blocks:
+        i. from the python standard library
+        ii. from external, third party packages
+        iii. from our own internal code
 
 ~~~~~~~~~~~~~~~~~~~
 Git commit messages
