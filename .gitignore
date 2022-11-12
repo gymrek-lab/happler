@@ -1,9 +1,9 @@
 # python cache
 __pycache__
-# pytest cache
+# pytest and testing-related caches
 .pytest_cache
-# pytest coverage cache
 .coverage
+.nox
 # sphinx documentation
 docs/_build/
 # poetry
