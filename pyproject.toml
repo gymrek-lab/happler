@@ -26,8 +26,8 @@ click = ">=8.0.4"
 networkx = ">=2.6.3"
 scipy = ">=1.7.3"
 pydot = ">=1.4.2"
-haptools = ">=0.0.3"
-pysam = "0.19.0" # temporary until pysam >0.20.0 is released
+haptools = {extras = ["files"], version = ">=0.0.3"}
+pysam = "0.19.0" # temporary workaround until pysam >0.20.0 is released
 
 # docs
 # these belong in the docs group only, but RTD doesn't support that yet -- see
@@ -75,6 +75,7 @@ happler = 'happler.__main__:main'
 [tool.black]
 line-length = 88
 preview = true
+extend-exclude = "analysis/"
 
 [tool.pytest.ini_options]
 log_cli_level = "DEBUG"

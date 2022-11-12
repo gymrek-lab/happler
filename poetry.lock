@@ -267,6 +267,7 @@ python-versions = ">=3.7,<3.11"
 click = ">=8.0.3"
 cyvcf2 = ">=0.30.14"
 matplotlib = ">=3.5.1"
+Pgenlib = {version = ">=0.81.2", optional = true, markers = "extra == \"files\""}
 pysam = ">=0.19.0"
 
 [package.extras]
@@ -556,6 +557,14 @@ python-versions = "*"
 
 [package.dependencies]
 ptyprocess = ">=0.5"
+
+[[package]]
+name = "pgenlib"
+version = "0.81.2"
+description = "Python wrapper for pgenlib's basic reader and writer."
+category = "main"
+optional = false
+python-versions = ">=3.5"
 
 [[package]]
 name = "pickleshare"
@@ -1038,7 +1047,7 @@ tests = []
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7,<3.11"
-content-hash = "479c8d9673e3656b7dc76ac9c99883e5349306214e754c099f701defb5b4a41f"
+content-hash = "cc30a5646292a52317215cecc974d071b16677d6dd603335f485b2c509d299a8"
 
 [metadata.files]
 alabaster = [
@@ -1468,6 +1477,9 @@ pathspec = [
 pexpect = [
     {file = "pexpect-4.8.0-py2.py3-none-any.whl", hash = "sha256:0b48a55dcb3c05f3329815901ea4fc1537514d6ba867a152b581d69ae3710937"},
     {file = "pexpect-4.8.0.tar.gz", hash = "sha256:fc65a43959d153d0114afe13997d439c22823a27cefceb5ff35c2178c6784c0c"},
+]
+pgenlib = [
+    {file = "Pgenlib-0.81.2.tar.gz", hash = "sha256:c8dac92add708197b3ffe41f9fa7612bc48765483295d360b9820a2636094467"},
 ]
 pickleshare = [
     {file = "pickleshare-0.7.5-py2.py3-none-any.whl", hash = "sha256:9649af414d74d4df115d5d718f82acb59c9d418196b7b4290ed47a12ce62df56"},
