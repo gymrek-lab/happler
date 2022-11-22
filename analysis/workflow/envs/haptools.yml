@@ -1,0 +1,6 @@
+channels:
+    - conda-forge
+    - bioconda
+    - nodefaults
+dependencies:
+    - haptools==0.0.3

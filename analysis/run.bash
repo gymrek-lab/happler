@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #PBS -V
 #PBS -d .
-#PBS -q hotel
+#PBS -q condo
 #PBS -j oe
 #PBS -o /dev/null
 #PBS -N run.snakemake
@@ -12,7 +12,6 @@
 # An example bash script demonstrating how to run the entire snakemake pipeline
 # This script creates two separate log files in the output dir:
 # 	1) log - the basic snakemake log of completed rules
-# 	2) qlog - a more detailed log of the progress of each rule and any errors
 
 # Before running this snakemake pipeline, remember to complete the config file
 # with the required input info.
@@ -23,7 +22,6 @@ mkdir -p "$out_path/logs"
 
 # clear leftover log files
 echo ""> "$out_path/logs/log"
-echo ""> "$out_path/logs/qlog"
 
 # try to find and activate the snakemake conda env if we need it
 if ! command -v 'snakemake' &>/dev/null && \
@@ -44,18 +42,22 @@ if [ "$ENVIRONMENT" = "BATCH" ]; then
     --latency-wait 60 \
     --use-conda \
     --conda-frontend mamba \
+    --notemp \
+    --rerun-trigger {mtime,params,input} \
     -k \
     -j 12 \
     -c 12 \
-    "$@" >>"$out_path/logs/log" 2>>"$out_path/logs/qlog"
+    "$@" &>"$out_path/logs/log"
 else
     snakemake \
     --latency-wait 60 \
     --use-conda \
-    --conda-frontend conda \
+    --conda-frontend mamba \
+    --notemp \
+    --rerun-trigger {mtime,params,input} \
     -k \
-    -c 12 \
-    "$@" >>"$out_path/logs/log" 2>>"$out_path/logs/qlog"
+    -c 4 \
+    "$@" &>"$out_path/logs/log"
 fi
 
 exit_code="$?"

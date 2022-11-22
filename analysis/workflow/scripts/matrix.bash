@@ -19,7 +19,7 @@ str_temp_file="$6"
 
 bcftools view -Oz -S <(
     zcat "$samps_file"
-) -o "$temp_file" "$snp_vcf" "$loc"
+) -o "$snp_temp_file" "$snp_vcf" "$loc"
 
 bcftools view -Ou -S <(
     zcat "$samps_file" | awk '{print $1 "_" $1;}'

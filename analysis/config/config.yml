@@ -38,9 +38,13 @@ phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required!
 loci:
- - locus: 1:98001984-99001984
-   str: 1:98506615
-   snp: 1:98501984
+ # - locus: 1:98001984-99001984
+ #   str: 1:98506615
+ #   snp: 1:98501984
+ - locus: 19:45401409-46401409 # center: 45901409 (APOe4)
+   str: 19:45903857 # STR_691361
+   snp: 19:45910672 # rs1046282
+   hap: [rs36046716:G, rs1046282:G]
 #  - locus: 10:104457618-105457618
 #    str: 10:104639652
 #    snp: 10:104612335
