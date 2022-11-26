@@ -152,7 +152,9 @@ class TreeBuilder:
                 yield None, allele, None
                 continue
             # step 2: run all association tests on all of the haplotypes
-            results[allele] = self.method.run(hap_matrix.sum(axis=2), self.phens.data)
+            results[allele] = self.method.run(
+                hap_matrix.sum(axis=2), self.phens.data[:,0],
+            )
             # also, record the best p-value among all the SNPs with this allele
             best_p_idx[allele] = results[allele].data["pval"].argmin()
         # exit if neither of the alleles worked
