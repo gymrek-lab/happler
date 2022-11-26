@@ -66,6 +66,21 @@ def main():
     help="Whether to discard multi-allelic variants or just complain about them.",
 )
 @click.option(
+    "-c",
+    "--chunk-size",
+    type=int,
+    default=None,
+    show_default="all variants",
+    help="If using a PGEN file, read genotypes in chunks of X variants; reduces memory",
+)
+@click.option(
+    "--discard-missing",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Ignore any samples that are missing genotypes for the required variants",
+)
+@click.option(
     "-o",
     "--output",
     type=click.File("w"),
@@ -88,6 +103,8 @@ def run(
     samples: Tuple[str] = tuple(),
     samples_file: Path = None,
     discard_multiallelic: bool = False,
+    chunk_size: int = None,
+    discard_missing: bool = False,
     output: TextIO = sys.stdout,
     verbosity: str = "CRITICAL",
 ):
@@ -136,17 +153,31 @@ def run(
         samples = None
     # load data
     log.info("Loading genotypes")
-    if discard_multiallelic:
-        gt = data.Genotypes(genotypes)
-        gt.read(region=region, samples=samples)
-        log.info("Discarding multiallelic variants")
-        gt.check_biallelic(discard_also=True)
-        gt.check_phase()
+    if genotypes.suffix == ".pgen":
+        gt = data.GenotypesPLINK(fname=genotypes, log=log, chunk_size=chunk_size)
     else:
-        gt = data.Genotypes.load(genotypes, region=region, samples=samples)
+        gt = data.Genotypes(fname=genotypes, log=log)
+    gt.read(region=region, samples=samples)
+    if discard_missing:
+        log.info("Discarding samples that are missing variants")
+    gt.check_missing(discard_also=discard_missing)
+    if discard_multiallelic:
+        log.info("Discarding multiallelic variants")
+    gt.check_biallelic(discard_also=discard_multiallelic)
+    gt.check_phase()
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
     log.info("Loading phenotypes")
-    ph = data.Phenotypes.load(phenotypes, samples=samples)
+    ph = data.Phenotypes.load(phenotypes, samples=gt.samples)
+    if len(ph.samples) < len(gt.samples):
+        diff = set(gt.samples) - set(ph.samples)
+        log.error(
+            f"The phenotypes file is missing {len(diff)} samples. Here are the first "
+            f"few: {list(diff)[:5]}"
+        )
+    if len(ph.names) > 1:
+        log.warning("Ignoring all but the first trait in the phenotypes file")
+        ph.names = ph.names[:1]
+        ph.data = ph.data[:,:1]
     log.info("Running tree builder")
     hap_tree = tree.TreeBuilder(gt, ph).run()
     log.info("Outputting haplotypes")
