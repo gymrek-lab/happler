@@ -115,7 +115,7 @@ class TreeBuilder:
                 continue
             new_node_idx = self.tree.add_node(variant, parent_idx, allele, results)
             # create a new Haplotype with the variant-allele pair added
-            variant_gts = self.gens.data[:, variant.idx, :] == allele
+            variant_gts = self.gens.data[:, variant.idx, :2] == allele
             new_parent_hap = parent_hap.append(variant, allele, variant_gts)
             self._create_tree(new_parent_hap, new_node_idx, results)
 
