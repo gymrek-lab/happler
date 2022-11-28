@@ -66,6 +66,13 @@ def main():
     help="Whether to discard multi-allelic variants or just complain about them.",
 )
 @click.option(
+    "--discard-missing",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Ignore any samples that are missing genotypes for the required variants",
+)
+@click.option(
     "-c",
     "--chunk-size",
     type=int,
@@ -74,19 +81,36 @@ def main():
     help="If using a PGEN file, read genotypes in chunks of X variants; reduces memory",
 )
 @click.option(
-    "--discard-missing",
+    "--maf",
+    type=float,
+    default=None,
+    show_default="no filtering",
+    help="Ignore variants with a MAF below this threshold",
+)
+@click.option(
+    "--phased",
     is_flag=True,
     show_default=True,
     default=False,
-    help="Ignore any samples that are missing genotypes for the required variants",
+    hidden=True,
+    help="Do not check that variants are phased. Saves time and memory.",
+)
+@click.option(
+    "-t",
+    "--threshold",
+    type=float,
+    default=0.05,
+    show_default=0.05,
+    hidden=True,
+    help="The alpha threshold used to determine when to terminate tree building",
 )
 @click.option(
     "-o",
     "--output",
-    type=click.File("w"),
-    default="-",
+    type=click.Path(path_type=Path),
+    default=Path("/dev/stdout"),
     show_default="stdout",
-    help="A .hap file describing the extracted haplotypes.",
+    help="A .hap file describing the extracted haplotypes",
 )
 @click.option(
     "-v",
@@ -103,9 +127,12 @@ def run(
     samples: Tuple[str] = tuple(),
     samples_file: Path = None,
     discard_multiallelic: bool = False,
-    chunk_size: int = None,
     discard_missing: bool = False,
-    output: TextIO = sys.stdout,
+    chunk_size: int = None,
+    maf: float = None,
+    phased: bool = False,
+    threshold: float = 0.05,
+    output: Path = Path("/dev/stdout"),
     verbosity: str = "CRITICAL",
 ):
     """
@@ -117,21 +144,6 @@ def run(
     phenotype value
 
     Ex: happler run tests/data/simple.vcf tests/data/simple.tsv > simple.hap
-
-    \f
-    Parameters
-    ----------
-    genotypes : Path
-        The path to the genotypes in VCF format
-    phenotypes : Path
-        The path to the phenotypes in TSV format. There should be no header lines.
-    region : str, optional
-        See documentation for :py:meth:`~.data.Genotypes.read`
-    sample : Tuple[str], optional
-        See documentation for :py:meth:`~.data.Genotypes.read`
-    samples_file : Path, optional
-        A single column txt file containing a list of the samples (one per line) to
-        subset from the genotypes file
     """
     log = logging.getLogger("run")
     logging.basicConfig(
@@ -156,14 +168,23 @@ def run(
     if genotypes.suffix == ".pgen":
         gt = data.GenotypesPLINK(fname=genotypes, log=log, chunk_size=chunk_size)
     else:
-        gt = data.Genotypes(fname=genotypes, log=log)
+        gt = data.GenotypesRefAlt(fname=genotypes, log=log)
+    gt._prephased = phased
     gt.read(region=region, samples=samples)
-    if discard_missing:
-        log.info("Discarding samples that are missing variants")
+    num_variants, num_samples = len(gt.variants), len(gt.samples)
     gt.check_missing(discard_also=discard_missing)
-    if discard_multiallelic:
-        log.info("Discarding multiallelic variants")
+    removed = num_samples - len(gt.samples)
+    if removed:
+        log.info(f"Ignoring {removed} samples that are missing variants")
     gt.check_biallelic(discard_also=discard_multiallelic)
+    removed = num_variants - len(gt.variants)
+    if removed:
+        log.info(f"Ignoring {removed} multiallelic variants")
+        num_variants = len(gt.variants)
+    gt.check_maf(threshold=maf, discard_also=True)
+    removed = num_variants - len(gt.variants)
+    if maf is not None:
+        log.info(f"Ignoring {removed} variants with MAF < {maf}")
     gt.check_phase()
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
     log.info("Loading phenotypes")
@@ -179,9 +200,10 @@ def run(
         ph.names = ph.names[:1]
         ph.data = ph.data[:,:1]
     log.info("Running tree builder")
-    hap_tree = tree.TreeBuilder(gt, ph).run()
+    terminator = tree.terminator.TTestTerminator(thresh=threshold)
+    hap_tree = tree.TreeBuilder(gt, ph, terminator=terminator).run()
     log.info("Outputting haplotypes")
-    tree.Haplotypes.from_tree(hap_tree).write(output)
+    tree.Haplotypes.from_tree(fname=output, tree=hap_tree, gts=gt, log=log).write()
 
 
 if __name__ == "__main__":
