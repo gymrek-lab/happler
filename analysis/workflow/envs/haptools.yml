@@ -3,4 +3,8 @@ channels:
     - bioconda
     - nodefaults
 dependencies:
-    - haptools==0.0.3
+    - pysam>=0.19.1
+    - pip
+    - gxx_linux-64
+    - pip:
+        - git+https://github.com/CAST-genomics/haptools.git#haptools[files]==0.0.3
