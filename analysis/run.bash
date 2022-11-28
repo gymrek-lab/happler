@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 #PBS -V
 #PBS -d .
-#PBS -q condo
+#PBS -q home-gymrek
 #PBS -j oe
 #PBS -o /dev/null
 #PBS -N run.snakemake
 #PBS -l nodes=1:ppn=1
 #PBS -l walltime=5:00:00
+#PBS -W group_list=gymreklab-group
+#PBS -A gymreklab-group
 
 
 # An example bash script demonstrating how to run the entire snakemake pipeline
@@ -37,8 +39,8 @@ fi
 # check: are we being executed from within qsub?
 if [ "$ENVIRONMENT" = "BATCH" ]; then
     snakemake \
-    --cluster "qsub -d . -V -q hotel -l walltime={resources.runtime} -l nodes=1:ppn={threads} -j oe -o /dev/null" \
-    --default-resources 'runtime="00:30:00"' \
+    --cluster "qsub -d . -V -q {resources.queue} -l walltime={resources.runtime} -l nodes=1:ppn={threads} -j oe -o /dev/null -W group_list=gymreklab-group -A gymreklab-group " \
+    --default-resources 'runtime="00:30:00"' 'queue="condo"' \
     --latency-wait 60 \
     --use-conda \
     --conda-frontend mamba \
