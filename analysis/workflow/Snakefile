@@ -70,6 +70,8 @@ rule plink2vcf:
         bcf=out + "/{chr}_{locus}/unphased.bcf",
         bcf_idx=out + "/{chr}_{locus}/unphased.bcf.csi",
         log=temp(out + "/{chr}_{locus}/unphased.log"),
+    resources:
+        runtime="0:15:00"
     log:
         logs + "/{chr}_{locus}/plink2vcf"
     benchmark:
@@ -103,7 +105,7 @@ rule phase_gt:
         phased=out + "/{chr}_{locus}/phased.bcf",
         phased_idx=out + "/{chr}_{locus}/phased.bcf.csi",
     resources:
-        runtime="3:00:00"
+        runtime="4:00:00"
     threads: 8
     log:
         logs + "/{chr}_{locus}/phase_gt"
@@ -155,7 +157,7 @@ rule vcf2gt:
         temp_str=temp(out + "/{chr}_{locus}/strs.bcf"),
         matrix=out + "/{chr}_{locus}/matrix.tsv.gz",
     resources:
-        runtime="2:00:00"
+        runtime="1:45:00"
     log:
         logs + "/{chr}_{locus}/vcf2gt",
     benchmark:
@@ -176,11 +178,13 @@ rule vcf2plink:
             locus=wildcards.locus.split("_")[1],
         ),
     params:
+        maf=config["min_maf"],
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
     output:
         pgen=out+"/{locus}/snps.pgen",
         pvar=out+"/{locus}/snps.pvar",
         psam=out+"/{locus}/snps.psam",
+        log=temp(out+"/{locus}/snps.log"),
     resources:
         runtime="0:30:00"
     log:
@@ -190,7 +194,8 @@ rule vcf2plink:
     conda:
         "envs/default.yml"
     shell:
-        "plink2 --bcf {input.vcf} --out {params.prefix}"
+        "plink2 --bcf {input.vcf} --maf {params.maf} --make-pgen --out {params.prefix}"
+        " &>{log}"
 
 
 rule str2gt:
@@ -253,6 +258,8 @@ rule phens2pheno:
         phens=rules.phens.output.phenotypes,
     output:
         pheno=out + "/{locus}/sim/{mode}/{beta}/{locus}.pheno"
+    wildcard_constraints:
+        mode="snp|str",
     log:
         logs + "/{locus}/sim/{mode}/{beta}/pheno",
     benchmark:
@@ -260,18 +267,18 @@ rule phens2pheno:
     conda:
         "envs/default.yml"
     shell:
-        "zcat {input} | \{ read -r head; echo $head | "
-        "sed 's/^sample\\t/#IID\t/' | cut -f-2; cut -f1,3 \} >{output} 2>{log}"
+        "zcat {input} | {{ read -r head; echo $head | "
+        "sed 's/^sample\\t/#IID\t/' | cut -f-2; cut -f1,3 }} >{output} 2>{log}"
 
 
 rule create_hap:
     """ create a hap file suitable for haptools transform and simphenotype """
     params:
+        ignore="this", # the first parameter is always ignored for some reason
         chrom=lambda wildcards: wildcards.chr,
-        start=lambda wildcards: wildcards.locus.split('-')[0],
-        end=lambda wildcards: wildcards.locus.split('-')[1],
-        alleles=lambda wildcards: loci[wildcards.chr + "_" + wildcards.locus]["hap"],
+        locus=lambda wildcards: wildcards.locus.replace('-', '\t'),
         beta=lambda wildcards: wildcards.beta,
+        alleles=lambda wildcards: loci[wildcards.chr + "_" + wildcards.locus]["hap"],
     output:
         hap=out + "/{chr}_{locus}/sim/hap/{beta}/{chr}_{locus}.hap"
     log:
@@ -281,7 +288,7 @@ rule create_hap:
     conda:
         "envs/default.yml"
     script:
-        "scripts/create_hap_file.bash"
+        "scripts/create_hap_file.sh"
 
 
 rule transform:
@@ -292,6 +299,7 @@ rule transform:
             rules.create_hap.output.hap,
             chr=wildcards.locus.split("_")[0],
             locus=wildcards.locus.split("_")[1],
+            beta=wildcards.beta,
         ),
         pgen=rules.vcf2plink.output.pgen,
         pvar=rules.vcf2plink.output.pvar,
@@ -305,7 +313,7 @@ rule transform:
     benchmark:
         bench + "/{locus}/sim/hap/{beta}/transform",
     conda:
-        "envs/haptools.yml"
+        "happler"
     shell:
         "haptools transform -o {output.pgen} {input.pgen} {input.hap} &>{log}"
 
@@ -324,9 +332,29 @@ rule simphenotype:
     benchmark:
         bench + "/{locus}/sim/hap/{beta}/simphenotype",
     conda:
-        "envs/haptools.yml"
+        "happler"
     shell:
         "haptools simphenotype -o {output.pheno} {input.pgen} {input.hap} &>{log}"
+
+
+rule pheno2phens:
+    """ generate a phens file for a causal haplotype """
+    input:
+        pgen=rules.transform.output.pgen,
+        pvar=rules.transform.output.pvar,
+        psam=rules.transform.output.psam,
+        pheno=rules.simphenotype.output.pheno,
+    output:
+        phens=out + "/{locus}/sim/hap/{beta}/phens.tsv.gz",
+    log:
+        logs + "/{locus}/sim/hap/{beta}/pheno2phens",
+    benchmark:
+        bench + "/{locus}/sim/hap/{beta}/pheno2phens",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/pheno2phens.py -o {output.phens} {input.pgen} "
+        "{input.pheno} &>{log}"
 
 
 run_methods_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output"
@@ -360,8 +388,15 @@ rule happler:
         gts=rules.vcf2plink.output.pgen,
         pts=lambda wildcards: rules.simphenotype.output.pheno \
             if wildcards.mode == "hap" else rules.phens2pheno.output.pheno,
+    params:
+        thresh=100,
+        chunk_size=1000,
     output:
         hap=run_methods_out + "/happler.hap"
+    resources:
+        runtime="0:30:00",
+        queue="hotel",
+    threads: 6
     log:
         logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler",
     benchmark:
@@ -369,7 +404,77 @@ rule happler:
     conda:
         "happler"
     shell:
-        "happler -o {output.hap} --verbosity DEBUG --discard-multiallelic {input.gts} {inputs.pts} &>{log}"
+        "happler run -o {output.hap} --verbosity DEBUG --discard-multiallelic"
+        " -t {params.thresh} --discard-missing --chunk-size {params.chunk_size} "
+        "{input.gts} {input.pts} &>{log}"
+
+
+rule transform_happler:
+    input:
+        hap=rules.happler.output.hap,
+        pgen=rules.vcf2plink.output.pgen,
+        pvar=rules.vcf2plink.output.pvar,
+        psam=rules.vcf2plink.output.psam,
+    params:
+        hap_id="H1",
+    output:
+        pgen=temp(run_methods_out + "/happler.pgen"),
+        pvar=temp(run_methods_out + "/happler.pvar"),
+        psam=temp(run_methods_out + "/happler.psam"),
+    resources:
+        runtime="0:04:00"
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/transform_happler",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/transform_happler",
+    conda:
+        "happler"
+    shell:
+        "haptools transform -o {output.pgen} --id {params.hap_id} {input.pgen} "
+        "{input.hap} &>{log}"
+
+
+rule append_hap2mat:
+    input:
+        matrix=rules.phens.input,
+        hps=rules.transform_happler.output.pgen,
+        hps_pvar=rules.transform_happler.output.pvar,
+        hps_psam=rules.transform_happler.output.psam,
+    output:
+        matrix=run_methods_out + "/happler.tsv.gz",
+    resources:
+        runtime="0:04:00"
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/append_hap2mat",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/append_hap2mat",
+    conda:
+        "happler"
+    shell:
+        "zcat {input.matrix} | paste - <(workflow/scripts/append_hap.py {input.hps} "
+        "<(zcat {input.matrix} | cut -f1 | tail -n+2)) | gzip >{output.matrix} 2>{log}"
+
+
+rule run_susie_happler:
+    """ execute SuSiE using the haplotypes from happler """
+    input:
+        gt=rules.phens.input,
+        phen=rules.phens.output,
+    params:
+        outdir=run_methods_out,
+        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
+    output:
+        sumstats=temp(run_methods_out + "/sumstats.rds"),
+        finemap=run_methods_out + "/finemap.rds",
+        susie=run_methods_out + "/susie.rds",
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/methods",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/methods",
+    conda:
+        "envs/susie.yml"
+    shell:
+        "workflow/scripts/finemapping_methods.R {input} {params} &>{log}"
 
 
 plot_results_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/results"
