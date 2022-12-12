@@ -51,6 +51,7 @@ rule all:
                     [
                         out + "/{locus}/sim/{mode}/{beta}/{causal}clude/results/susie.pdf",
                         out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results/susie.pdf",
+                        out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results/manhattan.pdf",
                     ],
                     locus=locus,
                     mode=(loci[locus].keys() - set(("locus",))),
@@ -332,7 +333,10 @@ rule phens2pheno:
 rule create_hap:
     """ create a hap file suitable for haptools transform and simphenotype """
     input:
-        gts=rules.vcf2plink.output.pvar,
+        gts=lambda wildcards: expand(
+            rules.vcf2plink.output.pvar,
+            locus=wildcards.chr + "_" + wildcards.locus,
+        ),
     params:
         ignore="this", # the first parameter is always ignored for some reason
         chrom=lambda wildcards: wildcards.chr,
@@ -675,7 +679,7 @@ rule manhattan:
         ],
         orange_ids = "-b hap -b H1",
     output:
-        png = plot_results_happler_out+"/hap.pdf",
+        png = plot_results_happler_out+"/manhattan.pdf",
     resources:
         runtime="0:05:00"
     log:
