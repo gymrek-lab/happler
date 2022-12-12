@@ -198,7 +198,7 @@ def run(
     if len(ph.names) > 1:
         log.warning("Ignoring all but the first trait in the phenotypes file")
         ph.names = ph.names[:1]
-        ph.data = ph.data[:,:1]
+        ph.data = ph.data[:, :1]
     log.info("Running tree builder")
     terminator = tree.terminator.TTestTerminator(thresh=threshold)
     hap_tree = tree.TreeBuilder(gt, ph, terminator=terminator).run()

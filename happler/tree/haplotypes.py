@@ -12,7 +12,7 @@ from haptools.data import (
     Genotypes,
     Variant as VariantBase,
     Haplotype as HaplotypeBase,
-    Haplotypes as HaplotypesBase
+    Haplotypes as HaplotypesBase,
 )
 
 from .tree import Tree
@@ -226,11 +226,7 @@ class Haplotypes(HaplotypesBase):
 
     @classmethod
     def from_tree(
-        cls,
-        fname: Path | str,
-        tree: Tree,
-        gts: Genotypes,
-        log: Logger = None
+        cls, fname: Path | str, tree: Tree, gts: Genotypes, log: Logger = None
     ) -> Haplotypes:
         """
         Create a Haplotypes object from a Tree object and a Genotypes object
@@ -252,21 +248,18 @@ class Haplotypes(HaplotypesBase):
             The completed Haplotypes object
         """
         haps = cls(
-            fname=fname,
-            haplotype=HapplerHaplotype,
-            variant=HapplerVariant,
-            log=log
+            fname=fname, haplotype=HapplerHaplotype, variant=HapplerVariant, log=log
         )
         haps.data = {}
         for hap_idx, haplotype in enumerate(tree.haplotypes()):
-            hap_id = "H"+str(hap_idx)
+            hap_id = "H" + str(hap_idx)
             haps.data[hap_id] = HapplerHaplotype(
-                chrom = gts.variants[haplotype[0]["variant"].idx]["chrom"],
-                start = 0,
-                end = 0,
-                id = hap_id,
-                beta = 0,
-                pval = 0,
+                chrom=gts.variants[haplotype[0]["variant"].idx]["chrom"],
+                start=0,
+                end=0,
+                id=hap_id,
+                beta=0,
+                pval=0,
             )
             alleles = {
                 node["variant"].idx: gts.variants[node["variant"].idx][
@@ -276,11 +269,11 @@ class Haplotypes(HaplotypesBase):
             }
             haps.data[hap_id].variants = tuple(
                 HapplerVariant(
-                    start = node["variant"].pos,
-                    end = node["variant"].pos + len(alleles[node["variant"].idx]),
-                    id = node["variant"].id,
-                    allele = alleles[node["variant"].idx],
-                    score = cls._handle_nan(node["results"], "pval"),
+                    start=node["variant"].pos,
+                    end=node["variant"].pos + len(alleles[node["variant"].idx]),
+                    id=node["variant"].id,
+                    allele=alleles[node["variant"].idx],
+                    score=cls._handle_nan(node["results"], "pval"),
                 )
                 for node in haplotype
             )
