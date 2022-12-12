@@ -61,13 +61,27 @@ dat = list(X=X,Y=as.matrix(y))
 input = paste0(out,'/sumstats.rds')
 saveRDS(list(data=dat, sumstats=sumstats), input)
 
+thisFile <- function() {
+  # function to figure out the path to the current script
+  # copied from https://stackoverflow.com/a/15373917/16815703
+  cmdArgs <- commandArgs(trailingOnly = FALSE)
+  needle <- "--file="
+  match <- grep(needle, cmdArgs)
+  if (length(match) > 0) {
+    # Rscript
+    return(normalizePath(sub(needle, "", cmdArgs[match])))
+  } else {
+    # 'source'd via R console
+    return(normalizePath(sys.frames()[[1]]$ofile))
+  }
+}
 
 # run FINEMAP
 # and set an output path; the results will be written to an RDS file with this basename
 output = paste0(out, "/finemap")
 args = "--n-causal-snps 1"
 commandArgs = function(...) 1
-source(paste0(.libPaths(), '/susieR/code/finemap.R'))
+source(paste0(dirname(thisFile()), "/finemap_1p4.R"))
 
 
 # run SuSiE
