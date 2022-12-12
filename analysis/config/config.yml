@@ -42,18 +42,13 @@ loci:
  #   str: 1:98506615
  #   snp: 1:98501984
  - locus: 19:45401409-46401409 # center: 45901409 (APOe4)
-   str: 19:45903857 # STR_691361
+   # str: 19:45903857 # STR_691361
    snp: 19:45910672 # rs1046282
-   hap: [rs36046716:G, rs1046282:G]
+   hap: [rs36046716:G, rs1046282:G] # 45892145, 45910672
 #  - locus: 10:104457618-105457618
 #    str: 10:104639652
 #    snp: 10:104612335
    # - locus: 16:56927279-57084844
-
-# Generates phenotypes for either SNP or STR ("snp" or "str")
-# If you want to run multiple modes, just provide them in a list.
-# defaults to "snp"
-mode: [str]
 
 # Discard rare variants with a MAF below this number
 # Defaults to 0 if not specified
@@ -62,7 +57,7 @@ min_maf: 0.1
 # The strength of association between the chosen STR or SNP and the simulated phenotype
 # Defaults to 0.1 if not specified
 # You can also provide a list of floats, if you want to test several beta values
-beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
+beta: [0.05]
 
 # Whether to include the causal variant in the set of genotypes provided to the
 # finemapping methods. Set this to true if you're interested in seeing how the

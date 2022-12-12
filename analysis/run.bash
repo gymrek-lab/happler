@@ -6,7 +6,7 @@
 #PBS -o /dev/null
 #PBS -N run.snakemake
 #PBS -l nodes=1:ppn=1
-#PBS -l walltime=5:00:00
+#PBS -l walltime=7:00:00
 #PBS -W group_list=gymreklab-group
 #PBS -A gymreklab-group
 
