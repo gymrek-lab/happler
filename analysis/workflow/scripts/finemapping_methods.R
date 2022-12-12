@@ -11,6 +11,7 @@
 
 
 library(abind)
+library(data.table)
 
 
 # first, we import the phenotype file into X and Y vectors
@@ -20,14 +21,11 @@ phen = args[2]
 out = args[3]
 exclude_causal = as.logical(as.integer(args[4]))
 
-# gt = "out/1_98001984-99001984/gt_matrix.tsv.gz"
-# phen = "out/1_98001984-99001984/phens.tsv.gz"
-# out = "out/1_98001984-99001984/susieR"
 dir.create(out, showWarnings = FALSE)
 
 
 # import genotype matrices as proper matrices
-gt = read.csv(gt, sep="\t", header=T)
+gt = data.table::fread(gt, sep="\t", header=T, stringsAsFactors = FALSE, colClasses = "numeric")
 phen = read.csv(phen, sep="\t", header=T)
 # create matrices without unecessary columns
 X = as.matrix(gt[,-1])
