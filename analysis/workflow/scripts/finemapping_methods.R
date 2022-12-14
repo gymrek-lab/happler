@@ -24,6 +24,7 @@ exclude_causal = as.logical(as.integer(args[4]))
 dir.create(out, showWarnings = FALSE)
 
 
+write("reading genotype matrix", stderr())
 # import genotype matrices as proper matrices
 gt = data.table::fread(gt, sep="\t", header=T, stringsAsFactors = FALSE, colClasses = "numeric")
 phen = read.csv(phen, sep="\t", header=T)
@@ -44,6 +45,7 @@ if (exclude_causal) {
 }
 
 
+write("computing summary statistics for FINEMAP", stderr())
 # compute summary statistics for FINEMAP
 mm_regression = function(X, Y, Z=NULL) {
   if (!is.null(Z)) {
@@ -59,6 +61,7 @@ mm_regression = function(X, Y, Z=NULL) {
 sumstats = mm_regression(as.matrix(X), as.matrix(y))
 dat = list(X=X,Y=as.matrix(y))
 input = paste0(out,'/sumstats.rds')
+write("saving summary statistics to RDS file", stderr())
 saveRDS(list(data=dat, sumstats=sumstats), input)
 
 thisFile <- function() {
@@ -81,15 +84,18 @@ thisFile <- function() {
 output = paste0(out, "/finemap")
 args = "--n-causal-snps 1"
 commandArgs = function(...) 1
+write("executing FINEMAP", stderr())
 source(paste0(dirname(thisFile()), "/finemap_1p4.R"))
 
 
 # run SuSiE
 # write the output to an RDS file
+write("executing SuSiE", stderr())
 fitted = susieR::susie(X, y, L=1)
 
 # when writing the output, also include information about which variant is causal
 # and whether it was included in the simulation
+write("writing SuSiE output", stderr())
 saveRDS(
   list(causal_var=causal_variant, causal_excluded=exclude_causal, fitted=fitted),
   paste0(out, '/susie.rds')
