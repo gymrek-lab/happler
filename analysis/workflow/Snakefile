@@ -616,8 +616,8 @@ rule snp_hap_2gt:
         "plink2 --pfile {params.in_prefix} --out {params.prefix} --export Av &>{log} "
         "&& cut -f 4,7- {output.traw} | (read -r head; echo \"$head\" | "
         "sed 's/POS\\t/sample\\t/; s/\\t0_/\\t/g'; sed 's/\\t/:0\\t/;') | "
-        "datamash transpose | (read -r head; echo \"$head\" | rev | cut -f2- | rev; "
-        "echo \"$head\" | rev | cut -f-2 | rev | sed 's/:0/:2/g'; cat) | "
+        "datamash transpose | (read -r head; paste <(echo \"$head\" | rev | cut -f2- |"
+        " rev) <(echo \"$head\" | rev | cut -f-2 | rev | sed 's/:0/:2/g'); cat) | "
         "gzip > {output.matrix} 2>{log}"
 
 
