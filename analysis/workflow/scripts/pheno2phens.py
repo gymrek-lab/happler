@@ -39,16 +39,16 @@ def main(hps: Path, pheno: Path, output: Path):
     assert len(gts.variants) == 1
     assert gts.samples == pts.samples
     assert len(pts.names) == 1
-    pos = gts.variants["pos"]
+    pos = gts.variants["pos"][0]
     
     hap_gts = gts.data[:, 0, :].sum(axis=1)
     # normalize the genotypes
     hap_gts = (hap_gts - hap_gts.mean()) / hap_gts.std()
 
     with Data.hook_compressed(output, mode="w") as phens:
-        phens.write(f"sample\t{pos}:2\tphen")
+        phens.write(f"sample\t{pos}:2\tphen\n")
         for samp, gt, pt in zip(gts.samples, hap_gts, pts.data[:, 0]):
-            phens.write(f"{samp}, {gt:.17f}, {pt:.17f}")
+            phens.write(f"{samp}\t{gt:.17f}\t{pt:.17f}\n")
 
 
 if __name__ == "__main__":
