@@ -507,7 +507,8 @@ rule happler:
     params:
         thresh=100,
     output:
-        hap=run_methods_out + "/happler.hap"
+        hap=run_methods_out + "/happler.hap",
+        dot=run_methods_out + "/happler.dot",
     resources:
         runtime="0:15:00",
         queue="hotel",
@@ -520,7 +521,23 @@ rule happler:
         "happler"
     shell:
         "happler run -o {output.hap} --verbosity DEBUG --discard-multiallelic"
-        " -t {params.thresh} --discard-missing {input.gts} {input.pts} &>{log}"
+        " -t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
+
+
+rule hap_tree:
+    """ visualize the haplotype tree as a png file """
+    input:
+        dot=rules.happler.output.dot,
+    output:
+        png=run_methods_out + "/happler.png",
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/hap_tree",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/hap_tree",
+    conda:
+        "envs/default.yml"
+    shell:
+        "dot -Tpng {input.dot} -o {output.png}"
 
 
 rule transform_happler:
