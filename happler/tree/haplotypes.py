@@ -226,7 +226,7 @@ class Haplotypes(HaplotypesBase):
 
     @classmethod
     def from_tree(
-        cls, fname: Path | str, tree: Tree, gts: Genotypes, log: Logger = None
+        cls, fname: Path | str, tree: Tree, gts: GenotypesRefAlt, log: Logger = None
     ) -> Haplotypes:
         """
         Create a Haplotypes object from a Tree object and a Genotypes object
@@ -237,7 +237,7 @@ class Haplotypes(HaplotypesBase):
             The fname parameter for the Haplotypes object
         tree : Tree
             The Tree object containing the haplotypes to encode within a Haplotypes obj
-        gts : Genotypes
+        gts : GenotypesRefAlt
             The genotypes from which the tree was constructed
         log : Logger, optional
             The log parameter for the Haplotypes object

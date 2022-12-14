@@ -59,8 +59,8 @@ def _create_fake_phens(data) -> Phenotypes:
     """
     phens = Phenotypes(fname=None)
     phens.samples = tuple("samp" + str(i) for i in range(data.shape[0]))
-    if len(data.shape) > 1:
-        data = np.squeeze(data)
+    if len(data.shape) == 1:
+        data = data[:, np.newaxis]
     phens.data = data
     # check: are all of the phenotype values the same?
     if np.all(phens.data == phens.data[0]):
