@@ -186,9 +186,8 @@ class TreeBuilder:
             node_res = self.results_type.from_np(best_results)
             # step 6: check whether we should terminate the branch
             self.log.debug(
-                "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
-                    best_variant.id, allele, parent_res, node_res
-                )
+                "Testing variant {} / allele {} with parent_res {} and node_res {}"
+                .format(best_variant.id, allele, parent_res, node_res)
             )
             if self.terminator.check(
                 parent_res, node_res, num_samps, num_snps_tested, self.log
