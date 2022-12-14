@@ -326,7 +326,7 @@ rule phens2pheno:
     conda:
         "envs/default.yml"
     shell:
-        "zcat {input} | {{ read -r head; echo $head | "
+        "zcat {input.phens} | {{ read -r head; echo $head | "
         "sed 's/^sample\\t/#IID\t/' | cut -f-2; cut -f1,3 }} >{output} 2>{log}"
 
 
@@ -341,14 +341,14 @@ rule create_hap:
         ignore="this", # the first parameter is always ignored for some reason
         chrom=lambda wildcards: wildcards.chr,
         locus=lambda wildcards: wildcards.locus.replace('-', '\t'),
-        beta=lambda wildcards: wildcards.beta,
+        beta=0.99,
         alleles=lambda wildcards: loci[wildcards.chr + "_" + wildcards.locus]["hap"],
     output:
-        hap=out + "/{chr}_{locus}/sim/hap/{beta}/{chr}_{locus}.hap"
+        hap=out + "/{chr}_{locus}/sim/hap/{chr}_{locus}.hap"
     log:
-        logs + "/{chr}_{locus}/sim/hap/{beta}/create_hap",
+        logs + "/{chr}_{locus}/sim/hap/create_hap",
     benchmark:
-        bench + "/{chr}_{locus}/sim/hap/{beta}/create_hap",
+        bench + "/{chr}_{locus}/sim/hap/create_hap",
     conda:
         "envs/default.yml"
     script:
@@ -363,19 +363,18 @@ rule transform:
             rules.create_hap.output.hap,
             chr=wildcards.locus.split("_")[0],
             locus=wildcards.locus.split("_")[1],
-            beta=wildcards.beta,
         ),
         pgen=rules.vcf2plink.output.pgen,
         pvar=rules.vcf2plink.output.pvar,
         psam=rules.vcf2plink.output.psam,
     output:
-        pgen=temp(out + "/{locus}/sim/hap/{beta}/{locus}.pgen"),
-        pvar=temp(out + "/{locus}/sim/hap/{beta}/{locus}.pvar"),
-        psam=temp(out + "/{locus}/sim/hap/{beta}/{locus}.psam"),
+        pgen=temp(out + "/{locus}/sim/hap/{locus}.pgen"),
+        pvar=temp(out + "/{locus}/sim/hap/{locus}.pvar"),
+        psam=temp(out + "/{locus}/sim/hap/{locus}.psam"),
     log:
-        logs + "/{locus}/sim/hap/{beta}/transform",
+        logs + "/{locus}/sim/hap/transform",
     benchmark:
-        bench + "/{locus}/sim/hap/{beta}/transform",
+        bench + "/{locus}/sim/hap/transform",
     conda:
         "happler"
     shell:
@@ -391,15 +390,15 @@ rule merge:
         hps_pvar=rules.transform.output.pvar,
         hps_psam=rules.transform.output.psam,
     output:
-        pgen=out+"/{locus}/sim/hap/{beta}/hap_gts_merged.pgen",
-        pvar=out+"/{locus}/sim/hap/{beta}/hap_gts_merged.pvar",
-        psam=out+"/{locus}/sim/hap/{beta}/hap_gts_merged.psam",
+        pgen=out+"/{locus}/sim/hap/hap_gts_merged.pgen",
+        pvar=out+"/{locus}/sim/hap/hap_gts_merged.pvar",
+        psam=out+"/{locus}/sim/hap/hap_gts_merged.psam",
     resources:
         runtime="0:04:00"
     log:
-        logs + "/{locus}/sim/hap/{beta}/merge"
+        logs + "/{locus}/sim/hap/merge"
     benchmark:
-        bench + "/{locus}/sim/hap/{beta}/merge"
+        bench + "/{locus}/sim/hap/merge"
     conda:
         "happler"
     shell:
@@ -414,13 +413,13 @@ rule append_hap2mat:
         hps_pvar=rules.transform.output.pvar,
         hps_psam=rules.transform.output.psam,
     output:
-        matrix=out + "/{locus}/sim/{mode}/{beta}/hap_gt_matrix.tsv.gz",
+        matrix=out + "/{locus}/sim/{mode}/hap_gt_matrix.tsv.gz",
     resources:
         runtime="0:04:00"
     log:
-        logs + "/{locus}/sim/{mode}/{beta}/append_hap2mat",
+        logs + "/{locus}/sim/{mode}/append_hap2mat",
     benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/append_hap2mat",
+        bench + "/{locus}/sim/{mode}/append_hap2mat",
     conda:
         "happler"
     shell:
@@ -436,6 +435,8 @@ rule simphenotype:
         pgen=rules.transform.output.pgen,
         pvar=rules.transform.output.pvar,
         psam=rules.transform.output.psam,
+    params:
+        beta=lambda wildcards: wildcards.beta,
     output:
         pheno=out + "/{locus}/sim/hap/{beta}/{locus}.pheno",
     log:
@@ -445,7 +446,8 @@ rule simphenotype:
     conda:
         "happler"
     shell:
-        "haptools simphenotype -o {output.pheno} {input.pgen} {input.hap} &>{log}"
+        "haptools simphenotype -o {output.pheno} {input.pgen} "
+        "<( sed 's/\\t0.99$/\\t{params.beta}/' {input.hap} ) &>{log}"
 
 
 rule pheno2phens:
