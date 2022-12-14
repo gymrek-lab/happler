@@ -105,6 +105,13 @@ def main():
     help="The alpha threshold used to determine when to terminate tree building",
 )
 @click.option(
+    "--show-tree",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Output a tree in addition to the regular output.",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -132,6 +139,7 @@ def run(
     maf: float = None,
     phased: bool = False,
     threshold: float = 0.05,
+    show_tree: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "CRITICAL",
 ):
@@ -204,6 +212,14 @@ def run(
     hap_tree = tree.TreeBuilder(gt, ph, terminator=terminator).run()
     log.info("Outputting haplotypes")
     tree.Haplotypes.from_tree(fname=output, tree=hap_tree, gts=gt, log=log).write()
+    if show_tree:
+        if output.suffix == ".gz":
+            dot_output = output.with_suffix("").with_suffix(".dot")
+        else:
+            dot_output = output.with_suffix(".dot")
+        log.info("Writing tree to dot file")
+        with open(dot_output, "w") as dot_file:
+            dot_file.write(hap_tree.dot())
 
 
 if __name__ == "__main__":
