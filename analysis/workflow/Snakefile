@@ -489,7 +489,7 @@ rule run_methods:
         finemap=run_methods_out + "/finemap.rds",
         susie=run_methods_out + "/susie.rds",
     resources:
-        runtime="3:00:00",
+        runtime="1:00:00",
     log:
         logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/run_methods",
     benchmark:
@@ -616,7 +616,7 @@ rule snp_hap_2gt:
         "plink2 --pfile {params.in_prefix} --out {params.prefix} --export Av &>{log} "
         "&& cut -f 4,7- {output.traw} | (read -r head; echo \"$head\" | "
         "sed 's/POS\\t/sample\\t/; s/\\t0_/\\t/g'; sed 's/\\t/:0\\t/;') | "
-        "datamash transpose | (read -r head; paste <(echo \"$head\" | rev | cut -f2- |"
+        "datamash transpose | (read -r head; paste <(echo \"$head\" | rev | cut -f3- |"
         " rev) <(echo \"$head\" | rev | cut -f-2 | rev | sed 's/:0/:2/g'); cat) | "
         "gzip > {output.matrix} 2>{log}"
 
@@ -666,13 +666,13 @@ rule run_methods_happler:
         phen=rules.pheno2phens.output.phens,
     params:
         outdir=run_methods_out + "/happler",
-        exclude_causal=lambda wildcards: 0,
+        exclude_causal=lambda wildcards: 1,
     output:
         sumstats=temp(run_methods_out + "/happler/sumstats.rds"),
         finemap=run_methods_out + "/happler/finemap.rds",
         susie=run_methods_out + "/happler/susie.rds",
     resources:
-        runtime="6:00:00",
+        runtime="1:00:00",
         queue="hotel",
     log:
         logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/run_methods",
