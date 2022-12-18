@@ -10,6 +10,24 @@
 #         0 otherwise
 
 
+thisFile <- function() {
+  # function to figure out the path to the current script
+  # copied from https://stackoverflow.com/a/15373917/16815703
+  cmdArgs <- commandArgs(trailingOnly = FALSE)
+  needle <- "--file="
+  match <- grep(needle, cmdArgs)
+  if (length(match) > 0) {
+    # Rscript
+    return(normalizePath(sub(needle, "", cmdArgs[match])))
+  } else {
+    # 'source'd via R console
+    return(normalizePath(sys.frames()[[1]]$ofile))
+  }
+}
+thisDir = dirname(thisFile())
+write(paste("path to current script is:", thisDir), stderr())
+
+
 library(abind)
 library(data.table)
 
@@ -26,9 +44,10 @@ dir.create(out, showWarnings = FALSE)
 
 write("reading genotype matrix", stderr())
 # import genotype matrices as proper matrices
-gt = data.table::fread(gt, sep="\t", header=T, stringsAsFactors = FALSE, colClasses = "numeric")
-phen = read.csv(phen, sep="\t", header=T)
+gt = data.table::fread(gt, sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
+phen = data.table::fread(phen, sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
 # create matrices without unecessary columns
+# this removes the samples column
 X = as.matrix(gt[,-1])
 # the number of samples and the number of variants:
 n = nrow(X)
@@ -58,26 +77,11 @@ mm_regression = function(X, Y, Z=NULL) {
   #   out[2,,] is se betahat (the standard errors of the beta hats)
   return(aperm(reg, c(3,2,1)))
 }
-sumstats = mm_regression(as.matrix(X), as.matrix(y))
-dat = list(X=X,Y=as.matrix(y))
+sumstats = mm_regression(X, y)
+dat = list(X=X,Y=y)
 input = paste0(out,'/sumstats.rds')
 write("saving summary statistics to RDS file", stderr())
 saveRDS(list(data=dat, sumstats=sumstats), input)
-
-thisFile <- function() {
-  # function to figure out the path to the current script
-  # copied from https://stackoverflow.com/a/15373917/16815703
-  cmdArgs <- commandArgs(trailingOnly = FALSE)
-  needle <- "--file="
-  match <- grep(needle, cmdArgs)
-  if (length(match) > 0) {
-    # Rscript
-    return(normalizePath(sub(needle, "", cmdArgs[match])))
-  } else {
-    # 'source'd via R console
-    return(normalizePath(sys.frames()[[1]]$ofile))
-  }
-}
 
 # run FINEMAP
 # and set an output path; the results will be written to an RDS file with this basename
@@ -85,7 +89,7 @@ output = paste0(out, "/finemap")
 args = "--n-causal-snps 1"
 commandArgs = function(...) 1
 write("executing FINEMAP", stderr())
-source(paste0(dirname(thisFile()), "/finemap_1p4.R"))
+source(paste0(thisDir, "/finemap_1p4.R"))
 
 
 # run SuSiE
@@ -100,3 +104,6 @@ saveRDS(
   list(causal_var=causal_variant, causal_excluded=exclude_causal, fitted=fitted),
   paste0(out, '/susie.rds')
 )
+
+write("trying to exit with successful error code", stderr())
+quit()
