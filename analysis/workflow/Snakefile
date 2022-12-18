@@ -43,15 +43,19 @@ def get_vcf_chrs(vcf_path):
 chrs = get_vcf_chrs(config["snp_panel"])
 
 
+wildcard_constraints:
+    beta="\d+\.\d+",
+
 rule all:
     input:
         expand(
             [
                 output for locus in loci.keys() for output in expand(
                     [
-                        out + "/{locus}/sim/{mode}/{beta}/{causal}clude/results/susie.pdf",
+                        out + "/{locus}/sim/{mode}/{beta}/happler/happler.png",
                         out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results/susie.pdf",
                         out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results/manhattan.pdf",
+                        out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output/results/susie.pdf",
                     ],
                     locus=locus,
                     mode=(loci[locus].keys() - set(("locus",))),
@@ -326,8 +330,8 @@ rule phens2pheno:
     conda:
         "envs/default.yml"
     shell:
-        "zcat {input.phens} | {{ read -r head; echo $head | "
-        "sed 's/^sample\\t/#IID\t/' | cut -f-2; cut -f1,3 }} >{output} 2>{log}"
+        "zcat {input.phens} | {{ read -r head; echo \"$head\" | "
+        "sed 's/^sample\\t/#IID\\t/' | cut -f-2; cut -f1,3; }} >{output} 2>{log}"
 
 
 rule create_hap:
@@ -509,16 +513,16 @@ rule happler:
     params:
         thresh=100,
     output:
-        hap=run_methods_out + "/happler.hap",
-        dot=run_methods_out + "/happler.dot",
+        hap=out + "/{locus}/sim/{mode}/{beta}/happler/happler.hap",
+        dot=out + "/{locus}/sim/{mode}/{beta}/happler/happler.dot",
     resources:
         runtime="0:15:00",
         queue="hotel",
     threads: 6
     log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler",
+        logs + "/{locus}/sim/{mode}/{beta}/happler",
     benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler",
+        bench + "/{locus}/sim/{mode}/{beta}/happler",
     conda:
         "happler"
     shell:
@@ -530,16 +534,18 @@ rule hap_tree:
     """ visualize the haplotype tree as a png file """
     input:
         dot=rules.happler.output.dot,
+    params:
+        file_ext = lambda wildcards, output: Path(output.png).suffix[1:],
     output:
-        png=run_methods_out + "/happler.png",
+        png=out + "/{locus}/sim/{mode}/{beta}/happler/happler.png",
     log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/hap_tree",
+        logs + "/{locus}/sim/{mode}/{beta}/hap_tree",
     benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/hap_tree",
+        bench + "/{locus}/sim/{mode}/{beta}/hap_tree",
     conda:
         "envs/default.yml"
     shell:
-        "dot -Tpng {input.dot} -o {output.png}"
+        "dot -T{params.file_ext} {input.dot} -o {output.png} &>{log}"
 
 
 rule transform_happler:
@@ -551,15 +557,15 @@ rule transform_happler:
     params:
         hap_id="H1",
     output:
-        pgen=temp(run_methods_out + "/happler.pgen"),
-        pvar=temp(run_methods_out + "/happler.pvar"),
-        psam=temp(run_methods_out + "/happler.psam"),
+        pgen=temp(out + "/{locus}/sim/{mode}/{beta}/happler/happler.pgen"),
+        pvar=temp(out + "/{locus}/sim/{mode}/{beta}/happler/happler.pvar"),
+        psam=temp(out + "/{locus}/sim/{mode}/{beta}/happler/happler.psam"),
     resources:
         runtime="0:04:00"
     log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/transform_happler",
+        logs + "/{locus}/sim/{mode}/{beta}/transform_happler",
     benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/transform_happler",
+        bench + "/{locus}/sim/{mode}/{beta}/transform_happler",
     conda:
         "happler"
     shell:
@@ -576,15 +582,15 @@ rule merge_happler:
         hps_pvar=rules.transform_happler.output.pvar,
         hps_psam=rules.transform_happler.output.psam,
     output:
-        pgen=run_methods_out + "/merged_happler.pgen",
-        pvar=run_methods_out + "/merged_happler.pvar",
-        psam=run_methods_out + "/merged_happler.psam",
+        pgen=out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler.pgen",
+        pvar=out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler.pvar",
+        psam=out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler.psam",
     resources:
         runtime="0:04:00"
     log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/merge_happler",
+        logs + "/{locus}/sim/{mode}/{beta}/merge_happler",
     benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/merge_happler",
+        bench + "/{locus}/sim/{mode}/{beta}/merge_happler",
     conda:
         "happler"
     shell:
@@ -601,15 +607,15 @@ rule snp_hap_2gt:
         in_prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
         prefix=lambda wildcards, output: Path(output.traw).with_suffix(""),
     output:
-        traw=temp(run_methods_out + "/merged_happler-gts.traw"),
-        log=temp(run_methods_out + "/merged_happler-gts.log"),
-        matrix=run_methods_out + "/merged_happler.tsv.gz",
+        traw=temp(out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler-gts.traw"),
+        log=temp(out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler-gts.log"),
+        matrix=out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler.tsv.gz",
     resources:
         runtime="0:04:00"
     log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/snp_hap_2gt",
+        logs + "/{locus}/sim/{mode}/{beta}/snp_hap_2gt",
     benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/snp_hap_2gt",
+        bench + "/{locus}/sim/{mode}/{beta}/snp_hap_2gt",
     conda:
         "envs/default.yml"
     shell:
@@ -640,16 +646,15 @@ rule gwas:
     params:
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
-        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
     output:
-        log = temp(run_methods_out + "/hap.log"),
-        linear = run_methods_out + "/hap.hap.glm.linear",
+        log = temp(out + "/{locus}/sim/{mode}/{beta}/happler/hap.log"),
+        linear = out + "/{locus}/sim/{mode}/{beta}/happler/hap.hap.glm.linear",
     resources:
         runtime="0:10:00",
     log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/gwas",
+        logs + "/{locus}/sim/{mode}/{beta}/gwas",
     benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/gwas",
+        bench + "/{locus}/sim/{mode}/{beta}/gwas",
     threads: 1
     conda:
         "envs/default.yml"
@@ -665,14 +670,14 @@ rule run_methods_happler:
         gt=rules.snp_hap_2gt.output.matrix,
         phen=rules.pheno2phens.output.phens,
     params:
-        outdir=run_methods_out + "/happler",
-        exclude_causal=lambda wildcards: 1,
+        outdir=lambda wildcards, output: Path(output.susie).parent,
+        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
     output:
-        sumstats=temp(run_methods_out + "/happler/sumstats.rds"),
-        finemap=run_methods_out + "/happler/finemap.rds",
-        susie=run_methods_out + "/happler/susie.rds",
+        sumstats=temp(out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/sumstats.rds"),
+        finemap=out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/finemap.rds",
+        susie=out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/susie.rds",
     resources:
-        runtime="1:00:00",
+        runtime="1:15:00",
         queue="hotel",
     log:
         logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/run_methods",
@@ -684,13 +689,13 @@ rule run_methods_happler:
         "workflow/scripts/finemapping_methods.R {input} {params} &>{log}"
 
 
-plot_results_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/results"
+plot_results_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output/results"
 plot_results_happler_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results"
 
 
 rule manhattan:
     input:
-        linear = rules.gwas.output.linear,
+        linear=rules.gwas.output.linear,
     params:
         linear = lambda wildcards, input: f"-l "+input.linear,
         red_ids = lambda wildcards: [
