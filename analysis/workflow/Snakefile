@@ -54,7 +54,7 @@ rule all:
                     [
                         out + "/{locus}/sim/{mode}/{beta}/happler/happler.png",
                         out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results/susie.pdf",
-                        out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results/manhattan.pdf",
+                        out + "/{locus}/sim/hap/{beta}/{causal}clude/happler/results/manhattan.pdf",
                         out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output/results/susie.pdf",
                     ],
                     locus=locus,
@@ -511,7 +511,7 @@ rule happler:
         pts=lambda wildcards: rules.simphenotype.output.pheno \
             if wildcards.mode == "hap" else rules.phens2pheno.output.pheno,
     params:
-        thresh=100,
+        thresh=0.05,
     output:
         hap=out + "/{locus}/sim/{mode}/{beta}/happler/happler.hap",
         dot=out + "/{locus}/sim/{mode}/{beta}/happler/happler.dot",
@@ -624,7 +624,7 @@ rule snp_hap_2gt:
         "sed 's/POS\\t/sample\\t/; s/\\t0_/\\t/g'; sed 's/\\t/:0\\t/;') | "
         "datamash transpose | (read -r head; paste <(echo \"$head\" | rev | cut -f3- |"
         " rev) <(echo \"$head\" | rev | cut -f-2 | rev | sed 's/:0/:2/g'); cat) | "
-        "gzip > {output.matrix} 2>{log}"
+        "gzip > {output.matrix} 2>>{log}"
 
 
 # rule append_happlerhap2mat:
@@ -701,7 +701,9 @@ rule manhattan:
         red_ids = lambda wildcards: [
             f"-i {i.split(':')[0]}" for i in loci[wildcards.locus]["hap"]
         ],
-        orange_ids = "-b hap -b H1",
+        orange_ids = lambda wildcards: (
+            "" if int(exclude_causal[wildcards.causal]) else "-b hap "
+        ) + "-b H1",
     output:
         png = plot_results_happler_out+"/manhattan.pdf",
     resources:
@@ -720,11 +722,13 @@ rule manhattan:
 rule plot_results:
     """create plots to summarize the results of the simulations"""
     input:
-        gt=rules.phens.input.matrix,
+        gt=rules.run_methods.input.gt,
         finemap=rules.run_methods.output.finemap,
         susie=rules.run_methods.output.susie,
     params:
         outdir=plot_results_out,
+        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
+        causal_hap="",
     output:
         finemap_pdf=plot_results_out + "/finemap.pdf",
         susie_pdf=plot_results_out + "/susie.pdf",
@@ -743,11 +747,18 @@ rule plot_results_happler:
         on happler
     """
     input:
-        gt=rules.snp_hap_2gt.output.matrix,
+        gt=rules.run_methods_happler.input.gt,
         finemap=rules.run_methods_happler.output.finemap,
         susie=rules.run_methods_happler.output.susie,
+        happler_hap=rules.happler.output.hap,
     params:
         outdir=plot_results_happler_out,
+        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
+        causal_hap=lambda wildcards: expand(
+            rules.create_hap.output.hap,
+            chr=wildcards.locus.split("_")[0],
+            locus=wildcards.locus.split("_")[1],
+        ) if wildcards.mode == "hap" else "",
     output:
         finemap_pdf=plot_results_happler_out + "/finemap.pdf",
         susie_pdf=plot_results_happler_out + "/susie.pdf",
