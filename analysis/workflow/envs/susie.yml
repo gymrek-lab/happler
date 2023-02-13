@@ -4,6 +4,7 @@ channels:
 dependencies:
     - conda-forge::r-susier==0.11.42
     - conda-forge::r-abind==1.4_5
+    - conda-forge::r-r.utils==2.12.0
     - conda-forge::r-dplyr==1.0.7
     - conda-forge::r-readr==1.4.0
     - aryarm::r-dscrutils==0.4.3

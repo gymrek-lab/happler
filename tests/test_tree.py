@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 import numpy as np
-from haptools.data import Genotypes, Phenotypes
+from haptools.data import Genotypes, GenotypesRefAlt, Phenotypes
 
 from happler.tree import (
     VariantType,
@@ -166,6 +166,19 @@ def test_haplotypes_write():
     snp2 = Variant(idx=1, id="SNP2", pos=2)
     snp3 = Variant(idx=2, id="SNP3", pos=3)
 
+    # create temporary genotypes object
+    gts = GenotypesRefAlt(fname=None)
+    gts.variants = np.array(
+        [
+            ("SNP1", "1", 1, "A", "G"),
+            ("SNP2", "1", 2, "T", "C"),
+            ("SNP3", "1", 3, "G", "T"),
+        ],
+        dtype=gts.variants.dtype,
+    )
+    gts.data = None
+    gts.samples = None
+
     # create a results object that all of the SNPs can share
     res = NodeResults(beta=0.1, pval=0.1, stderr=0.1)
 
@@ -178,21 +191,26 @@ def test_haplotypes_write():
     snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=0, results=res)
 
     # write the tree to a file
-    with open("test_write.haps", "w") as file:
-        Haplotypes.from_tree(tree).write(file)
+    fname = "test_write.haps"
+    Haplotypes.from_tree(fname=fname, tree=tree, gts=gts).write()
 
     # verify that the results appear as intended
-    with open("test_write.haps", "r") as file:
+    with open(fname, "r") as file:
         lines = [line.rstrip() for line in file.readlines()]
         assert lines == [
-            "M\t0.0.1",
-            "H\t0\t0\t0.00\t0.00\tnan",
-            "V\tSNP1\t0\t0\t0\t0.10",
-            "V\tSNP2\t0\t0\t1\t0.10",
-            "V\tSNP3\t0\t0\t1\t0.10",
-            "H\t1\t0\t0.00\t0.00\tnan",
-            "V\tSNP1\t1\t0\t1\t0.10",
-            "V\tSNP2\t1\t0\t0\t0.10",
+            "#\torderH\tbeta\tpval",
+            "#\torderV\tscore",
+            "#\tversion\t0.1.0",
+            "#H\tbeta\t.2f\tEffect size in linear model",
+            "#H\tpval\t.2f\tP-value in linear model",
+            "#V\tscore\t.2f\tScore assigned to this variant",
+            "H\t1\t1\t4\tH0\t0.00\t0.00",
+            "H\t1\t1\t3\tH1\t0.00\t0.00",
+            "V\tH0\t1\t2\tSNP1\tA\t0.10",
+            "V\tH0\t2\t3\tSNP2\tC\t0.10",
+            "V\tH0\t3\t4\tSNP3\tT\t0.10",
+            "V\tH1\t1\t2\tSNP1\tG\t0.10",
+            "V\tH1\t2\t3\tSNP2\tT\t0.10",
         ]
 
     # remove the file

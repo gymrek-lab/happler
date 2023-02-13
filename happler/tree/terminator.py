@@ -99,12 +99,13 @@ class TTestTerminator(Terminator):
             )
         # correct for multiple hypothesis testing
         # For now, we use the Bonferroni correction
-        if pval >= (self.thresh / num_tests):
+        thresh = self.thresh / num_tests
+        if pval >= thresh:
             logger.debug(
-                "Terminated with t-stat {} and p-value {}".format(t_stat, pval)
+                f"Terminated with t-stat {t_stat} and p-value {pval} >= {thresh}"
             )
             return True
-        logger.debug("Significant with t-stat {} and p-value {}".format(t_stat, pval))
+        logger.debug(f"Significant with t-stat {t_stat} and p-value {pval} < {thresh}")
         return False
 
 

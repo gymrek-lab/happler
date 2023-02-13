@@ -4,7 +4,7 @@ import snakemake.io as io
 from snakemake.utils import min_version
 
 ##### set minimum snakemake version #####
-min_version("6.7.0")
+min_version("7.14.0")
 
 
 # IMPORT CONFIG VARIABLES
@@ -21,7 +21,6 @@ def check_config(value, default=False, place=config, as_set=False):
 config["out"] = check_config("out", "out")
 config["superpop"] = check_config("superpop", "EUR")
 config["min_maf"] = check_config("min_maf", 0)
-config["mode"] = check_config("mode", "snp", as_set=True)
 config["beta"] = check_config("beta", 0.1, as_set=True)
 config["exclude_causal"] = check_config("exclude_causal", False, as_set=True)
 # remove any trailing slashes in directories and set the variables
@@ -44,13 +43,26 @@ def get_vcf_chrs(vcf_path):
 chrs = get_vcf_chrs(config["snp_panel"])
 
 
+wildcard_constraints:
+    beta="\d+\.\d+",
+
 rule all:
     input:
         expand(
-            out + "/{locus}/sim/{mode}/{beta}/{causal}clude/results/susie.pdf",
-            locus=loci.keys(),
+            [
+                output for locus in loci.keys() for output in expand(
+                    [
+                        out + "/{locus}/sim/{mode}/{beta}/happler/happler.png",
+                        out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results/susie.pdf",
+                        out + "/{locus}/sim/hap/{beta}/{causal}clude/happler/results/manhattan.pdf",
+                        out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output/results/susie.pdf",
+                    ],
+                    locus=locus,
+                    mode=(loci[locus].keys() - set(("locus",))),
+                    allow_missing=True,
+                )
+            ],
             beta=config["beta"],
-            mode=config["mode"],
             causal=exclude_causal.keys(),
         ),
 
@@ -70,6 +82,8 @@ rule plink2vcf:
         bcf=out + "/{chr}_{locus}/unphased.bcf",
         bcf_idx=out + "/{chr}_{locus}/unphased.bcf.csi",
         log=temp(out + "/{chr}_{locus}/unphased.log"),
+    resources:
+        runtime="0:15:00"
     log:
         logs + "/{chr}_{locus}/plink2vcf"
     benchmark:
@@ -78,7 +92,7 @@ rule plink2vcf:
         "envs/default.yml"
     shell:
         "plink2 --pfile {params.pfile} --out {params.out} --from-bp {params.start} "
-        "--to-bp {params.end} --chr {params.chrom} "
+        "--to-bp {params.end} --chr {params.chrom} --snps-only 'just-acgt' "
         "--export vcf bgz id-paste=iid &>{log} && "
         "bcftools view -Ob -o {output.bcf} {output.vcf} &>>{log} && "
         "tabix -p bcf {output.bcf} &>>{log}"
@@ -103,7 +117,7 @@ rule phase_gt:
         phased=out + "/{chr}_{locus}/phased.bcf",
         phased_idx=out + "/{chr}_{locus}/phased.bcf.csi",
     resources:
-        runtime="3:00:00"
+        runtime="4:00:00"
     threads: 8
     log:
         logs + "/{chr}_{locus}/phase_gt"
@@ -155,7 +169,7 @@ rule vcf2gt:
         temp_str=temp(out + "/{chr}_{locus}/strs.bcf"),
         matrix=out + "/{chr}_{locus}/matrix.tsv.gz",
     resources:
-        runtime="2:00:00"
+        runtime="1:45:00"
     log:
         logs + "/{chr}_{locus}/vcf2gt",
     benchmark:
@@ -167,14 +181,73 @@ rule vcf2gt:
         " {input.samples} {output.temp_snp} {output.temp_str} 2>{log} | gzip > {output.matrix}"
 
 
+rule vcf2plink:
+    """ convert a VCF into a PGEN file """
+    input:
+        vcf=lambda wildcards: expand(
+            rules.vcf2gt.output.temp_snp,
+            chr=wildcards.locus.split("_")[0],
+            locus=wildcards.locus.split("_")[1],
+        ),
+    params:
+        maf=config["min_maf"],
+        prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+    output:
+        pgen=out+"/{locus}/snps.pgen",
+        pvar=out+"/{locus}/snps.pvar",
+        psam=out+"/{locus}/snps.psam",
+        log=temp(out+"/{locus}/snps.log"),
+    resources:
+        runtime="0:03:00"
+    log:
+        logs + "/{locus}/vcf2plink",
+    benchmark:
+        bench + "/{locus}/vcf2plink",
+    conda:
+        "envs/default.yml"
+    shell:
+        "plink2 --bcf {input.vcf} --maf {params.maf} --make-pgen --out {params.prefix}"
+        " &>{log}"
+
+
+rule snp2gt:
+    """ convert a PGEN file into a SNP GT matrix """
+    input:
+        pgen=out+"/{locus}/snps.pgen",
+        pvar=out+"/{locus}/snps.pvar",
+        psam=out+"/{locus}/snps.psam",
+    params:
+        in_prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
+        prefix=lambda wildcards, output: Path(output.traw).with_suffix(""),
+    output:
+        traw=temp(out+"/{locus}/snps-gts.traw"),
+        log=temp(out+"/{locus}/snps-gts.log"),
+        matrix=out+"/{locus}/snps.tsv.gz",
+    resources:
+        runtime="0:04:00"
+    log:
+        logs + "/{locus}/snp2gt",
+    benchmark:
+        bench + "/{locus}/snp2gt",
+    conda:
+        "envs/default.yml"
+    shell:
+        "plink2 --pfile {params.in_prefix} --out {params.prefix} --export Av &>{log} "
+        "&& cut -f 4,7- {output.traw} | (read -r head; echo \"$head\" | "
+        "sed 's/POS\\t/sample\\t/; s/\\t0_/\\t/g'; sed 's/\\t/:0\\t/') | "
+        "datamash transpose | gzip > {output.matrix} 2>{log}"
+
+
 rule str2gt:
     """ sum the difference of each allele length from the reference allele length """
     input:
-        matrix=out + "/{locus}/matrix-10.tsv.gz",
-    params:
-        maf=config["min_maf"],
+        vcf=lambda wildcards: expand(
+            rules.vcf2gt.output.temp_str,
+            chr=wildcards.locus.split("_")[0],
+            locus=wildcards.locus.split("_")[1],
+        ),
     output:
-        matrix=out + "/{locus}/gt_matrix.tsv.gz",
+        matrix=out + "/{locus}/strs.tsv.gz",
     resources:
         runtime="2:00:00"
     log:
@@ -182,50 +255,236 @@ rule str2gt:
     benchmark:
         bench + "/{locus}/str2gt",
     conda:
+        "envs/trtools.yml"
+    shell:
+        "workflow/scripts/str_gt.py -o {output.matrix} {input.vcf} 2>{log}"
+
+
+rule append_str2mat:
+    """ append the STR allele lengths to the genotype matrix """
+    input:
+        matrix=rules.snp2gt.output,
+        strs=rules.str2gt.output.matrix,
+    output:
+        matrix=out + "/{locus}/gt_matrix.tsv.gz",
+    resources:
+        runtime="0:20:00"
+    log:
+        logs + "/{locus}/append_str2mat",
+    benchmark:
+        bench + "/{locus}/append_str2mat",
+    conda:
         "envs/default.yml"
     shell:
-        "workflow/scripts/gt_matrix.py -o {output.matrix} -m {params.maf} {input.matrix} 2>{log}"
+        "paste <(zcat {input.matrix}) <(zcat {input.strs} | tail -n+2 | datamash "
+        "transpose) | gzip >{output.matrix} 2>{log}"
 
 
 def phen_loc(wildcards):
-    if config["mode"] == "snp":
-        if "snp" in loci[wildcards.locus]:
-            return "--snp-loc " + loci[wildcards.locus]["snp"].split(":")[1]
-        return "--max-vars 1"
+    config_locus = loci[wildcards.locus]
+    if "snp" in config_locus:
+        return "--snp-loc " + config_locus["snp"].split(":")[1]
+    elif "str" in config_locus:
+        return "--str-loc " + config_locus["str"].split(":")[1]
     else:
-        return "--str-loc " + loci[wildcards.locus]["str"].split(":")[1]
+        return "--max-vars 1"
 
 
 rule phens:
     """ generate phenotypes from the genotype matrix """
     input:
-        matrix=rules.str2gt.output,
+        matrix=lambda wildcards: (
+            rules.append_str2mat if wildcards.mode == "str" else rules.snp2gt
+        ).output.matrix,
     params:
         loc=phen_loc,
         beta=lambda wildcards: wildcards.beta,
         mode=lambda wildcards: wildcards.mode,
+    wildcard_constraints:
+        mode="snp|str",
     output:
-        phenotypes=out + "/{locus}/sim/{mode}/{beta}/phens.tsv.gz",
+        phens=out + "/{locus}/sim/{mode}/{beta}/phens.tsv.gz",
     log:
         logs + "/{locus}/sim/{mode}/{beta}/phens",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/phens",
     conda:
         "envs/default.yml"
     shell:
-        "workflow/scripts/generate_phenotypes.py -o {output.phenotypes} "
+        "workflow/scripts/generate_phenotypes.py -o {output.phens} "
         "--beta-{params.mode} {params.beta} {params.loc} -- {input.matrix} &>{log}"
+
+
+rule phens2pheno:
+    """ convert our custom 'phens' TSV file to a PLINK2 pheno file """
+    input:
+        phens=rules.phens.output.phens,
+    output:
+        pheno=out + "/{locus}/sim/{mode}/{beta}/{locus}.pheno"
+    wildcard_constraints:
+        mode="snp|str",
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/pheno",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/pheno",
+    conda:
+        "envs/default.yml"
+    shell:
+        "zcat {input.phens} | {{ read -r head; echo \"$head\" | "
+        "sed 's/^sample\\t/#IID\\t/' | cut -f-2; cut -f1,3; }} >{output} 2>{log}"
+
+
+rule create_hap:
+    """ create a hap file suitable for haptools transform and simphenotype """
+    input:
+        gts=lambda wildcards: expand(
+            rules.vcf2plink.output.pvar,
+            locus=wildcards.chr + "_" + wildcards.locus,
+        ),
+    params:
+        ignore="this", # the first parameter is always ignored for some reason
+        chrom=lambda wildcards: wildcards.chr,
+        locus=lambda wildcards: wildcards.locus.replace('-', '\t'),
+        beta=0.99,
+        alleles=lambda wildcards: loci[wildcards.chr + "_" + wildcards.locus]["hap"],
+    output:
+        hap=out + "/{chr}_{locus}/sim/hap/{chr}_{locus}.hap"
+    log:
+        logs + "/{chr}_{locus}/sim/hap/create_hap",
+    benchmark:
+        bench + "/{chr}_{locus}/sim/hap/create_hap",
+    conda:
+        "envs/default.yml"
+    script:
+        "scripts/create_hap_file.sh"
+
+
+rule transform:
+    """ use the hap file to create a pgen of the haplotype """
+    # note that we don't need to subset the samples here, b/c we did it above, anyway
+    input:
+        hap=lambda wildcards: expand(
+            rules.create_hap.output.hap,
+            chr=wildcards.locus.split("_")[0],
+            locus=wildcards.locus.split("_")[1],
+        ),
+        pgen=rules.vcf2plink.output.pgen,
+        pvar=rules.vcf2plink.output.pvar,
+        psam=rules.vcf2plink.output.psam,
+    output:
+        pgen=temp(out + "/{locus}/sim/hap/{locus}.pgen"),
+        pvar=temp(out + "/{locus}/sim/hap/{locus}.pvar"),
+        psam=temp(out + "/{locus}/sim/hap/{locus}.psam"),
+    log:
+        logs + "/{locus}/sim/hap/transform",
+    benchmark:
+        bench + "/{locus}/sim/hap/transform",
+    conda:
+        "happler"
+    shell:
+        "haptools transform -o {output.pgen} {input.pgen} {input.hap} &>{log}"
+
+
+rule merge:
+    input:
+        gts=rules.vcf2plink.output.pgen,
+        gts_pvar=rules.vcf2plink.output.pvar,
+        gts_psam=rules.vcf2plink.output.psam,
+        hps=rules.transform.output.pgen,
+        hps_pvar=rules.transform.output.pvar,
+        hps_psam=rules.transform.output.psam,
+    output:
+        pgen=out+"/{locus}/sim/hap/hap_gts_merged.pgen",
+        pvar=out+"/{locus}/sim/hap/hap_gts_merged.pvar",
+        psam=out+"/{locus}/sim/hap/hap_gts_merged.psam",
+    resources:
+        runtime="0:04:00"
+    log:
+        logs + "/{locus}/sim/hap/merge"
+    benchmark:
+        bench + "/{locus}/sim/hap/merge"
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/merge_plink.py {input.gts} {input.hps} {output.pgen} &> {log}"
+
+
+rule append_hap2mat:
+    """ append the haplotype genotypes to the genotype matrix """
+    input:
+        matrix=rules.phens.input.matrix,
+        hps=rules.transform.output.pgen,
+        hps_pvar=rules.transform.output.pvar,
+        hps_psam=rules.transform.output.psam,
+    output:
+        matrix=out + "/{locus}/sim/{mode}/hap_gt_matrix.tsv.gz",
+    resources:
+        runtime="0:04:00"
+    log:
+        logs + "/{locus}/sim/{mode}/append_hap2mat",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/append_hap2mat",
+    conda:
+        "happler"
+    shell:
+        "paste <(zcat {input.matrix}) <(workflow/scripts/append_hap.py {input.hps} "
+        "<(zcat {input.matrix} | cut -f1 | tail -n+2) 2>{log}) | gzip "
+        ">{output.matrix} 2>{log}"
+
+
+rule simphenotype:
+    """ use the hap file to create simulated phenotypes for the haplotype """
+    input:
+        hap=rules.transform.input.hap,
+        pgen=rules.transform.output.pgen,
+        pvar=rules.transform.output.pvar,
+        psam=rules.transform.output.psam,
+    params:
+        beta=lambda wildcards: wildcards.beta,
+    output:
+        pheno=out + "/{locus}/sim/hap/{beta}/{locus}.pheno",
+    log:
+        logs + "/{locus}/sim/hap/{beta}/simphenotype",
+    benchmark:
+        bench + "/{locus}/sim/hap/{beta}/simphenotype",
+    conda:
+        "happler"
+    shell:
+        "haptools simphenotype -o {output.pheno} {input.pgen} "
+        "<( sed 's/\\t0.99$/\\t{params.beta}/' {input.hap} ) &>{log}"
+
+
+rule pheno2phens:
+    """ generate a phens file for a causal haplotype """
+    input:
+        pgen=rules.transform.output.pgen,
+        pvar=rules.transform.output.pvar,
+        psam=rules.transform.output.psam,
+        pheno=rules.simphenotype.output.pheno,
+    output:
+        phens=out + "/{locus}/sim/hap/{beta}/phens.tsv.gz",
+    log:
+        logs + "/{locus}/sim/hap/{beta}/pheno2phens",
+    benchmark:
+        bench + "/{locus}/sim/hap/{beta}/pheno2phens",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/pheno2phens.py -o {output.phens} {input.pgen} "
+        "{input.pheno} &>{log}"
 
 
 run_methods_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output"
 
 
 rule run_methods:
-    """
-    run the methods FINEMAP and SuSie
-    and generate plots with results
-    """
+    """run the methods FINEMAP and SuSie"""
     input:
-        gt=rules.phens.input,
-        phen=rules.phens.output,
+        gt=lambda wildcards: rules.append_hap2mat.output.matrix if \
+            wildcards.mode == "hap" else rules.phens.input.matrix(wildcards),
+        phen=lambda wildcards: (
+            rules.pheno2phens if wildcards.mode == "hap" else rules.phens
+        ).output.phens,
     params:
         outdir=run_methods_out,
         exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
@@ -233,31 +492,279 @@ rule run_methods:
         sumstats=temp(run_methods_out + "/sumstats.rds"),
         finemap=run_methods_out + "/finemap.rds",
         susie=run_methods_out + "/susie.rds",
+    resources:
+        runtime="1:00:00",
     log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/methods",
+        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/run_methods",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/run_methods",
     conda:
         "envs/susie.yml"
     shell:
         "workflow/scripts/finemapping_methods.R {input} {params} &>{log}"
 
 
-plot_results_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/results"
+rule happler:
+    """ execute happler! """
+    input:
+        gts=rules.vcf2plink.output.pgen,
+        pts=lambda wildcards: rules.simphenotype.output.pheno \
+            if wildcards.mode == "hap" else rules.phens2pheno.output.pheno,
+    params:
+        thresh=0.05,
+    output:
+        hap=out + "/{locus}/sim/{mode}/{beta}/happler/happler.hap",
+        dot=out + "/{locus}/sim/{mode}/{beta}/happler/happler.dot",
+    resources:
+        runtime="0:15:00",
+        queue="hotel",
+    threads: 6
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/happler",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/happler",
+    conda:
+        "happler"
+    shell:
+        "happler run -o {output.hap} --verbosity DEBUG --discard-multiallelic"
+        " -t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
+
+
+rule hap_tree:
+    """ visualize the haplotype tree as a png file """
+    input:
+        dot=rules.happler.output.dot,
+    params:
+        file_ext = lambda wildcards, output: Path(output.png).suffix[1:],
+    output:
+        png=out + "/{locus}/sim/{mode}/{beta}/happler/happler.png",
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/hap_tree",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/hap_tree",
+    conda:
+        "envs/default.yml"
+    shell:
+        "dot -T{params.file_ext} {input.dot} -o {output.png} &>{log}"
+
+
+rule transform_happler:
+    input:
+        hap=rules.happler.output.hap,
+        pgen=rules.vcf2plink.output.pgen,
+        pvar=rules.vcf2plink.output.pvar,
+        psam=rules.vcf2plink.output.psam,
+    params:
+        hap_id="H1",
+    output:
+        pgen=temp(out + "/{locus}/sim/{mode}/{beta}/happler/happler.pgen"),
+        pvar=temp(out + "/{locus}/sim/{mode}/{beta}/happler/happler.pvar"),
+        psam=temp(out + "/{locus}/sim/{mode}/{beta}/happler/happler.psam"),
+    resources:
+        runtime="0:04:00"
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/transform_happler",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/transform_happler",
+    conda:
+        "happler"
+    shell:
+        "haptools transform -o {output.pgen} --id {params.hap_id} {input.pgen} "
+        "{input.hap} &>{log}"
+
+
+rule merge_happler:
+    input:
+        gts=rules.merge.output.pgen,
+        gts_pvar=rules.merge.output.pvar,
+        gts_psam=rules.merge.output.psam,
+        hps=rules.transform_happler.output.pgen,
+        hps_pvar=rules.transform_happler.output.pvar,
+        hps_psam=rules.transform_happler.output.psam,
+    output:
+        pgen=out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler.pgen",
+        pvar=out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler.pvar",
+        psam=out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler.psam",
+    resources:
+        runtime="0:04:00"
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/merge_happler",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/merge_happler",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/merge_plink.py {input.gts} {input.hps} {output.pgen} &> {log}"
+
+
+rule snp_hap_2gt:
+    """ convert a PGEN file containing SNPs and haps into a SNP GT matrix """
+    input:
+        pgen=rules.merge_happler.output.pgen,
+        pvar=rules.merge_happler.output.pvar,
+        psam=rules.merge_happler.output.psam,
+    params:
+        in_prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
+        prefix=lambda wildcards, output: Path(output.traw).with_suffix(""),
+    output:
+        traw=temp(out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler-gts.traw"),
+        log=temp(out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler-gts.log"),
+        matrix=out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler.tsv.gz",
+    resources:
+        runtime="0:04:00"
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/snp_hap_2gt",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/snp_hap_2gt",
+    conda:
+        "envs/default.yml"
+    shell:
+        "plink2 --pfile {params.in_prefix} --out {params.prefix} --export Av &>{log} "
+        "&& cut -f 4,7- {output.traw} | (read -r head; echo \"$head\" | "
+        "sed 's/POS\\t/sample\\t/; s/\\t0_/\\t/g'; sed 's/\\t/:0\\t/;') | "
+        "datamash transpose | (read -r head; paste <(echo \"$head\" | rev | cut -f3- |"
+        " rev) <(echo \"$head\" | rev | cut -f-2 | rev | sed 's/:0/:2/g'); cat) | "
+        "gzip > {output.matrix} 2>>{log}"
+
+
+# rule append_happlerhap2mat:
+#     """ append the haplotype genotypes to the genotype matrix """
+#     shell:
+#         "paste <(zcat {input.matrix}) <(workflow/scripts/append_hap.py {input.hps} "
+#         "<(zcat {input.matrix} | cut -f1 | tail -n+2) 2>{log}) | gzip "
+#         ">{output.matrix} 2>{log}"
+
+
+rule gwas:
+    """run a GWAS"""
+    input:
+        pgen=rules.merge_happler.output.pgen,
+        pvar=rules.merge_happler.output.pvar,
+        psam=rules.merge_happler.output.psam,
+        pts=lambda wildcards: rules.simphenotype.output.pheno \
+            if wildcards.mode == "hap" else rules.phens2pheno.output.pheno,
+    params:
+        in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
+        out_prefix = lambda w, output: Path(output.log).with_suffix(""),
+    output:
+        log = temp(out + "/{locus}/sim/{mode}/{beta}/happler/hap.log"),
+        linear = out + "/{locus}/sim/{mode}/{beta}/happler/hap.hap.glm.linear",
+    resources:
+        runtime="0:10:00",
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/gwas",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/gwas",
+    threads: 1
+    conda:
+        "envs/default.yml"
+    shell:
+        "plink2 --linear allow-no-covars --variance-standardize "
+        "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
+        "--out {params.out_prefix} --threads {threads} &>{log}"
+
+
+rule run_methods_happler:
+    """ execute SuSiE and FINEMAP using the haplotypes from happler """
+    input:
+        gt=rules.snp_hap_2gt.output.matrix,
+        phen=rules.pheno2phens.output.phens,
+    params:
+        outdir=lambda wildcards, output: Path(output.susie).parent,
+        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
+    output:
+        sumstats=temp(out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/sumstats.rds"),
+        finemap=out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/finemap.rds",
+        susie=out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/susie.rds",
+    resources:
+        runtime="1:15:00",
+        queue="hotel",
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/run_methods",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/run_methods",
+    conda:
+        "envs/susie.yml"
+    shell:
+        "workflow/scripts/finemapping_methods.R {input} {params} &>{log}"
+
+
+plot_results_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output/results"
+plot_results_happler_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results"
+
+
+rule manhattan:
+    input:
+        linear=rules.gwas.output.linear,
+    params:
+        linear = lambda wildcards, input: f"-l "+input.linear,
+        red_ids = lambda wildcards: [
+            f"-i {i.split(':')[0]}" for i in loci[wildcards.locus]["hap"]
+        ],
+        orange_ids = lambda wildcards: (
+            "" if int(exclude_causal[wildcards.causal]) else "-b hap "
+        ) + "-b H1",
+    output:
+        png = plot_results_happler_out+"/manhattan.pdf",
+    resources:
+        runtime="0:05:00"
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/manhattan",
+    benchmark:
+        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/manhattan",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/manhattan.py -o {output.png} {params.linear} "
+        "{params.red_ids} {params.orange_ids} &>{log}"
 
 
 rule plot_results:
     """create plots to summarize the results of the simulations"""
     input:
-        gt=rules.phens.input,
+        gt=rules.run_methods.input.gt,
         finemap=rules.run_methods.output.finemap,
         susie=rules.run_methods.output.susie,
     params:
         outdir=plot_results_out,
+        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
+        causal_hap="",
     output:
         finemap_pdf=plot_results_out + "/finemap.pdf",
         susie_pdf=plot_results_out + "/susie.pdf",
         # susie_eff_pdf=temp(plot_results_out + "/susie_eff.pdf"),
     log:
         logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/results",
+    conda:
+        "envs/susie.yml"
+    script:
+        "scripts/summarize_results.R"
+
+
+rule plot_results_happler:
+    """
+        create plots to summarize the results of the simulations when tested
+        on happler
+    """
+    input:
+        gt=rules.run_methods_happler.input.gt,
+        finemap=rules.run_methods_happler.output.finemap,
+        susie=rules.run_methods_happler.output.susie,
+        happler_hap=rules.happler.output.hap,
+    params:
+        outdir=plot_results_happler_out,
+        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
+        causal_hap=lambda wildcards: expand(
+            rules.create_hap.output.hap,
+            chr=wildcards.locus.split("_")[0],
+            locus=wildcards.locus.split("_")[1],
+        ) if wildcards.mode == "hap" else "",
+    output:
+        finemap_pdf=plot_results_happler_out + "/finemap.pdf",
+        susie_pdf=plot_results_happler_out + "/susie.pdf",
+        # susie_eff_pdf=temp(plot_results_happler_out + "/susie_eff.pdf"),
+    log:
+        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results",
     conda:
         "envs/susie.yml"
     script:
