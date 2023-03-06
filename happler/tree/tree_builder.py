@@ -166,7 +166,7 @@ class TreeBuilder:
             best_p_idx, key=lambda a: results[a].data["pval"][best_p_idx[a]]
         )
         best_var_idx = best_p_idx[best_allele]
-        num_snps_tested = len(results[best_allele].data)
+        num_tests = len(parent.nodes) + 1
         # step 4: find the index of the best variant within the genotype matrix
         # we need to account for indices that we removed when running transform()
         # There might be a faster way of doing this but for now we're just going to
@@ -190,7 +190,7 @@ class TreeBuilder:
                 .format(best_variant.id, allele, parent_res, node_res)
             )
             if self.terminator.check(
-                parent_res, node_res, num_samps, num_snps_tested, self.log
+                parent_res, node_res, num_samps, num_tests, self.log
             ):
                 yield None, allele, node_res
                 continue
