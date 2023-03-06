@@ -2,13 +2,13 @@
 
 import sys
 import click
-import logging
 from pathlib import Path
 from typing import TextIO
 from typing import Union, Tuple
 
 from . import tree
 from haptools import data
+from haptools import logging
 
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -123,8 +123,8 @@ def main():
     "-v",
     "--verbosity",
     type=click.Choice(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
-    default="ERROR",
-    show_default="only errors",
+    default="INFO",
+    show_default=True,
     help="The level of verbosity desired",
 )
 def run(
@@ -141,7 +141,7 @@ def run(
     threshold: float = 0.05,
     show_tree: bool = False,
     output: Path = Path("/dev/stdout"),
-    verbosity: str = "CRITICAL",
+    verbosity: str = "INFO",
 ):
     """
     Use the tool to find trait-associated haplotypes
@@ -153,11 +153,7 @@ def run(
 
     Ex: happler run tests/data/simple.vcf tests/data/simple.tsv > simple.hap
     """
-    log = logging.getLogger("run")
-    logging.basicConfig(
-        format="[%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)",
-        level=verbosity,
-    )
+    log = logging.getLogger(name="happler", level=verbosity)
     # handle samples
     if samples and samples_file:
         raise click.UsageError(
@@ -196,7 +192,8 @@ def run(
     gt.check_phase()
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
     log.info("Loading phenotypes")
-    ph = data.Phenotypes.load(phenotypes, samples=gt.samples)
+    ph = data.Phenotypes(fname=phenotypes, log=log)
+    ph.read(samples=gt.samples)
     if len(ph.samples) < len(gt.samples):
         diff = set(gt.samples) - set(ph.samples)
         log.error(
@@ -208,8 +205,8 @@ def run(
         ph.names = ph.names[:1]
         ph.data = ph.data[:, :1]
     log.info("Running tree builder")
-    terminator = tree.terminator.TTestTerminator(thresh=threshold)
-    hap_tree = tree.TreeBuilder(gt, ph, terminator=terminator).run()
+    terminator = tree.terminator.TTestTerminator(thresh=threshold, log=log)
+    hap_tree = tree.TreeBuilder(gt, ph, terminator=terminator, log=log).run()
     log.info("Outputting haplotypes")
     tree.Haplotypes.from_tree(fname=output, tree=hap_tree, gts=gt, log=log).write()
     if show_tree:
