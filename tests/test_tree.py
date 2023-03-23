@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 import numpy as np
-from haptools.data import Genotypes, GenotypesRefAlt, Phenotypes
+from haptools.data import Genotypes, GenotypesVCF, Phenotypes
 
 from happler.tree import (
     VariantType,
@@ -167,12 +167,12 @@ def test_haplotypes_write():
     snp3 = Variant(idx=2, id="SNP3", pos=3)
 
     # create temporary genotypes object
-    gts = GenotypesRefAlt(fname=None)
+    gts = GenotypesVCF(fname=None)
     gts.variants = np.array(
         [
-            ("SNP1", "1", 1, "A", "G"),
-            ("SNP2", "1", 2, "T", "C"),
-            ("SNP3", "1", 3, "G", "T"),
+            ("SNP1", "1", 1, ("A", "G")),
+            ("SNP2", "1", 2, ("T", "C")),
+            ("SNP3", "1", 3, ("G", "T")),
         ],
         dtype=gts.variants.dtype,
     )

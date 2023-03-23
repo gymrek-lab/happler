@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from scipy.stats import t as t_dist
+from haptools.logging import getLogger
 
 from .tree import NodeResults, NodeResultsExtra
 
@@ -19,8 +20,9 @@ class Terminator(ABC):
         The threshold of significance
     """
 
-    def __init__(self, thresh: float = 0.05):
+    def __init__(self, thresh: float = 0.05, log: Logger = None):
         self.thresh = thresh
+        self.log = log or getLogger(self.__class__.__name__)
         super().__init__()
 
     @abstractmethod
@@ -63,7 +65,6 @@ class TTestTerminator(Terminator):
         node_res: NodeResults,
         num_samps: int,
         num_tests: int,
-        logger: Logger,
     ) -> bool:
         t_stat = None
         if parent_res:
@@ -74,7 +75,7 @@ class TTestTerminator(Terminator):
                 or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
             ):
                 # terminate if the effect sizes have gone in the opposite direction
-                logger.debug("Terminated b/c effect size went in wrong direction")
+                self.log.debug("Terminated b/c effect size went in wrong direction")
                 return True
             # perform a two tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
@@ -101,18 +102,19 @@ class TTestTerminator(Terminator):
         # For now, we use the Bonferroni correction
         thresh = self.thresh / num_tests
         if pval >= thresh:
-            logger.debug(
+            self.log.debug(
                 f"Terminated with t-stat {t_stat} and p-value {pval} >= {thresh}"
             )
             return True
-        logger.debug(f"Significant with t-stat {t_stat} and p-value {pval} < {thresh}")
+        self.log.debug(f"Significant with t-stat {t_stat} and p-value {pval} < {thresh}")
         return False
 
 
 class BICTerminator(Terminator):
-    def __init__(self, thresh: float = 10):
+    def __init__(self, thresh: float = 10, log: Logger = None):
         super().__init__()
         self.thresh = thresh
+        self.log = log or getLogger(self.__class__.__name__)
 
     def check(
         self,
@@ -120,7 +122,6 @@ class BICTerminator(Terminator):
         node_res: NodeResultsExtra,
         num_samps: int,
         num_tests: int,
-        logger: Logger,
     ) -> bool:
         stat = None
         if parent_res:
@@ -131,12 +132,12 @@ class BICTerminator(Terminator):
                 or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
             ):
                 # terminate if the effect sizes have gone in the opposite direction
-                logger.debug("Terminated b/c effect size went in wrong direction")
+                self.log.debug("Terminated b/c effect size went in wrong direction")
                 return True
             stat = node_res.bic - parent_res.bic
             # just choose an arbitrary threshold
             if stat < self.thresh:
-                logger.debug("Terminated with delta BIC {}".format(stat))
+                self.log.debug("Terminated with delta BIC {}".format(stat))
                 return True
         else:
             # parent_res = None when the parent node is the root node
@@ -144,9 +145,9 @@ class BICTerminator(Terminator):
             # correct for multiple hypothesis testing
             # For now, we use the Bonferroni correction
             if pval >= (self.thresh / num_tests):
-                logger.debug("Terminated with p-value {}".format(pval))
+                self.log.debug("Terminated with p-value {}".format(pval))
                 return True
-        logger.debug(
+        self.log.debug(
             "Significant with "
             + ("delta BIC {}".format(stat) if parent_res else "pval {}".format(pval))
         )

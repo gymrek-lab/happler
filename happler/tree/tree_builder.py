@@ -1,7 +1,8 @@
 from __future__ import annotations
-from logging import getLogger, Logger
+from logging import Logger
 
 import numpy as np
+from haptools.logging import getLogger
 from haptools.data import Genotypes, Phenotypes
 
 from .variant import Variant
@@ -189,9 +190,7 @@ class TreeBuilder:
                 "Testing variant {} / allele {} with parent_res {} and node_res {}"
                 .format(best_variant.id, allele, parent_res, node_res)
             )
-            if self.terminator.check(
-                parent_res, node_res, num_samps, num_tests, self.log
-            ):
+            if self.terminator.check(parent_res, node_res, num_samps, num_tests):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res
