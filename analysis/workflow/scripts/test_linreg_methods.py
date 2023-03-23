@@ -6,6 +6,12 @@ from haptools import data
 import matplotlib.pyplot as plt
 from happler.tree.assoc_test import AssocTestSimpleSM as AssocTest
 
+# COMMAND TO TEST AGAINST PLINK2: scripts/test_linreg_methods.py > fake.tsv && \
+# ~/miniconda3/envs/plink2/bin/plink2 --glm omit-ref allow-no-covars hide-covar \
+# --pheno iid-only fake.pheno --pfile fake --no-pheno --out fake &>/dev/null && \
+# join -t $'\t' -j1 <(sort -k1,1 fake.tsv) <(cut -f3,9,12 fake.bmi.glm.linear | \
+# sort -k1,1) | sort -k3,3g | column -t
+
 sample_size = 50
 num_variants = 10
 np.random.seed(12345)
