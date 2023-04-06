@@ -172,7 +172,7 @@ def run(
     if genotypes.suffix == ".pgen":
         gt = data.GenotypesPLINK(fname=genotypes, log=log, chunk_size=chunk_size)
     else:
-        gt = data.GenotypesRefAlt(fname=genotypes, log=log)
+        gt = data.GenotypesVCF(fname=genotypes, log=log)
     gt._prephased = phased
     gt.read(region=region, samples=samples)
     num_variants, num_samples = len(gt.variants), len(gt.samples)
@@ -195,6 +195,7 @@ def run(
     ph = data.Phenotypes(fname=phenotypes, log=log)
     ph.read(samples=set(gt.samples))
     # ph.standardize() # commented out because our linreg models will fit an intercept
+    ph.subset(samples=gt.samples, inplace=True)
     if len(ph.samples) < len(gt.samples):
         diff = set(gt.samples) - set(ph.samples)
         log.error(
@@ -206,8 +207,9 @@ def run(
         ph.names = ph.names[:1]
         ph.data = ph.data[:, :1]
     log.info("Running tree builder")
+    test_method = tree.assoc_test.AssocTestSimple()
     terminator = tree.terminator.TTestTerminator(thresh=threshold, log=log)
-    hap_tree = tree.TreeBuilder(gt, ph, terminator=terminator, log=log).run()
+    hap_tree = tree.TreeBuilder(gt, ph, method=test_method, terminator=terminator, log=log).run()
     log.info("Outputting haplotypes")
     tree.Haplotypes.from_tree(fname=output, tree=hap_tree, gts=gt, log=log).write()
     if show_tree:
