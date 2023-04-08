@@ -115,6 +115,7 @@ class TreeBuilder:
                 # there were no significant variants!
                 continue
             new_node_idx = self.tree.add_node(variant, parent_idx, allele, results)
+            self.log.debug(self.tree.dot())
             # create a new Haplotype with the variant-allele pair added
             variant_gts = self.gens.data[:, variant.idx, :2] == allele
             new_parent_hap = parent_hap.append(variant, allele, variant_gts)

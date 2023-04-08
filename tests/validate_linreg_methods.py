@@ -6,7 +6,7 @@ import numpy.typing as npt
 from happler.tree.assoc_test import AssocTestSimpleSM as AssocTest
 
 # COMMAND TO TEST AGAINST PLINK2:
-# scripts/test_linreg_methods.py > fake.tsv && \
+# tests/validate_linreg_methods.py > fake.tsv && \
 # ~/miniconda3/envs/plink2/bin/plink2 --glm omit-ref allow-no-covars hide-covar \
 # --pheno iid-only fake.pheno --pfile fake --no-pheno --out fake &>/dev/null && \
 # join -t $'\t' -j1 <(sort -k1,1 fake.tsv) <(cut -f3,9,12 fake.bmi.glm.linear | \
@@ -57,16 +57,16 @@ def standardize(X: npt.NDArray[np.uint8]) -> npt.NDArray[np.float64]:
 
 pts = data.Phenotypes("fake.pheno")
 # pts.data = np.random.normal(size=gts.data.shape[0]) * 0.4
-pts.data = gts.data[:, 0].sum(axis=1)*0.005 + np.random.normal(scale=0.6, size=gts.data.shape[0]) + 1
+pts.data = gts.data[:, 0].sum(axis=1)*0.005 + np.random.normal(scale=0.6, size=gts.data.shape[0]) + 2
 pts.data = pts.data[:, np.newaxis]
 pts.samples = tuple(gts.samples)
 pts.names = ("bmi",)
-# pts.standardize()
 pts.write()
 
 pts = data.Phenotypes(pts.fname)
 pts.read()
 pts.subset(samples=gts.samples, inplace=True)
+pts.standardize()
 
 tester = AssocTest()
 results = tester.run(gts.data[:, :, :2].sum(axis=2), pts.data[:,0].flatten()).data

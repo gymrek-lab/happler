@@ -194,7 +194,7 @@ def run(
     log.info("Loading phenotypes")
     ph = data.Phenotypes(fname=phenotypes, log=log)
     ph.read(samples=set(gt.samples))
-    # ph.standardize() # commented out because our linreg models will fit an intercept
+    ph.standardize()
     ph.subset(samples=gt.samples, inplace=True)
     if len(ph.samples) < len(gt.samples):
         diff = set(gt.samples) - set(ph.samples)
