@@ -36,6 +36,7 @@ class AssocTest(ABC):
     pval_thresh : float, optional
         The threshold of significance
     """
+
     def standardize(self, X: npt.NDArray[np.uint8]) -> npt.NDArray[np.float64]:
         """
         Standardize the genotypes so they have mean 0 and variance 1
@@ -116,7 +117,9 @@ class AssocTestSimple(AssocTest):
         return (-2 * likelihood) + ((k + 1) * np.log(n))
 
     def perform_test(
-        self, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64],
+        self,
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
     ) -> tuple:
         """
         Perform the test for a single haplotype.
@@ -182,7 +185,9 @@ class AssocTestSimple(AssocTest):
 
 class AssocTestSimpleSM(AssocTestSimple):
     def perform_test(
-        self, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64],
+        self,
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
     ) -> tuple:
         """
         Perform the test for a single haplotype.

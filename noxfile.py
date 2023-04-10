@@ -65,6 +65,7 @@ if os.getenv("CONDA_EXE"):
             if session.interactive:
                 session.notify("coverage", posargs=[])
 
+
 else:
 
     @session(python=python_versions)

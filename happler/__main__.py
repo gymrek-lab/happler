@@ -209,7 +209,9 @@ def run(
     log.info("Running tree builder")
     test_method = tree.assoc_test.AssocTestSimple()
     terminator = tree.terminator.TTestTerminator(thresh=threshold, log=log)
-    hap_tree = tree.TreeBuilder(gt, ph, method=test_method, terminator=terminator, log=log).run()
+    hap_tree = tree.TreeBuilder(
+        gt, ph, method=test_method, terminator=terminator, log=log
+    ).run()
     log.info("Outputting haplotypes")
     tree.Haplotypes.from_tree(fname=output, tree=hap_tree, gts=gt, log=log).write()
     if show_tree:

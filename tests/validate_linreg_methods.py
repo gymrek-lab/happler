@@ -17,19 +17,19 @@ num_variants = 10
 np.random.seed(12345)
 
 gts = data.GenotypesPLINK("fake.pgen")
-gts.data = np.random.choice([True, False], size=sample_size*num_variants*2).reshape((sample_size, num_variants, 2))
+gts.data = np.random.choice([True, False], size=sample_size * num_variants * 2).reshape(
+    (sample_size, num_variants, 2)
+)
 gts.samples = tuple(f"sample{i}" for i in range(sample_size))
 gts.variants = np.array(
-	[
-		(f"id{i}", "chr0", i, ("A", "T"))
-		for i in range(1, num_variants+1)
-	],
-	dtype=gts.variants.dtype,
+    [(f"id{i}", "chr0", i, ("A", "T")) for i in range(1, num_variants + 1)],
+    dtype=gts.variants.dtype,
 )
 gts.write()
 
 gts = data.GenotypesPLINK(gts.fname)
 gts.read()
+
 
 def standardize(X: npt.NDArray[np.uint8]) -> npt.NDArray[np.float64]:
     """
@@ -55,9 +55,14 @@ def standardize(X: npt.NDArray[np.uint8]) -> npt.NDArray[np.float64]:
     # )
     return standardized
 
+
 pts = data.Phenotypes("fake.pheno")
 # pts.data = np.random.normal(size=gts.data.shape[0]) * 0.4
-pts.data = gts.data[:, 0].sum(axis=1)*0.005 + np.random.normal(scale=0.6, size=gts.data.shape[0]) + 2
+pts.data = (
+    gts.data[:, 0].sum(axis=1) * 0.005
+    + np.random.normal(scale=0.6, size=gts.data.shape[0])
+    + 2
+)
 pts.data = pts.data[:, np.newaxis]
 pts.samples = tuple(gts.samples)
 pts.names = ("bmi",)
@@ -69,7 +74,7 @@ pts.subset(samples=gts.samples, inplace=True)
 pts.standardize()
 
 tester = AssocTest()
-results = tester.run(gts.data[:, :, :2].sum(axis=2), pts.data[:,0].flatten()).data
+results = tester.run(gts.data[:, :, :2].sum(axis=2), pts.data[:, 0].flatten()).data
 # for i in range(num_variants):
 # for i in [0]:
 # 	plt.scatter(gts.data[:, i].sum(axis=1), pts.data)
@@ -77,4 +82,4 @@ results = tester.run(gts.data[:, :, :2].sum(axis=2), pts.data[:,0].flatten()).da
 # 	plt.clf()
 print("ID\tBETA\tP")
 for ID, beta, pval in zip(gts.variants["id"], results["beta"], results["pval"]):
-	print(f"{ID}\t{beta}\t{pval}")
+    print(f"{ID}\t{beta}\t{pval}")
