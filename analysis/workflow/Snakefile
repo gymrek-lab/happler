@@ -665,7 +665,7 @@ rule gwas:
 
 
 rule run_methods_happler:
-    """ execute SuSiE and FINEMAP using the haplotypes from happler """
+    """ execute SuSiE using the haplotypes from happler """
     input:
         gt=rules.snp_hap_2gt.output.matrix,
         phen=rules.pheno2phens.output.phens,
@@ -673,8 +673,6 @@ rule run_methods_happler:
         outdir=lambda wildcards, output: Path(output.susie).parent,
         exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
     output:
-        sumstats=temp(out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/sumstats.rds"),
-        finemap=out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/finemap.rds",
         susie=out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/susie.rds",
     resources:
         runtime="1:15:00",
@@ -686,7 +684,7 @@ rule run_methods_happler:
     conda:
         "envs/susie.yml"
     shell:
-        "workflow/scripts/finemapping_methods.R {input} {params} &>{log}"
+        "workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
 
 
 plot_results_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output/results"
@@ -748,7 +746,6 @@ rule plot_results_happler:
     """
     input:
         gt=rules.run_methods_happler.input.gt,
-        finemap=rules.run_methods_happler.output.finemap,
         susie=rules.run_methods_happler.output.susie,
         happler_hap=rules.happler.output.hap,
     params:
@@ -760,7 +757,6 @@ rule plot_results_happler:
             locus=wildcards.locus.split("_")[1],
         ) if wildcards.mode == "hap" else "",
     output:
-        finemap_pdf=plot_results_happler_out + "/finemap.pdf",
         susie_pdf=plot_results_happler_out + "/susie.pdf",
         # susie_eff_pdf=temp(plot_results_happler_out + "/susie_eff.pdf"),
     log:
