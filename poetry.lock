@@ -280,8 +280,8 @@ tests = []
 [package.source]
 type = "git"
 url = "https://github.com/cast-genomics/haptools.git"
-reference = "6bd4d2e"
-resolved_reference = "6bd4d2e4e459c5b4b6a17916dfe7711925dfcded"
+reference = "c5594d9b5d6455bd9a231f218610153117b2eec7"
+resolved_reference = "c5594d9b5d6455bd9a231f218610153117b2eec7"
 
 [[package]]
 name = "humanfriendly"
@@ -1056,7 +1056,7 @@ tests = []
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7,<3.11"
-content-hash = "a6831c22b40c9591e5081312be5ab5c48309d30d17cd8d59fe46d758888d6dea"
+content-hash = "23e90d9245832883421db4e0f15709662126b03868149e5df260b8a13744d35a"
 
 [metadata.files]
 alabaster = [
