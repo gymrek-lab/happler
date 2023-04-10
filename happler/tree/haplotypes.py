@@ -10,6 +10,7 @@ import numpy.typing as npt
 from haptools.data import (
     Extra,
     Genotypes,
+    GenotypesVCF,
     Variant as VariantBase,
     Haplotype as HaplotypeBase,
     Haplotypes as HaplotypesBase,
@@ -226,7 +227,7 @@ class Haplotypes(HaplotypesBase):
 
     @classmethod
     def from_tree(
-        cls, fname: Path | str, tree: Tree, gts: GenotypesRefAlt, log: Logger = None
+        cls, fname: Path | str, tree: Tree, gts: GenotypesVCF, log: Logger = None
     ) -> Haplotypes:
         """
         Create a Haplotypes object from a Tree object and a Genotypes object
@@ -237,7 +238,7 @@ class Haplotypes(HaplotypesBase):
             The fname parameter for the Haplotypes object
         tree : Tree
             The Tree object containing the haplotypes to encode within a Haplotypes obj
-        gts : GenotypesRefAlt
+        gts : GenotypesVCF
             The genotypes from which the tree was constructed
         log : Logger, optional
             The log parameter for the Haplotypes object
@@ -262,8 +263,8 @@ class Haplotypes(HaplotypesBase):
                 pval=0,
             )
             alleles = {
-                node["variant"].idx: gts.variants[node["variant"].idx][
-                    "alt" if cls._handle_nan(node, "allele") else "ref"
+                node["variant"].idx: gts.variants[node["variant"].idx]["alleles"][
+                    cls._handle_nan(node, "allele")
                 ]
                 for node in haplotype
             }

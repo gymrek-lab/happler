@@ -1,7 +1,8 @@
 from __future__ import annotations
-from logging import getLogger, Logger
+from logging import Logger
 
 import numpy as np
+from haptools.logging import getLogger
 from haptools.data import Genotypes, Phenotypes
 
 from .variant import Variant
@@ -114,6 +115,7 @@ class TreeBuilder:
                 # there were no significant variants!
                 continue
             new_node_idx = self.tree.add_node(variant, parent_idx, allele, results)
+            self.log.debug(self.tree.dot())
             # create a new Haplotype with the variant-allele pair added
             variant_gts = self.gens.data[:, variant.idx, :2] == allele
             new_parent_hap = parent_hap.append(variant, allele, variant_gts)
@@ -166,7 +168,7 @@ class TreeBuilder:
             best_p_idx, key=lambda a: results[a].data["pval"][best_p_idx[a]]
         )
         best_var_idx = best_p_idx[best_allele]
-        num_snps_tested = len(results[best_allele].data)
+        num_tests = len(parent.nodes) + 1
         # step 4: find the index of the best variant within the genotype matrix
         # we need to account for indices that we removed when running transform()
         # There might be a faster way of doing this but for now we're just going to
@@ -189,9 +191,7 @@ class TreeBuilder:
                 "Testing variant {} / allele {} with parent_res {} and node_res {}"
                 .format(best_variant.id, allele, parent_res, node_res)
             )
-            if self.terminator.check(
-                parent_res, node_res, num_samps, num_snps_tested, self.log
-            ):
+            if self.terminator.check(parent_res, node_res, num_samps, num_tests):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res

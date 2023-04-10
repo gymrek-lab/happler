@@ -21,7 +21,11 @@ write("Loading input data", stderr())
 # import the finemap and susie results
 # and the path to an output directory
 gt = data.table::fread(snakemake@input[["gt"]], sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
-finemap_results = readRDS(snakemake@input[["finemap"]])[[1]]
+if ("finemap" %in% names(snakemake@input)) {
+    finemap_results = readRDS(snakemake@input[["finemap"]])[[1]]
+} else {
+    finemap_results = NULL
+}
 susie_results = readRDS(snakemake@input[["susie"]])
 out = snakemake@params[["outdir"]]
 hap = FALSE
@@ -78,11 +82,13 @@ if (exclude_causal) {
     b[causal_variant] = 1
 }
 
-write("Parsing FINEMAP data", stderr())
-# parse the finemap data
-snp = finemap_results$snp
-finemap_pip = snp[order(as.numeric(snp$snp)),]$snp_prob
-names(finemap_pip) = names(susie_pip)
+if (!is.null(finemap_results)) {
+    write("Parsing FINEMAP data", stderr())
+    # parse the finemap data
+    snp = finemap_results$snp
+    finemap_pip = snp[order(as.numeric(snp$snp)),]$snp_prob
+    names(finemap_pip) = names(susie_pip)
+}
 
 # define a function that generates the PIP plot data
 pip_plot_data = function(pips, X, b, susie_cs=NULL) {
@@ -176,11 +182,13 @@ if (hap) {
 ggsave(paste0(out,'/susie.pdf'), width=10, height=5, device='pdf')
 dev.off()
 
-write("Creating PIP plot for FINEMAP", stderr())
-if (hap) {
-    pip_plot_haps(finemap_pip, X, b, haplotypes)
-} else {
-    pip_plot(finemap_pip, X, b)
+if (!is.null(finemap_results)) {
+    write("Creating PIP plot for FINEMAP", stderr())
+    if (hap) {
+        pip_plot_haps(finemap_pip, X, b, haplotypes)
+    } else {
+        pip_plot(finemap_pip, X, b)
+    }
+    ggsave(paste0(out,'/finemap.pdf'), width=10, height=5, device='pdf')
+    while (!is.null(dev.list())) dev.off()
 }
-ggsave(paste0(out,'/finemap.pdf'), width=10, height=5, device='pdf')
-dev.off()

@@ -37,6 +37,30 @@ class AssocTest(ABC):
         The threshold of significance
     """
 
+    def standardize(self, X: npt.NDArray[np.uint8]) -> npt.NDArray[np.float64]:
+        """
+        Standardize the genotypes so they have mean 0 and variance 1
+
+        Parameters
+        ----------
+        X : npt.NDArray[np.float64]
+            The genotypes, with shape n x p. There are only two dimensions.
+            Each column is a haplotype and each row is a sample.
+
+        Returns
+        -------
+        npt.NDArray[np.float64]
+            An array with the same shape as X but standardized properly
+        """
+        std = np.std(X, axis=0)
+        standardized = (X - np.mean(X, axis=0)) / std
+        # # for variants where the stdev is 0, just set all values to 0 instead of nan
+        # zero_elements = std == 0
+        # standardized[:, zero_elements] = np.zeros(
+        #     (X.shape[0], np.sum(zero_elements))
+        # )
+        return standardized
+
     @abstractmethod
     def run(
         self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
@@ -70,7 +94,7 @@ class AssocTestSimple(AssocTest):
         """
         Return the BIC (Bayesian Information Criterion) for an OLS test
 
-        This function follows the implementatin in https://stackoverflow.com/a/58984868
+        This function follows the implementation in https://stackoverflow.com/a/58984868
 
         Parameters
         ----------
@@ -93,7 +117,9 @@ class AssocTestSimple(AssocTest):
         return (-2 * likelihood) + ((k + 1) * np.log(n))
 
     def perform_test(
-        self, x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
+        self,
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
     ) -> tuple:
         """
         Perform the test for a single haplotype.
@@ -157,6 +183,39 @@ class AssocTestSimple(AssocTest):
         )
 
 
+class AssocTestSimpleSM(AssocTestSimple):
+    def perform_test(
+        self,
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+    ) -> tuple:
+        """
+        Perform the test for a single haplotype.
+
+        Parameters
+        ----------
+        x : npt.NDArray[np.float64]
+            The genotypes with shape n x 1 (for a single haplotype)
+        y : npt.NDArray[np.float64]
+            The phenotypes, with shape n x 1
+
+        Returns
+        -------
+        tuple
+            The slope, p-value, and stderr obtained from the test. The delta BIC is
+            appended to the end if ``self.with_bic`` is True.
+        """
+        res = sm.OLS(y, sm.add_constant(x)).fit()
+        params = res.params
+        stderr = res.bse
+        pvals = res.pvalues
+        bic = res.bic
+        if self.with_bic:
+            return params[-1], pvals[-1], stderr[-1], bic
+        else:
+            return params[-1], pvals[-1], stderr[-1]
+
+
 class AssocTestSimpleCovariates(AssocTestSimple):
     def __init__(self, covars: npt.NDArray[np.float64], with_bic=False):
         """
@@ -190,7 +249,7 @@ class AssocTestSimpleCovariates(AssocTestSimple):
         # the independent variables consist of this haplotype and the covariates
         X = np.hstack(x, self.covars)
         # initialize and create a multi-linear regression model
-        mlr = sm.OLS(X, y)
+        mlr = sm.OLS(y, X)
         fit = mlr.fit()
         params = fit.params
         stderr = fit.bse
