@@ -112,6 +112,12 @@ def main():
     help="Output a tree in addition to the regular output.",
 )
 @click.option(
+    "--covars",
+    type=click.Path(exists=True, path_type=Path),
+    show_default="no covariates",
+    help="Any covariates to include in the file (as a PLINK2 .covar) file",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -140,6 +146,7 @@ def run(
     phased: bool = False,
     threshold: float = 0.05,
     show_tree: bool = False,
+    covars: Path = None,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "INFO",
 ):
@@ -191,13 +198,14 @@ def run(
         log.info(f"Ignoring {removed} variants with MAF < {maf}")
     gt.check_phase()
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
+    gt_samples_set = set(gt.samples)
     log.info("Loading phenotypes")
     ph = data.Phenotypes(fname=phenotypes, log=log)
-    ph.read(samples=set(gt.samples))
+    ph.read(samples=gt_samples_set)
     ph.standardize()
     ph.subset(samples=gt.samples, inplace=True)
     if len(ph.samples) < len(gt.samples):
-        diff = set(gt.samples) - set(ph.samples)
+        diff = gt_samples_set - set(ph.samples)
         log.error(
             f"The phenotypes file is missing {len(diff)} samples. Here are the first "
             f"few: {list(diff)[:5]}"
@@ -207,7 +215,19 @@ def run(
         ph.names = ph.names[:1]
         ph.data = ph.data[:, :1]
     log.info("Running tree builder")
-    test_method = tree.assoc_test.AssocTestSimple()
+    if covars:
+        cv = data.Covariates(fname=covars, log=log)
+        cv.read(samples=gt_samples_set)
+        cv.subset(samples=gt.samples, inplace=True)
+        if len(cv.samples) < len(gt.samples):
+            diff = gt_samples_set - set(ph.samples)
+            log.error(
+                f"The covariates file is missing {len(diff)} samples. Here are the first "
+                f"few: {list(diff)[:5]}"
+            )
+        test_method = tree.assoc_test.AssocTestSimpleCovariates(covars=cv.data)
+    else:
+        test_method = tree.assoc_test.AssocTestSimpleSM()
     terminator = tree.terminator.TTestTerminator(thresh=threshold, log=log)
     hap_tree = tree.TreeBuilder(
         gt, ph, method=test_method, terminator=terminator, log=log
