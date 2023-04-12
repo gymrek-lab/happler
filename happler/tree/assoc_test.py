@@ -184,6 +184,13 @@ class AssocTestSimple(AssocTest):
 
 
 class AssocTestSimpleSM(AssocTestSimple):
+    def _get_sm_result(
+        self,
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+    ) -> sm.regression.linear_model.RegressionResults:
+        return sm.OLS(y, sm.add_constant(x)).fit()
+
     def perform_test(
         self,
         x: npt.NDArray[np.float64],
@@ -205,7 +212,7 @@ class AssocTestSimpleSM(AssocTestSimple):
             The slope, p-value, and stderr obtained from the test. The delta BIC is
             appended to the end if ``self.with_bic`` is True.
         """
-        res = sm.OLS(y, sm.add_constant(x)).fit()
+        res = self._get_sm_result(x, y)
         params = res.params
         stderr = res.bse
         pvals = res.pvalues
@@ -216,7 +223,7 @@ class AssocTestSimpleSM(AssocTestSimple):
             return params[-1], pvals[-1], stderr[-1]
 
 
-class AssocTestSimpleCovariates(AssocTestSimple):
+class AssocTestSimpleCovariates(AssocTestSimpleSM):
     def __init__(self, covars: npt.NDArray[np.float64], with_bic=False):
         """
         Implement a subclass of AssocTestSimple with covariates.
@@ -230,32 +237,10 @@ class AssocTestSimpleCovariates(AssocTestSimple):
         self.covars = covars
         super().__init__(with_bic=with_bic)
 
-    def perform_test(self, x, y):
-        """
-        Perform the test for a single haplotype.
-
-        Parameters
-        ----------
-        x : npt.NDArray[np.float64]
-            The genotypes with shape n x 1 (for a single haplotype)
-        y : npt.NDArray[np.float64]
-            The phenotypes, with shape n x 1
-
-        Returns
-        -------
-        tuple
-            The slope, p-value, and stderr obtained from the test.
-        """
-        # the independent variables consist of this haplotype and the covariates
-        X = np.hstack(x, self.covars)
-        # initialize and create a multi-linear regression model
-        mlr = sm.OLS(y, X)
-        fit = mlr.fit()
-        params = fit.params
-        stderr = fit.bse
-        pvals = fit.pvalues
-        bic = fit.bic
-        if self.with_bic:
-            return params[0], pvals[0], stderr[0], bic
-        else:
-            return params[0], pvals[0], stderr[0]
+    def _get_sm_result(
+        self,
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+    ) -> sm.regression.linear_model.RegressionResults:
+        X = sm.add_constant(np.column_stack((self.covars, x)))
+        return sm.OLS(y, X).fit()
