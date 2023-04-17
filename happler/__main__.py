@@ -222,8 +222,8 @@ def run(
         if len(cv.samples) < len(gt.samples):
             diff = gt_samples_set - set(ph.samples)
             log.error(
-                f"The covariates file is missing {len(diff)} samples. Here are the first "
-                f"few: {list(diff)[:5]}"
+                f"The covariates file is missing {len(diff)} samples. Here are the"
+                f" first few: {list(diff)[:5]}"
             )
         test_method = tree.assoc_test.AssocTestSimpleCovariates(covars=cv.data)
     else:
