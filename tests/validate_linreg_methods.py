@@ -3,17 +3,17 @@
 import numpy as np
 from haptools import data
 import numpy.typing as npt
-from happler.tree.assoc_test import AssocTestSimpleSM as AssocTest
+from happler.tree.assoc_test import AssocTestSimpleCovariates as AssocTest
 
 # COMMAND TO TEST AGAINST PLINK2:
+
 # tests/validate_linreg_methods.py > fake.tsv && \
-# ~/miniconda3/envs/plink2/bin/plink2 --glm omit-ref allow-no-covars hide-covar \
+# ~/miniconda3/envs/plink2/bin/plink2 --glm omit-ref hide-covar --covar iid-only fake.covar \
 # --pheno iid-only fake.pheno --pfile fake --no-pheno --out fake &>/dev/null && \
-# join -t $'\t' -j1 <(sort -k1,1 fake.tsv) <(cut -f3,9,12 fake.bmi.glm.linear | \
-# sort -k1,1) | sort -k3,3g | column -t
+# diff -sy -W 67 <(sort -k1,1 fake.tsv | column -t) <(cut -f3,9,12 fake.bmi.glm.linear | sort -k1,1 | column -t)
 
 sample_size = 100
-num_variants = 10
+num_variants = 5
 np.random.seed(12345)
 
 gts = data.GenotypesPLINK("fake.pgen")
@@ -30,36 +30,10 @@ gts.write()
 gts = data.GenotypesPLINK(gts.fname)
 gts.read()
 
-
-def standardize(X: npt.NDArray[np.uint8]) -> npt.NDArray[np.float64]:
-    """
-    Standardize the genotypes so they have mean 0 and variance 1
-
-    Parameters
-    ----------
-    X : npt.NDArray[np.float64]
-        The genotypes, with shape n x p. There are only two dimensions.
-        Each column is a haplotype and each row is a sample.
-
-    Returns
-    -------
-    npt.NDArray[np.float64]
-        An array with the same shape as X but standardized properly
-    """
-    std = np.std(X, axis=0)
-    standardized = (X - np.mean(X, axis=0)) / std
-    # # for variants where the stdev is 0, just set all values to 0 instead of nan
-    # zero_elements = std == 0
-    # standardized[:, zero_elements] = np.zeros(
-    #     (X.shape[0], np.sum(zero_elements))
-    # )
-    return standardized
-
-
 pts = data.Phenotypes("fake.pheno")
 # pts.data = np.random.normal(size=gts.data.shape[0]) * 0.4
 pts.data = (
-    gts.data[:, 0].sum(axis=1) * 0.005
+    gts.data[:, 0].sum(axis=1) * 0.4
     + np.random.normal(scale=0.6, size=gts.data.shape[0])
     + 2
 )
@@ -71,9 +45,21 @@ pts.write()
 pts = data.Phenotypes(pts.fname)
 pts.read()
 pts.subset(samples=gts.samples, inplace=True)
-pts.standardize()
+# pts.standardize()
 
-tester = AssocTest()
+cvs = data.Covariates("fake.covar")
+cvs.data = np.random.normal(size=gts.data.shape[0]) * 0.01 + 2
+cvs.data = cvs.data[:, np.newaxis]
+cvs.samples = tuple(gts.samples)
+cvs.names = ("sex",)
+cvs.write()
+
+cvs = data.Covariates(cvs.fname)
+cvs.read()
+cvs.subset(samples=gts.samples, inplace=True)
+cvs.standardize()
+
+tester = AssocTest(covars=cvs.data)
 results = tester.run(gts.data[:, :, :2].sum(axis=2), pts.data[:, 0].flatten()).data
 # for i in range(num_variants):
 # for i in [0]:
@@ -82,4 +68,4 @@ results = tester.run(gts.data[:, :, :2].sum(axis=2), pts.data[:, 0].flatten()).d
 # 	plt.clf()
 print("ID\tBETA\tP")
 for ID, beta, pval in zip(gts.variants["id"], results["beta"], results["pval"]):
-    print(f"{ID}\t{beta}\t{pval}")
+    print(f"{ID}\t{beta:.6g}\t{pval:.6g}")
