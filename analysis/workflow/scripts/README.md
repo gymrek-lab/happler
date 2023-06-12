@@ -3,23 +3,41 @@ This directory contains various scripts used by the pipeline. However, you can u
 
 All python scripts implement the --help argument. For bash and R scripts, you can run `head <script>` to read about their usage.
 
+## [choose_different_ld.py](choose_different_ld.py)
+Choose haplotype alleles such that their SNPs have a range of strengths of LD with the causal haplotype.
+
+## [create_hap_file.sh](create_hap_file.sh)
+Create a [.hap file](https://haptools.readthedocs.io/en/stable/formats/haplotypes.html) for use by haptools when simulating causal variables.
+
+## [finemap_1p4.R](finemap_1p4.R)
+Generate proper input files to run FINEMAP. Then run it.
+
 ## [finemapping_methods.R](finemapping_methods.R)
-An R script to execute FINEMAP and SuSie and generate Manhattan plots against the true causal variants from the simulation framework.
+Run FINEMAP and SuSiE. Duplicates code from `run_FINEMAP.R` and `run_SuSiE.R`.
 
 ## [generate_phenotypes.py](generate_phenotypes.py)
 Uses pre-existing gentoype matrices to create a file of phenotypes.
 
-## [matrix.bash](matrix.bash)
-Extract fields (POS, ID, MAF, GT, and alleles) from a VCF of STRs and SNPs. Each column is a sample and the rows are variants.
-
-## [gt_matrix.py](gt_matrix.py)
-Transform the TSV from `matrix.bash` into a genotype matrix, with entries 0, 1, and 2. Columns are variants and rows are samples. Column names have the variant type appended.
+## [keep_samps.bash](keep_samps.bash)
+Determine the intersection of the set of samples between multiple input reference panels
 
 ## [ld_heatmap.py](ld_heatmap.py)
 Creates a heatmap of the LD pattern among the variants in a genotype matrix.
 
+## [manhattan.py](manhattan.py)
+Create a manhattan plot to visualize the results of a GWAS.
+
 ## [plot_phenotypes.py](plot_phenotypes.py)
 Performs a linear regression and outputs a plot for phenotypes from `generate_phenotypes.py`.
+
+## [merge_plink.py](merge_plink.py)
+Merge variants from two PGEN files that have the same set of samples.
+
+## [run_FINEMAP.R](run_FINEMAP.R)
+Run FINEMAP with a set of genotypes and phenotypes. Compute summary statistics, then call the `finemap_1p4.R` script.
+
+## [run_SuSiE.R](run_SuSiE.R)
+Run SuSiE with a set of genotypes and phenotypes. Follow the same interface as `run_FINEMAP.R`.
 
 ## [summarize_results.R](summarize_results.R)
 This R script summarizes the output of several executions of FINEMAP and SuSiE by producing several useful visualizations.
