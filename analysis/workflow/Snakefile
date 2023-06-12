@@ -25,10 +25,6 @@ config["beta"] = check_config("beta", 0.1, as_set=True)
 config["exclude_causal"] = check_config("exclude_causal", False, as_set=True)
 # remove any trailing slashes in directories and set the variables
 out = str(Path(config["out"]))
-logs = out + "/logs"
-bench = out + "/bench"
-# parse loci
-loci = {loc["locus"].replace(":", "_"): loc for loc in config["loci"]}
 # convert the exclude_causal var into a dict for later
 exclude_causal = {("in", "ex")[val]: val for val in config["exclude_causal"]}
 
@@ -65,177 +61,6 @@ rule all:
             beta=config["beta"],
             causal=exclude_causal.keys(),
         ),
-
-
-rule plink2vcf:
-    """ convert a PLINK file to VCF """
-    input:
-        pgen=config["snp_panel"],
-    params:
-        pfile=lambda wildcards, input: str(Path(input.pgen).with_suffix('')),
-        out=lambda wildcards, output: str(Path(output.bcf).with_suffix('')),
-        start=lambda wildcards: wildcards.locus.split('-')[0],
-        end=lambda wildcards: wildcards.locus.split('-')[1],
-        chrom=lambda wildcards: wildcards.chr,
-    output:
-        vcf=temp(out + "/{chr}_{locus}/unphased.vcf.gz"),
-        bcf=out + "/{chr}_{locus}/unphased.bcf",
-        bcf_idx=out + "/{chr}_{locus}/unphased.bcf.csi",
-        log=temp(out + "/{chr}_{locus}/unphased.log"),
-    resources:
-        runtime="0:15:00"
-    log:
-        logs + "/{chr}_{locus}/plink2vcf"
-    benchmark:
-        bench + "/{chr}_{locus}/plink2vcf"
-    conda:
-        "envs/default.yml"
-    shell:
-        "plink2 --pfile {params.pfile} --out {params.out} --from-bp {params.start} "
-        "--to-bp {params.end} --chr {params.chrom} --snps-only 'just-acgt' "
-        "--export vcf bgz id-paste=iid &>{log} && "
-        "bcftools view -Ob -o {output.bcf} {output.vcf} &>>{log} && "
-        "tabix -p bcf {output.bcf} &>>{log}"
-
-
-def phase_gt_input(wildcards):
-    input_files = { 'map': config['phase_map'] }
-    if config["snp_panel"].endswith('.pgen'):
-        input_files['unphased'] = rules.plink2vcf.output.bcf
-    else:
-        input_files['unphased'] = config["snp_panel"]
-    input_files['unphased_idx'] = input_files['unphased'] + ".csi"
-    return input_files
-
-
-rule phase_gt:
-    """ phase an unphased set of genotypes """
-    input: unpack(phase_gt_input)
-    params:
-        locus=lambda wildcards: loci[wildcards.chr + "_" + wildcards.locus]["locus"],
-    output:
-        phased=out + "/{chr}_{locus}/phased.bcf",
-        phased_idx=out + "/{chr}_{locus}/phased.bcf.csi",
-    resources:
-        runtime="4:00:00"
-    threads: 8
-    log:
-        logs + "/{chr}_{locus}/phase_gt"
-    benchmark:
-        bench + "/{chr}_{locus}/phase_gt"
-    conda:
-        "envs/shapeit.yml"
-    shell:
-        "shapeit4 --input {input.unphased} --map {input.map} --region {params.locus} "
-        "--output {output.phased} --thread {threads} --log {log} &>>{log} && "
-        "tabix -p bcf {output.phased} &>>{log}"
-
-
-rule keep_samps:
-    """ create a list of the samples that we should keep """
-    input:
-        snp_vcf=lambda wildcards: rules.phase_gt.output.phased if check_config('phase_map')
-            else config["snp_panel"],
-        snp_vcf_idx=lambda wildcards: rules.phase_gt.output.phased_idx if check_config('phase_map')
-            else config["snp_panel"] + ".tbi",
-        str_vcf=config["str_panel"],
-        str_vcf_idx=config["str_panel"],
-        samp=config["exclude_samples"],
-    output:
-        samples=out+"/{chr}_{locus}/samples.tsv.gz"
-    log:
-        logs+"/{chr}_{locus}/keep_samps"
-    conda:
-        "envs/default.yml"
-    shell:
-        "workflow/scripts/keep_samps.bash {input.snp_vcf} {input.str_vcf} {input.samp}"
-        " | gzip > {output.samples} 2>{log}"
-
-
-rule vcf2gt:
-    """ convert a VCF into a genotype matrix (cols are vars and rows are samples) """
-    input:
-        snp_vcf=lambda wildcards: rules.phase_gt.output.phased if check_config('phase_map')
-            else config["snp_panel"],
-        snp_vcf_idx=lambda wildcards: rules.phase_gt.output.phased_idx if check_config('phase_map')
-            else config["snp_panel"] + ".tbi",
-        str_vcf=config["str_panel"],
-        str_vcf_idx=config["str_panel"],
-        samples=rules.keep_samps.output.samples,
-    params:
-        locus=lambda wildcards: loci[wildcards.chr + "_" + wildcards.locus]["locus"],
-    output:
-        temp_snp=temp(out + "/{chr}_{locus}/snps.bcf"),
-        temp_str=temp(out + "/{chr}_{locus}/strs.bcf"),
-        matrix=out + "/{chr}_{locus}/matrix.tsv.gz",
-    resources:
-        runtime="1:45:00"
-    log:
-        logs + "/{chr}_{locus}/vcf2gt",
-    benchmark:
-        bench + "/{chr}_{locus}/vcf2gt",
-    conda:
-        "envs/default.yml"
-    shell:
-        "workflow/scripts/matrix.bash '{params.locus}' {input.snp_vcf} {input.str_vcf}"
-        " {input.samples} {output.temp_snp} {output.temp_str} 2>{log} | gzip > {output.matrix}"
-
-
-rule vcf2plink:
-    """ convert a VCF into a PGEN file """
-    input:
-        vcf=lambda wildcards: expand(
-            rules.vcf2gt.output.temp_snp,
-            chr=wildcards.locus.split("_")[0],
-            locus=wildcards.locus.split("_")[1],
-        ),
-    params:
-        maf=config["min_maf"],
-        prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
-    output:
-        pgen=out+"/{locus}/snps.pgen",
-        pvar=out+"/{locus}/snps.pvar",
-        psam=out+"/{locus}/snps.psam",
-        log=temp(out+"/{locus}/snps.log"),
-    resources:
-        runtime="0:03:00"
-    log:
-        logs + "/{locus}/vcf2plink",
-    benchmark:
-        bench + "/{locus}/vcf2plink",
-    conda:
-        "envs/default.yml"
-    shell:
-        "plink2 --bcf {input.vcf} --maf {params.maf} --make-pgen --out {params.prefix}"
-        " &>{log}"
-
-
-rule snp2gt:
-    """ convert a PGEN file into a SNP GT matrix """
-    input:
-        pgen=out+"/{locus}/snps.pgen",
-        pvar=out+"/{locus}/snps.pvar",
-        psam=out+"/{locus}/snps.psam",
-    params:
-        in_prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
-        prefix=lambda wildcards, output: Path(output.traw).with_suffix(""),
-    output:
-        traw=temp(out+"/{locus}/snps-gts.traw"),
-        log=temp(out+"/{locus}/snps-gts.log"),
-        matrix=out+"/{locus}/snps.tsv.gz",
-    resources:
-        runtime="0:04:00"
-    log:
-        logs + "/{locus}/snp2gt",
-    benchmark:
-        bench + "/{locus}/snp2gt",
-    conda:
-        "envs/default.yml"
-    shell:
-        "plink2 --pfile {params.in_prefix} --out {params.prefix} --export Av &>{log} "
-        "&& cut -f 4,7- {output.traw} | (read -r head; echo \"$head\" | "
-        "sed 's/POS\\t/sample\\t/; s/\\t0_/\\t/g'; sed 's/\\t/:0\\t/') | "
-        "datamash transpose | gzip > {output.matrix} 2>{log}"
 
 
 rule str2gt:
@@ -625,14 +450,6 @@ rule snp_hap_2gt:
         "datamash transpose | (read -r head; paste <(echo \"$head\" | rev | cut -f3- |"
         " rev) <(echo \"$head\" | rev | cut -f-2 | rev | sed 's/:0/:2/g'); cat) | "
         "gzip > {output.matrix} 2>>{log}"
-
-
-# rule append_happlerhap2mat:
-#     """ append the haplotype genotypes to the genotype matrix """
-#     shell:
-#         "paste <(zcat {input.matrix}) <(workflow/scripts/append_hap.py {input.hps} "
-#         "<(zcat {input.matrix} | cut -f1 | tail -n+2) 2>{log}) | gzip "
-#         ">{output.matrix} 2>{log}"
 
 
 rule gwas:
