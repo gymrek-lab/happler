@@ -159,6 +159,25 @@ rule phens2pheno:
         "sed 's/^sample\\t/#IID\\t/' | cut -f-2; cut -f1,3; }} >{output} 2>{log}"
 
 
+rule create_haps_ld_range:
+    """ create a haps file with haplotypes that are in a range of LD with their SNPs """
+    input:
+        gts=lambda wildcards: expand(
+            rules.vcf2plink.output.pvar,
+            locus=wildcards.chr + "_" + wildcards.locus,
+        ),
+    output:
+        hap=out + "/{chr}_{locus}/sim/random_haps/{chr}_{locus}.hap"
+    log:
+        logs + "/{chr}_{locus}/sim/hap/create_haps_ld_range",
+    benchmark:
+        bench + "/{chr}_{locus}/sim/hap/create_haps_ld_range",
+    conda:
+        happler
+    shell:
+        "scripts/choose_different_ld.py {input.gts} > {output.hap}"
+
+
 rule create_hap:
     """ create a hap file suitable for haptools transform and simphenotype """
     input:
