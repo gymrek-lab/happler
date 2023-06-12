@@ -87,7 +87,7 @@ class TTestTerminator(Terminator):
                 return False
             # then, we compute the test statistic
             # use np.abs to account for the directions that the effect size may take
-            t_stat = np.abs(node_res.beta - parent_res.beta) / std_err
+            t_stat = (np.abs(node_res.beta) - np.abs(parent_res.beta)) / std_err
             # use a one-tailed test here b/c either the effect size becomes more
             # negative or it becomes more positive
             pval = t_dist.cdf(-t_stat, df=2 * (num_samps - 2))
