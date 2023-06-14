@@ -19,28 +19,23 @@ def check_config(value, default=False, place=config, as_set=False):
 
 # handle defaults
 config["out"] = check_config("out", "out")
-config["superpop"] = check_config("superpop", "EUR")
 config["min_maf"] = check_config("min_maf", 0)
-config["beta"] = check_config("beta", 0.1, as_set=True)
 config["exclude_causal"] = check_config("exclude_causal", False, as_set=True)
+locus = config["locus"].replace(":", "_")
 # remove any trailing slashes in directories and set the variables
-out = str(Path(config["out"]))
+config["out"] = str(Path(config["out"])) + f"/{locus}"
 # convert the exclude_causal var into a dict for later
 exclude_causal = {("in", "ex")[val]: val for val in config["exclude_causal"]}
 
 
-def get_vcf_chrs(vcf_path):
-    """return a dict of VCFs split by contig"""
-    if io.contains_wildcard(vcf_path):
-        return glob_wildcards(vcf_path).chr
-    return []
+module genotypes:
+    snakefile: "rules/genotypes.smk"
+    config: config
 
+use rule * from genotypes as genotypes_*
+config["gts_snp_panel"] = rules.genotypes_vcf2plink.output.pgen
+config["gts_str_panel"] = rules.genotypes_subset_str.output.vcf
 
-chrs = get_vcf_chrs(config["snp_panel"])
-
-
-wildcard_constraints:
-    beta="\d+\.\d+",
 
 rule all:
     input:
@@ -319,7 +314,6 @@ rule pheno2phens:
 
 
 run_methods_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output"
-
 
 rule run_methods:
     """run the methods FINEMAP and SuSie"""
