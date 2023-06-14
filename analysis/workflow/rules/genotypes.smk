@@ -1,21 +1,26 @@
 from pathlib import Path
 
 
-out = "out/genotypes"
-logs = "out/logs/genotypes"
-bench = "out/bench/genotypes"
+out = config["out"] + "/genotypes"
+logs = out + "/logs"
+bench = out + "/bench"
 
 
 locus_chr = config["locus"].split(":")[0]
-locus_start = config["locus"].split("-")[1].split('-')[0]
-locus_end = config["locus"].split("-")[1].split('-')[1]
+locus_start = config["locus"].split(":")[1].split('-')[0]
+locus_end = config["locus"].split(":")[1].split('-')[1]
 
+
+def check_config(value, default=False, place=config, as_set=False):
+    """return true if config value exists and is true"""
+    value = place[value] if (value in place and place[value]) else default
+    return (set(value) if isinstance(value, list) else {value}) if as_set else value
 
 
 rule plink2vcf:
     """ convert a PLINK file to VCF """
     input:
-        pgen=config["snp_panel"],
+        pgen=lambda wildcards: expand(config["snp_panel"], chr=locus_chr)[0],
     params:
         pfile=lambda wildcards, input: str(Path(input.pgen).with_suffix('')),
         out=lambda wildcards, output: str(Path(output.bcf).with_suffix('')),
@@ -34,7 +39,7 @@ rule plink2vcf:
     benchmark:
         bench + "/plink2vcf"
     conda:
-        "envs/default.yml"
+        "../envs/default.yml"
     shell:
         "plink2 --pfile {params.pfile} --out {params.out} --from-bp {params.start} "
         "--to-bp {params.end} --chr {params.chrom} --snps-only 'just-acgt' "
@@ -44,7 +49,7 @@ rule plink2vcf:
 
 
 def phase_gt_input(wildcards):
-    input_files = { 'map': config['phase_map'] }
+    input_files = { 'map': config['phase_map'].format(chr=locus_chr) }
     if config["snp_panel"].endswith('.pgen'):
         input_files['unphased'] = rules.plink2vcf.output.bcf
     else:
@@ -69,7 +74,7 @@ rule phase_gt:
     benchmark:
         bench + "/phase_gt"
     conda:
-        "envs/shapeit.yml"
+        "../envs/shapeit.yml"
     shell:
         "shapeit4 --input {input.unphased} --map {input.map} --region {params.locus} "
         "--output {output.phased} --thread {threads} --log {log} &>>{log} && "
@@ -83,15 +88,15 @@ rule keep_samps:
             else config["snp_panel"],
         snp_vcf_idx=lambda wildcards: rules.phase_gt.output.phased_idx if check_config('phase_map')
             else config["snp_panel"] + ".tbi",
-        str_vcf=config["str_panel"],
-        str_vcf_idx=config["str_panel"],
+        str_vcf=expand(config["str_panel"], chr=locus_chr),
+        str_vcf_idx=expand(config["str_panel"], chr=locus_chr),
         samp=config["exclude_samples"],
     output:
         samples=out+"/samples.tsv"
     log:
         logs+"/keep_samps"
     conda:
-        "envs/default.yml"
+        "../envs/default.yml"
     shell:
         "workflow/scripts/keep_samps.bash {input.snp_vcf} {input.str_vcf} {input.samp}"
         " > {output.samples} 2>{log}"
@@ -120,7 +125,29 @@ rule vcf2plink:
     benchmark:
         bench + "/vcf2plink",
     conda:
-        "envs/default.yml"
+        "../envs/default.yml"
     shell:
         "plink2 --bcf {input.vcf} --maf {params.maf} --make-pgen "
         "--keep {input.samples} --out {params.prefix} &>{log}"
+
+
+rule subset_str:
+    """ subset samples from a STR VCF """
+    input:
+        vcf=lambda wildcards: expand(config["str_panel"], chr=locus_chr)[0],
+        vcf_idx=lambda wildcards: expand(config["str_panel"] + ".tbi", chr=locus_chr),
+        samples=rules.keep_samps.output.samples,
+    output:
+        vcf=out+"/strs.bcf",
+        vcf_idx=out+"/strs.bcf.csi",
+    resources:
+        runtime="0:30:00"
+    log:
+        logs + "/subset_str",
+    benchmark:
+        bench + "/subset_str",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "bcftools view -S {input.samples} --write-index "
+        "-Ob -o {output.vcf} {input.vcf}"
