@@ -30,6 +30,7 @@ phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
 # There are different simulation modes that you can use:
 # 1. "str" - a tandem repeat is a string with a contig name, a colon, and the start position
 # 2. "snp" - a SNP follows the same format as "str"
+# 3. "hap" - a haplotype
 # The STR and SNP positions should be contained within the locus.
 # The positions should be provided in the same coordinate system as the reference
 # genome of the reference panel VCFs
@@ -37,9 +38,14 @@ phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
 # required!
 locus: 19:45401409-46401409 # center: 45901409 (APOe4)
 modes:
- str: 19:45903857 # STR_691361
- snp: 19:45910672 # rs1046282
- hap: [rs36046716:G, rs1046282:G] # 45892145, 45910672
+ str:
+  pos: 19:45903857 # STR_691361
+ snp:
+  pos: 19:45910672 # rs1046282
+ hap:
+  alleles: [rs36046716:G, rs1046282:G] # 45892145, 45910672
+  beta: [0.05]
+mode: hap
 
 # locus: 1:98001984-99001984
 # modes:
@@ -54,11 +60,6 @@ modes:
 # Discard rare variants with a MAF below this number
 # Defaults to 0 if not specified
 min_maf: 0.1
-
-# The strength of association between the chosen STR or SNP and the simulated phenotype
-# Defaults to 0.1 if not specified
-# You can also provide a list of floats, if you want to test several beta values
-beta: [0.05]
 
 # Sample sizes to use
 sample_size: [100, 1000, 10000, 100000, 500000]
