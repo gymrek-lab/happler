@@ -26,6 +26,7 @@ locus = config["locus"].replace(":", "_")
 config["out"] = str(Path(config["out"])) + f"/{locus}"
 # convert the exclude_causal var into a dict for later
 exclude_causal = {("in", "ex")[val]: val for val in config["exclude_causal"]}
+mode = config["mode"]
 
 
 module genotypes:
@@ -42,234 +43,51 @@ module simulate:
     config: config
 use rule * from simulate as simulate_*
 
-if config["mode"] in ("snp", "hap"):
-    mode = config["mode"]
+if mode in ("snp", "hap"):
     happler_config = {
         "pheno": rules.simulate_simphenotype.output.pheno,
+        "hap_file": rules.create_hap.output.hap,
         "snp_panel": config["gts_snp_panel"],
         "out": config["out"] + "/happler/"+mode+"/{beta}",
     }
+    if mode == "hap":
+        happler_config["snps"] = config["modes"][mode]["alleles"]
     module happler:
         snakefile: "rules/happler.smk"
         config: happler_config
     use rule * from happler as happler_*
-    merged_happler = rules.happler_merge_happler.output.pgen
-elif "str" == config["mode"]:
+    merged_happler = rules.happler_merge.output.pgen
+elif "str" == mode:
     pass
-elif "ld_range" == config["mode"]:
+elif "ld_range" == mode:
     pass
+else:
+    raise ValueError("Unsupported operating 'mode' in config")
+
+if mode in ("hap", "str"):
+    finemappers_config = {
+        "pheno": rules.simulate_simphenotype.output.pheno,
+        "out": config["out"] + "/finemappers/"+mode+"/{beta}",
+        "snp_panel": config["gts_snp_panel"],
+    }
+    module finemappers:
+        snakefile: "rules/finemappers.smk"
+        config: finemappers_config
+    use rule * from finemappers as finemappers_*
 else:
     raise ValueError("Unsupported operating 'mode' in config")
 
 
 rule all:
     input:
-        # expand(
-        #     [
-        #         output for locus in loci.keys() for output in expand(
-        #             [
-        #                 out + "/{locus}/sim/{mode}/{beta}/happler/happler.png",
-        #                 out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results/susie.pdf",
-        #                 out + "/{locus}/sim/hap/{beta}/{causal}clude/happler/results/manhattan.pdf",
-        #                 out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output/results/susie.pdf",
-        #             ],
-        #             locus=locus,
-        #             mode=(loci[locus].keys() - set(("locus",))),
-        #             allow_missing=True,
-        #         )
-        #     ],
-        #     beta=config["beta"],
-        #     causal=exclude_causal.keys(),
-        # ),
-        expand(merged_happler, beta=config["modes"]["hap"]["beta"])
+        expand(
+            [
+                rules.happler_tree.output.png,
+                rules.happler_manhattan.output.png,
+                rules.happler_results.output.susie_pdf,
+                rules.finemappers_results.output.susie_pdf,
+            ],
+            causal=("in", "ex"),
+            beta=config["modes"]["hap"]["beta"],
+        )
     default_target: True
-
-run_methods_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output"
-
-rule run_methods:
-    """run the methods FINEMAP and SuSie"""
-    input:
-        gt=lambda wildcards: rules.append_hap2mat.output.matrix if \
-            wildcards.mode == "hap" else rules.phens.input.matrix(wildcards),
-        phen=lambda wildcards: (
-            rules.pheno2phens if wildcards.mode == "hap" else rules.phens
-        ).output.phens,
-    params:
-        outdir=run_methods_out,
-        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
-    output:
-        sumstats=temp(run_methods_out + "/sumstats.rds"),
-        finemap=run_methods_out + "/finemap.rds",
-        susie=run_methods_out + "/susie.rds",
-    resources:
-        runtime="1:00:00",
-    log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/run_methods",
-    benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/run_methods",
-    conda:
-        "envs/susie.yml"
-    shell:
-        "workflow/scripts/finemapping_methods.R {input} {params} &>{log}"
-
-
-rule snp_hap_2gt:
-    """ convert a PGEN file containing SNPs and haps into a SNP GT matrix """
-    input:
-        pgen=rules.merge_happler.output.pgen,
-        pvar=rules.merge_happler.output.pvar,
-        psam=rules.merge_happler.output.psam,
-    params:
-        in_prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
-        prefix=lambda wildcards, output: Path(output.traw).with_suffix(""),
-    output:
-        traw=temp(out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler-gts.traw"),
-        log=temp(out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler-gts.log"),
-        matrix=out + "/{locus}/sim/{mode}/{beta}/happler/merged_happler.tsv.gz",
-    resources:
-        runtime="0:04:00"
-    log:
-        logs + "/{locus}/sim/{mode}/{beta}/snp_hap_2gt",
-    benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/snp_hap_2gt",
-    conda:
-        "envs/default.yml"
-    shell:
-        "plink2 --pfile {params.in_prefix} --out {params.prefix} --export Av &>{log} "
-        "&& cut -f 4,7- {output.traw} | (read -r head; echo \"$head\" | "
-        "sed 's/POS\\t/sample\\t/; s/\\t0_/\\t/g'; sed 's/\\t/:0\\t/;') | "
-        "datamash transpose | (read -r head; paste <(echo \"$head\" | rev | cut -f3- |"
-        " rev) <(echo \"$head\" | rev | cut -f-2 | rev | sed 's/:0/:2/g'); cat) | "
-        "gzip > {output.matrix} 2>>{log}"
-
-
-rule gwas:
-    """run a GWAS"""
-    input:
-        pgen=rules.merge_happler.output.pgen,
-        pvar=rules.merge_happler.output.pvar,
-        psam=rules.merge_happler.output.psam,
-        pts=lambda wildcards: rules.simphenotype.output.pheno \
-            if wildcards.mode == "hap" else rules.phens2pheno.output.pheno,
-    params:
-        in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
-        out_prefix = lambda w, output: Path(output.log).with_suffix(""),
-    output:
-        log = temp(out + "/{locus}/sim/{mode}/{beta}/happler/hap.log"),
-        linear = out + "/{locus}/sim/{mode}/{beta}/happler/hap.hap.glm.linear",
-    resources:
-        runtime="0:10:00",
-    log:
-        logs + "/{locus}/sim/{mode}/{beta}/gwas",
-    benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/gwas",
-    threads: 1
-    conda:
-        "envs/default.yml"
-    shell:
-        "plink2 --linear allow-no-covars --variance-standardize "
-        "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
-        "--out {params.out_prefix} --threads {threads} &>{log}"
-
-
-rule run_methods_happler:
-    """ execute SuSiE using the haplotypes from happler """
-    input:
-        gt=rules.snp_hap_2gt.output.matrix,
-        phen=rules.pheno2phens.output.phens,
-    params:
-        outdir=lambda wildcards, output: Path(output.susie).parent,
-        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
-    output:
-        susie=out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/susie.rds",
-    resources:
-        runtime="1:15:00",
-        queue="hotel",
-    log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/run_methods",
-    benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/run_methods",
-    conda:
-        "envs/susie.yml"
-    shell:
-        "workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
-
-
-plot_results_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/method_output/results"
-plot_results_happler_out = out + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results"
-
-
-rule manhattan:
-    input:
-        linear=rules.gwas.output.linear,
-    params:
-        linear = lambda wildcards, input: f"-l "+input.linear,
-        red_ids = lambda wildcards: [
-            f"-i {i.split(':')[0]}" for i in loci[wildcards.locus]["hap"]
-        ],
-        orange_ids = lambda wildcards: (
-            "" if int(exclude_causal[wildcards.causal]) else "-b hap "
-        ) + "-b H1",
-    output:
-        png = plot_results_happler_out+"/manhattan.pdf",
-    resources:
-        runtime="0:05:00"
-    log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/manhattan",
-    benchmark:
-        bench + "/{locus}/sim/{mode}/{beta}/{causal}clude/manhattan",
-    conda:
-        "happler"
-    shell:
-        "workflow/scripts/manhattan.py -o {output.png} {params.linear} "
-        "{params.red_ids} {params.orange_ids} &>{log}"
-
-
-rule plot_results:
-    """create plots to summarize the results of the simulations"""
-    input:
-        gt=rules.run_methods.input.gt,
-        finemap=rules.run_methods.output.finemap,
-        susie=rules.run_methods.output.susie,
-    params:
-        outdir=plot_results_out,
-        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
-        causal_hap="",
-    output:
-        finemap_pdf=plot_results_out + "/finemap.pdf",
-        susie_pdf=plot_results_out + "/susie.pdf",
-        # susie_eff_pdf=temp(plot_results_out + "/susie_eff.pdf"),
-    log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/results",
-    conda:
-        "envs/susie.yml"
-    script:
-        "scripts/summarize_results.R"
-
-
-rule plot_results_happler:
-    """
-        create plots to summarize the results of the simulations when tested
-        on happler
-    """
-    input:
-        gt=rules.run_methods_happler.input.gt,
-        susie=rules.run_methods_happler.output.susie,
-        happler_hap=rules.happler.output.hap,
-    params:
-        outdir=plot_results_happler_out,
-        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
-        causal_hap=lambda wildcards: expand(
-            rules.create_hap.output.hap,
-            chr=wildcards.locus.split("_")[0],
-            locus=wildcards.locus.split("_")[1],
-        ) if wildcards.mode == "hap" else "",
-    output:
-        susie_pdf=plot_results_happler_out + "/susie.pdf",
-        # susie_eff_pdf=temp(plot_results_happler_out + "/susie_eff.pdf"),
-    log:
-        logs + "/{locus}/sim/{mode}/{beta}/{causal}clude/happler/results",
-    conda:
-        "envs/susie.yml"
-    script:
-        "scripts/summarize_results.R"
