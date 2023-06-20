@@ -115,7 +115,7 @@ def main():
     "--covars",
     type=click.Path(exists=True, path_type=Path),
     show_default="no covariates",
-    help="Any covariates to include in the file (as a PLINK2 .covar) file",
+    help="Any covariates to include in the model (as a PLINK2 .covar) file",
 )
 @click.option(
     "-o",
