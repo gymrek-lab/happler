@@ -118,7 +118,7 @@ rule snp_hap_2gt:
     benchmark:
         bench + "/snp_hap_2gt",
     conda:
-        "envs/default.yml"
+        "../envs/default.yml"
     shell:
         "plink2 --pfile {params.in_prefix} --out {params.prefix} --export Av &>{log} "
         "&& cut -f 4,7- {output.traw} | (read -r head; echo \"$head\" | "
@@ -146,7 +146,7 @@ rule finemapper:
     benchmark:
         bench + "/finemapper",
     conda:
-        "envs/susie.yml"
+        "../envs/susie.yml"
     shell:
         "workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
 
@@ -172,7 +172,7 @@ rule gwas:
         bench + "/gwas",
     threads: 1
     conda:
-        "envs/default.yml"
+        "../envs/default.yml"
     shell:
         "plink2 --linear allow-no-covars --variance-standardize "
         "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
@@ -222,6 +222,6 @@ rule results:
     log:
         logs + "/results",
     conda:
-        "envs/susie.yml"
+        "../envs/susie.yml"
     script:
         "scripts/summarize_results.R"

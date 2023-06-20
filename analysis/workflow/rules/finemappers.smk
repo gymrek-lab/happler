@@ -28,7 +28,7 @@ rule run:
     benchmark:
         bench + "/{causal}clude/run",
     conda:
-        "envs/susie.yml"
+        "../envs/susie.yml"
     shell:
         "workflow/scripts/finemapping_methods.R {input} {params} &>{log}"
 
@@ -50,6 +50,6 @@ rule results:
     log:
         logs + "/{causal}clude/results",
     conda:
-        "envs/susie.yml"
+        "../envs/susie.yml"
     script:
         "scripts/summarize_results.R"

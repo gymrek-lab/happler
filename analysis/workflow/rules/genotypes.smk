@@ -33,7 +33,7 @@ rule plink2vcf:
         bcf_idx=out + "/unphased.bcf.csi",
         log=temp(out + "/unphased.log"),
     resources:
-        runtime="0:15:00"
+        runtime="0:20:00"
     log:
         logs + "/plink2vcf"
     benchmark:
