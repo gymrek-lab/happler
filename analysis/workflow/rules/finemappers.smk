@@ -30,7 +30,7 @@ rule run:
     conda:
         "../envs/susie.yml"
     shell:
-        "workflow/scripts/finemapping_methods.R {input} {params} &>{log}"
+        "../workflow/scripts/finemapping_methods.R {input} {params} &>{log}"
 
 
 rule results:

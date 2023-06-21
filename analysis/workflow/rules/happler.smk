@@ -148,7 +148,7 @@ rule finemapper:
     conda:
         "../envs/susie.yml"
     shell:
-        "workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
+        "../workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
 
 
 rule gwas:
@@ -199,7 +199,7 @@ rule manhattan:
     conda:
         "happler"
     shell:
-        "workflow/scripts/manhattan.py -o {output.png} {params.linear} "
+        "../workflow/scripts/manhattan.py -o {output.png} {params.linear} "
         "{params.red_ids} {params.orange_ids} &>{log}"
 
 
