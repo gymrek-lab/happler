@@ -9,8 +9,8 @@ bench = out + "/bench"
 exclude_causal = {"in": 0, "ex": 1}
 
 
-rule run:
-    """run the methods FINEMAP and SuSie"""
+rule susie:
+    """run the method SuSiE"""
     input:
         gt=config["snp_panel"],
         phen=config["pheno"],
@@ -18,27 +18,50 @@ rule run:
         outdir=lambda wildcards, output: Path(output.susie).parent,
         exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
     output:
-        sumstats=temp(out + "/{causal}clude/sumstats.rds"),
-        finemap=out + "/{causal}clude/finemap.rds",
         susie=out + "/{causal}clude/susie.rds",
     resources:
-        runtime="1:00:00",
+        runtime="1:15:00",
+        queue="hotel",
     log:
-        logs + "/{causal}clude/run",
+        logs + "/{causal}clude/susie",
     benchmark:
-        bench + "/{causal}clude/run",
+        bench + "/{causal}clude/susie",
     conda:
         "../envs/susie.yml"
     shell:
-        "../workflow/scripts/finemapping_methods.R {input} {params} &>{log}"
+        "../workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
+
+
+rule finemap:
+    """run the method FINEMAP"""
+    input:
+        gt=config["snp_panel"],
+        phen=config["pheno"],
+    params:
+        outdir=lambda wildcards, output: Path(output.finemap).parent,
+        exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),
+    output:
+        sumstats=temp(out + "/{causal}clude/sumstats.rds"),
+        finemap=out + "/{causal}clude/finemap.rds",
+    resources:
+        runtime="1:15:00",
+        queue="hotel",
+    log:
+        logs + "/{causal}clude/finemap",
+    benchmark:
+        bench + "/{causal}clude/finemap",
+    conda:
+        "../envs/susie.yml"
+    shell:
+        "../workflow/scripts/run_FINEMAP.R {input} {params} &>{log}"
 
 
 rule results:
     """create plots to summarize the results of the simulations"""
     input:
-        gt=rules.run.input.gt,
-        finemap=rules.run.output.finemap,
-        susie=rules.run.output.susie,
+        gt=config["snp_panel"],
+        finemap=rules.finemap.output.finemap,
+        susie=rules.susie.output.susie,
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         exclude_causal=lambda wildcards: int(exclude_causal[wildcards.causal]),

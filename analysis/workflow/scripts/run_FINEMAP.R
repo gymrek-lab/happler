@@ -3,11 +3,10 @@
 # This R script runs the fine-mapping method FINEMAP
 
 # param1: The path to a TSV containing the genotype data.
-# param2: The path to a .glm.linear PLINK2 file containing summary statistics.
-# param3: The path to a TSV containing the phenotype data.
-# param4: The path to a directory in which to write output
+# param2: The path to a TSV containing the phenotype data.
+# param3: The path to a directory in which to write output
 #         This will be created if it doesn't exist.
-# param5: 1 if the causal variant should be removed from the genotype matrix and
+# param4: 1 if the causal variant should be removed from the genotype matrix and
 #         0 otherwise
 
 
@@ -38,9 +37,8 @@ library(data.table)
 args = commandArgs(trailingOnly = TRUE)
 gt = args[1]
 phen = args[2]
-plink_sumstats = args[3]
-out = args[4]
-exclude_causal = as.logical(as.integer(args[5]))
+out = args[3]
+exclude_causal = as.logical(as.integer(args[4]))
 
 dir.create(out, showWarnings = FALSE)
 
