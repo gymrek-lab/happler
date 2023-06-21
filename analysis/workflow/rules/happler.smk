@@ -95,43 +95,13 @@ rule merge:
     conda:
         "happler"
     shell:
-        "workflow/scripts/merge_plink.py {input.gts} {input.hps} {output.pgen} &> {log}"
-
-
-rule snp_hap_2gt:
-    """ convert a PGEN file containing SNPs and haps into a SNP GT matrix """
-    input:
-        pgen=rules.merge.output.pgen,
-        pvar=rules.merge.output.pvar,
-        psam=rules.merge.output.psam,
-    params:
-        in_prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
-        prefix=lambda wildcards, output: Path(output.traw).with_suffix(""),
-    output:
-        traw=temp(out + "/merged-gts.traw"),
-        log=temp(out + "/merged-gts.log"),
-        matrix=out + "/merged.tsv.gz",
-    resources:
-        runtime="0:04:00"
-    log:
-        logs + "/snp_hap_2gt",
-    benchmark:
-        bench + "/snp_hap_2gt",
-    conda:
-        "../envs/default.yml"
-    shell:
-        "plink2 --pfile {params.in_prefix} --out {params.prefix} --export Av &>{log} "
-        "&& cut -f 4,7- {output.traw} | (read -r head; echo \"$head\" | "
-        "sed 's/POS\\t/sample\\t/; s/\\t0_/\\t/g'; sed 's/\\t/:0\\t/;') | "
-        "datamash transpose | (read -r head; paste <(echo \"$head\" | rev | cut -f3- |"
-        " rev) <(echo \"$head\" | rev | cut -f-2 | rev | sed 's/:0/:2/g'); cat) | "
-        "gzip > {output.matrix} 2>>{log}"
+        "../workflow/scripts/merge_plink.py {input.gts} {input.hps} {output.pgen} &> {log}"
 
 
 rule finemapper:
     """ execute SuSiE using the haplotypes from happler """
     input:
-        gt=rules.snp_hap_2gt.output.matrix,
+        gt=rules.merge.output.pgen,
         phen=config["pheno"],
     params:
         outdir=lambda wildcards, output: Path(output.susie).parent,

@@ -15,12 +15,26 @@ sink(log, type='message')
 
 
 suppressMessages(library(ggplot2))
+suppressMessages(library(pgenlibr))
 suppressMessages(library(data.table))
+
+readPGEN = function(pfile) {
+  if (endsWith(pfile, ".pgen")) {
+    pfile = substr(pfile, 1, nchar(pfile)-5)
+  }
+  pvar = pgenlibr::NewPvar(paste0(pfile, '.pvar'))
+  pgen = pgenlibr::NewPgen(paste0(pfile, '.pgen'), pvar=pvar)
+  n = pgenlibr::GetVariantCt(pgen)
+  X = pgenlibr::ReadList(pgen, 1:n, meanimpute=FALSE)
+  pgenlibr::ClosePgen(pgen)
+  pgenlibr::ClosePvar(pvar)
+  X
+}
 
 write("Loading input data", stderr())
 # import the finemap and susie results
 # and the path to an output directory
-gt = data.table::fread(snakemake@input[["gt"]], sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
+gt = readPGEN(snakemake@input[["gt"]])
 if ("finemap" %in% names(snakemake@input)) {
     finemap_results = readRDS(snakemake@input[["finemap"]])[[1]]
 } else {
@@ -55,7 +69,6 @@ if (hap) {
 }
 
 write("Formatting genotypes and creating output dir", stderr())
-X = as.matrix(gt[,-1])
 storage.mode(X) = 'double'
 dir.create(out, showWarnings = FALSE)
 
@@ -63,6 +76,7 @@ dir.create(out, showWarnings = FALSE)
 # 1) the truly causal variant, as defined in the simulation
 # 2) whether the causal variant was provided in the genotypes
 # 3) the list provided by susie as output
+# 4) the PIPs output by SuSiE
 causal_variant = susie_results$causal_var
 exclude_causal = susie_results$causal_excluded
 fitted = susie_results$fitted

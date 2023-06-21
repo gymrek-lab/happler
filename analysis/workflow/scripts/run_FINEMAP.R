@@ -30,6 +30,7 @@ write(paste("path to current script is:", thisDir), stderr())
 
 
 library(abind)
+library(pgenlibr)
 library(data.table)
 
 
@@ -43,19 +44,38 @@ exclude_causal = as.logical(as.integer(args[5]))
 
 dir.create(out, showWarnings = FALSE)
 
+readPGEN = function(pfile) {
+  if (endsWith(pfile, ".pgen")) {
+    pfile = substr(pfile, 1, nchar(pfile)-5)
+  }
+  pvar = pgenlibr::NewPvar(paste0(pfile, '.pvar'))
+  pgen = pgenlibr::NewPgen(paste0(pfile, '.pgen'), pvar=pvar)
+  n = pgenlibr::GetVariantCt(pgen)
+  X = pgenlibr::ReadList(pgen, 1:n, meanimpute=FALSE)
+  pgenlibr::ClosePgen(pgen)
+  pgenlibr::ClosePvar(pvar)
+  X
+}
+
+readPSAM = function(pfile) {
+  if (endsWith(pfile, ".pgen")) {
+    pfile = substr(pfile, 1, nchar(pfile)-5)
+  }
+  psam = data.table::fread(paste0(pfile, '.psam'), sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
+  psam[,1]
+}
 
 write("reading genotype matrix", stderr())
 # import genotype matrices as proper matrices
-gt = data.table::fread(gt, sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
+X = readPGEN(gt)
 phen = data.table::fread(phen, sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
-# create matrices without unecessary columns
-# this removes the samples column
-X = as.matrix(gt[,-1])
 # the number of samples and the number of variants:
 n = nrow(X)
 p = ncol(X)
 storage.mode(X) = 'double'
-y = as.matrix(phen[,ncol(phen)])
+# load psam and ensure sample names are the same
+stopifnot(readPSAM(gt) == phen[,1])
+y = as.matrix(phen[,2])
 # what is the column name of the causal variant?
 causal_variant = colnames(phen)[2]
 
