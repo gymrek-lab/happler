@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-out = config["out"] + "/happler"
+out = config["out"]
 logs = out + "/logs"
 bench = out + "/bench"
 
@@ -17,7 +17,7 @@ rule run:
         hap=out + "/happler.hap",
         dot=out + "/happler.dot",
     resources:
-        runtime="0:15:00",
+        runtime="0:30:00",
         queue="hotel",
     threads: 6
     log:
@@ -95,7 +95,7 @@ rule merge:
     conda:
         "happler"
     shell:
-        "../workflow/scripts/merge_plink.py {input.gts} {input.hps} {output.pgen} &> {log}"
+        "workflow/scripts/merge_plink.py {input.gts} {input.hps} {output.pgen} &> {log}"
 
 
 rule finemapper:
@@ -105,7 +105,7 @@ rule finemapper:
         phen=config["pheno"],
     params:
         outdir=lambda wildcards, output: Path(output.susie).parent,
-        exclude_causal=lambda wildcards: 0,
+        exclude_causal="NULL",
     output:
         susie=out + "/susie.rds",
     resources:
@@ -118,7 +118,32 @@ rule finemapper:
     conda:
         "../envs/susie.yml"
     shell:
-        "../workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
+        "workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
+
+
+rule results:
+    """
+        create plots to summarize the results of the simulations when tested
+        on happler
+    """
+    input:
+        gt=rules.finemapper.input.gt,
+        susie=rules.finemapper.output.susie,
+        happler_hap=rules.run.output.hap,
+    params:
+        outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
+        exclude_causal=lambda wildcards: 0,
+        causal_hap=config["hap_file"],
+        causal_gt="",
+    output:
+        susie_pdf = out + "/susie.pdf",
+        # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
+    log:
+        logs + "/results",
+    conda:
+        "../envs/susie.yml"
+    script:
+        "../scripts/summarize_results.R"
 
 
 rule gwas:
@@ -169,29 +194,5 @@ rule manhattan:
     conda:
         "happler"
     shell:
-        "../workflow/scripts/manhattan.py -o {output.png} {params.linear} "
+        "workflow/scripts/manhattan.py -o {output.png} {params.linear} "
         "{params.red_ids} {params.orange_ids} &>{log}"
-
-
-rule results:
-    """
-        create plots to summarize the results of the simulations when tested
-        on happler
-    """
-    input:
-        gt=rules.finemapper.input.gt,
-        susie=rules.finemapper.output.susie,
-        happler_hap=rules.run.output.hap,
-    params:
-        outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
-        exclude_causal=lambda wildcards: 0,
-        causal_hap=config["hap_file"],
-    output:
-        susie_pdf = out + "/susie.pdf",
-        # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
-    log:
-        logs + "/results",
-    conda:
-        "../envs/susie.yml"
-    script:
-        "scripts/summarize_results.R"
