@@ -41,3 +41,6 @@ Run SuSiE with a set of genotypes and phenotypes. Follow the same interface as `
 
 ## [summarize_results.R](summarize_results.R)
 This R script summarizes the output of several executions of FINEMAP and SuSiE by producing several useful visualizations.
+
+## [utils.R](utils.R)
+Define some useful methods for reading various file types into R. This script is sourced by other R scripts but never executed directly.

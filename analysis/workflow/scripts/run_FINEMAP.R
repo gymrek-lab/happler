@@ -27,46 +27,24 @@ thisFile <- function() {
 thisDir = dirname(thisFile())
 write(paste("path to current script is:", thisDir), stderr())
 
-
 library(abind)
-library(pgenlibr)
-library(data.table)
-
 
 # first, we import the phenotype file into X and Y vectors
 args = commandArgs(trailingOnly = TRUE)
 gt = args[1]
 phen = args[2]
 out = args[3]
-exclude_causal = as.logical(as.integer(args[4]))
+exclude_causal = args[4]
 
 dir.create(out, showWarnings = FALSE)
 
-readPGEN = function(pfile) {
-  if (endsWith(pfile, ".pgen")) {
-    pfile = substr(pfile, 1, nchar(pfile)-5)
-  }
-  pvar = pgenlibr::NewPvar(paste0(pfile, '.pvar'))
-  pgen = pgenlibr::NewPgen(paste0(pfile, '.pgen'), pvar=pvar)
-  n = pgenlibr::GetVariantCt(pgen)
-  X = pgenlibr::ReadList(pgen, 1:n, meanimpute=FALSE)
-  pgenlibr::ClosePgen(pgen)
-  pgenlibr::ClosePvar(pvar)
-  X
-}
-
-readPSAM = function(pfile) {
-  if (endsWith(pfile, ".pgen")) {
-    pfile = substr(pfile, 1, nchar(pfile)-5)
-  }
-  psam = data.table::fread(paste0(pfile, '.psam'), sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
-  psam[,1]
-}
+# load functions to help read various file types
+source(paste0(thisDir, "/utils.R"))
 
 write("reading genotype matrix", stderr())
 # import genotype matrices as proper matrices
 X = readPGEN(gt)
-phen = data.table::fread(phen, sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
+phen = readPheno(phen)
 # the number of samples and the number of variants:
 n = nrow(X)
 p = ncol(X)
@@ -74,15 +52,13 @@ storage.mode(X) = 'double'
 # load psam and ensure sample names are the same
 stopifnot(readPSAM(gt) == phen[,1])
 y = as.matrix(phen[,2])
-# what is the column name of the causal variant?
-causal_variant = colnames(phen)[2]
-
 
 # remove the causal variant if requested
-if (exclude_causal) {
-  X = X[,!(colnames(X) %in% c(causal_variant))]
+causal_variant = NULL
+if (exclude_causal != "NULL") {
+  stopifnot(readPSAM(exclude_causal) == phen[,1])
+  X = cbind(X, readPGEN(exclude_causal))
 }
-
 
 write("computing summary statistics for FINEMAP", stderr())
 # compute summary statistics for FINEMAP
