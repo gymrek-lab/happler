@@ -14,3 +14,5 @@ analysis/out
 analysis/log
 .snakemake
 .ipynb_checkpoints
+# vscode
+.vscode
