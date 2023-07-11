@@ -22,11 +22,15 @@ write("Loading input data", stderr())
 # import the finemap and susie results
 # and the path to an output directory
 X = readPGEN(snakemake@input[["gt"]])
-causal_gt = readPGEN(snakemake@params[["causal_gt"]])
-X = cbind(X, causal_gt)
 # also load the positions of each of the variants
 pos = readPVAR(snakemake@input[["gt"]])
-pos = c(pos, readPVAR(snakemake@params[["causal_gt"]]))
+if (nchar(snakemake@params[["causal_gt"]]) > 0) {
+    causal_gt = readPGEN(snakemake@params[["causal_gt"]])
+    X = cbind(X, causal_gt)
+    causal_variant = colnames(causal_gt)[1]
+    # also load the positions of each of the variants
+    pos = c(pos, readPVAR(snakemake@params[["causal_gt"]]))
+}
 
 if ("finemap" %in% names(snakemake@input)) {
     finemap_results = readRDS(snakemake@input[["finemap"]])[[1]]
@@ -66,11 +70,9 @@ storage.mode(X) = 'double'
 dir.create(out, showWarnings = FALSE)
 
 # parse the susie data:
-# 1) the truly causal variant, as defined in the simulation
-# 2) whether the causal variant was provided in the genotypes
-# 3) the list provided by susie as output
-# 4) the PIPs output by SuSiE
-causal_variant = colnames(causal_gt)[1]
+# 1) whether the causal variant was provided in the genotypes
+# 2) the list provided by susie as output
+# 3) the PIPs output by SuSiE
 exclude_causal = (susie_results$causal_excluded == "NULL")
 fitted = susie_results$fitted
 susie_pip = fitted$pip
@@ -100,6 +102,7 @@ if (!is.null(finemap_results)) {
 
 # define a function that generates the PIP plot data
 pip_plot_data = function(pips, X, b, pos, susie_cs=NULL) {
+    write("Creating dataframe for PIP plot", stderr())
     # note that each of pips, X, and b must be ordered by variant POS
     # first, initialize the values we need
     b_colors = c(`0`='black', `1`='red')
@@ -122,6 +125,7 @@ pip_plot_data = function(pips, X, b, pos, susie_cs=NULL) {
     } else {
         data$cs = 0
     }
+    write("Finished dataframe for PIP plot", stderr())
     return(data)
 }
 
