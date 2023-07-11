@@ -52,6 +52,7 @@ if mode in ("snp", "hap"):
     }
     if mode == "hap":
         happler_config["snps"] = config["modes"][mode]["alleles"]
+        happler_config["causal_gt"] = rules.simulate_transform.output.pgen
     module happler:
         snakefile: "rules/happler.smk"
         config: happler_config
@@ -70,6 +71,10 @@ if mode in ("hap", "str"):
         "out": config["out"] + "/finemappers/"+mode+"/{beta}",
         "snp_panel": config["gts_snp_panel"],
     }
+    if mode == "hap":
+        finemappers_config["causal_gt"] = rules.simulate_transform.output.pgen
+    else:
+        raise ValueError("Not yet implemented operating mode 'str' in config")
     module finemappers:
         snakefile: "rules/finemappers.smk"
         config: finemappers_config
@@ -84,10 +89,10 @@ rule all:
             [
                 rules.happler_tree.output.png,
                 rules.happler_manhattan.output.png,
-                rules.happler_results.output.susie_pdf,
+                # rules.happler_results.output.susie_pdf,
                 rules.finemappers_results.output.susie_pdf,
             ],
-            causal=("in", "ex"),
+            causal=(("ex",) if mode == "hap" else ("ex", "in")),
             beta=config["modes"]["hap"]["beta"],
         )
     default_target: True

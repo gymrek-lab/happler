@@ -3,11 +3,10 @@
 # This R script runs the fine-mapping method FINEMAP
 
 # param1: The path to a TSV containing the genotype data.
-# param2: The path to a .glm.linear PLINK2 file containing summary statistics.
-# param3: The path to a TSV containing the phenotype data.
-# param4: The path to a directory in which to write output
+# param2: The path to a TSV containing the phenotype data.
+# param3: The path to a directory in which to write output
 #         This will be created if it doesn't exist.
-# param5: 1 if the causal variant should be removed from the genotype matrix and
+# param4: 1 if the causal variant should be removed from the genotype matrix and
 #         0 otherwise
 
 
@@ -28,43 +27,38 @@ thisFile <- function() {
 thisDir = dirname(thisFile())
 write(paste("path to current script is:", thisDir), stderr())
 
-
 library(abind)
-library(data.table)
-
 
 # first, we import the phenotype file into X and Y vectors
 args = commandArgs(trailingOnly = TRUE)
 gt = args[1]
 phen = args[2]
-plink_sumstats = args[3]
-out = args[4]
-exclude_causal = as.logical(as.integer(args[5]))
+out = args[3]
+exclude_causal = args[4]
 
 dir.create(out, showWarnings = FALSE)
 
+# load functions to help read various file types
+source(paste0(thisDir, "/utils.R"))
 
 write("reading genotype matrix", stderr())
 # import genotype matrices as proper matrices
-gt = data.table::fread(gt, sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
-phen = data.table::fread(phen, sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
-# create matrices without unecessary columns
-# this removes the samples column
-X = as.matrix(gt[,-1])
+X = readPGEN(gt)
+phen = readPheno(phen)
 # the number of samples and the number of variants:
 n = nrow(X)
 p = ncol(X)
 storage.mode(X) = 'double'
-y = as.matrix(phen[,ncol(phen)])
-# what is the column name of the causal variant?
-causal_variant = colnames(phen)[2]
-
+# load psam and ensure sample names are the same
+stopifnot(readPSAM(gt) == phen[,1])
+y = as.matrix(phen[,2])
 
 # remove the causal variant if requested
-if (exclude_causal) {
-  X = X[,!(colnames(X) %in% c(causal_variant))]
+causal_variant = NULL
+if (exclude_causal != "NULL") {
+  stopifnot(readPSAM(exclude_causal) == phen[,1])
+  X = cbind(X, readPGEN(exclude_causal))
 }
-
 
 write("computing summary statistics for FINEMAP", stderr())
 # compute summary statistics for FINEMAP

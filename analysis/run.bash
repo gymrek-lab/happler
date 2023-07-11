@@ -44,7 +44,6 @@ if [ "$ENVIRONMENT" = "BATCH" ]; then
     --latency-wait 60 \
     --use-conda \
     --conda-frontend mamba \
-    --notemp \
     --rerun-trigger {mtime,params,input} \
     -k \
     -j 12 \

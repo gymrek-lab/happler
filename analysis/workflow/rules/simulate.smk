@@ -12,7 +12,7 @@ locus_end = config["locus"].split(":")[1].split('-')[1]
 
 
 rule create_haps_ld_range:
-    """ create a haps file with haplotypes that are in a range of LD with their SNPs """
+    """ create a hap file with haplotypes that are in a range of LD with their SNPs """
     input:
         gts=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
     output:
@@ -26,7 +26,7 @@ rule create_haps_ld_range:
     conda:
         "happler"
     shell:
-        "scripts/choose_different_ld.py {input.gts} > {output.hap}"
+        "../scripts/choose_different_ld.py {input.gts} > {output.hap}"
 
 
 rule create_hap:
@@ -50,7 +50,7 @@ rule create_hap:
     conda:
         "../envs/default.yml"
     script:
-        "scripts/create_hap_file.sh"
+        "../scripts/create_hap_file.sh"
 
 
 rule transform:

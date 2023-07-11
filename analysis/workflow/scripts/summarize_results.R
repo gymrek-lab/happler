@@ -13,14 +13,25 @@
 log <- file(snakemake@log[[1]], open="wt")
 sink(log, type='message')
 
-
 suppressMessages(library(ggplot2))
-suppressMessages(library(data.table))
+
+# load functions to help read various file types
+source("workflow/scripts/utils.R")
 
 write("Loading input data", stderr())
 # import the finemap and susie results
 # and the path to an output directory
-gt = data.table::fread(snakemake@input[["gt"]], sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
+X = readPGEN(snakemake@input[["gt"]])
+# also load the positions of each of the variants
+pos = readPVAR(snakemake@input[["gt"]])
+if (nchar(snakemake@params[["causal_gt"]]) > 0) {
+    causal_gt = readPGEN(snakemake@params[["causal_gt"]])
+    X = cbind(X, causal_gt)
+    causal_variant = colnames(causal_gt)[1]
+    # also load the positions of each of the variants
+    pos = c(pos, readPVAR(snakemake@params[["causal_gt"]]))
+}
+
 if ("finemap" %in% names(snakemake@input)) {
     finemap_results = readRDS(snakemake@input[["finemap"]])[[1]]
 } else {
@@ -55,16 +66,14 @@ if (hap) {
 }
 
 write("Formatting genotypes and creating output dir", stderr())
-X = as.matrix(gt[,-1])
 storage.mode(X) = 'double'
 dir.create(out, showWarnings = FALSE)
 
 # parse the susie data:
-# 1) the truly causal variant, as defined in the simulation
-# 2) whether the causal variant was provided in the genotypes
-# 3) the list provided by susie as output
-causal_variant = susie_results$causal_var
-exclude_causal = susie_results$causal_excluded
+# 1) whether the causal variant was provided in the genotypes
+# 2) the list provided by susie as output
+# 3) the PIPs output by SuSiE
+exclude_causal = (susie_results$causal_excluded == "NULL")
 fitted = susie_results$fitted
 susie_pip = fitted$pip
 
@@ -75,6 +84,7 @@ b = rep(0, ncol(X))
 names(b) = colnames(X)
 if (exclude_causal) {
     b = b[!(names(b) %in% c(causal_variant))]
+    pos = pos[!(names(pos) %in% c(causal_variant))]
     if (hap) {
         haplotypes = t(data.frame(haplotypes[c(2),]))
     }
@@ -91,7 +101,8 @@ if (!is.null(finemap_results)) {
 }
 
 # define a function that generates the PIP plot data
-pip_plot_data = function(pips, X, b, susie_cs=NULL) {
+pip_plot_data = function(pips, X, b, pos, susie_cs=NULL) {
+    write("Creating dataframe for PIP plot", stderr())
     # note that each of pips, X, and b must be ordered by variant POS
     # first, initialize the values we need
     b_colors = c(`0`='black', `1`='red')
@@ -102,10 +113,11 @@ pip_plot_data = function(pips, X, b, susie_cs=NULL) {
     } else {
         causal_var = X[,causal_var[1]]
     }
+    stopifnot(names(b) == names(pos))
     data = data.frame(
         pip = pips,
         b = as.character(b),
-        pos = as.integer(sub("\\.(0|1|2)", "", sub("X(\\S+)", "\\1", names(b)))),
+        pos = pos,
         ld_causal = as.vector(cor(causal_var, X))^2
     )
     if (!is.null(susie_cs)) {
@@ -113,14 +125,15 @@ pip_plot_data = function(pips, X, b, susie_cs=NULL) {
     } else {
         data$cs = 0
     }
+    write("Finished dataframe for PIP plot", stderr())
     return(data)
 }
 
 # define a function for PIP plotting
-pip_plot = function(pips, X, b, susie_cs=NULL) {
+pip_plot = function(pips, X, b, pos, susie_cs=NULL) {
     # create a ggplot of the PIPs
     # but first, get the data we need for the plot
-    data = pip_plot_data(pips, X, b, susie_cs)
+    data = pip_plot_data(pips, X, b, pos, susie_cs)
     # extract the causal variants to another data frame
     data_causal = data[data$b == '1',]
     # make the plot
@@ -136,10 +149,10 @@ pip_plot = function(pips, X, b, susie_cs=NULL) {
 }
 
 # define a function for PIP plotting with haplotypes as lines
-pip_plot_haps = function(pips, X, b, haplotypes, susie_cs=NULL) {
+pip_plot_haps = function(pips, X, b, pos, haplotypes, susie_cs=NULL) {
     # create a ggplot of the PIPs
     # but first, get the data we need for the plot
-    data = pip_plot_data(pips, X, b, susie_cs)
+    data = pip_plot_data(pips, X, b, pos, susie_cs)
     # extract the haplotypes to another data frame
     data_hap = cbind(data[grepl(".2", rownames(data), fixed=T),], haplotypes)
     data_hap$color = c("black", "red")[as.integer(data_hap$b)+1]
@@ -175,9 +188,9 @@ pip_plot_haps = function(pips, X, b, haplotypes, susie_cs=NULL) {
 
 write("Creating PIP plot for SuSiE", stderr())
 if (hap) {
-    pip_plot_haps(susie_pip, X, b, haplotypes, susie_cs=names(susie_pip[fitted$sets$cs[['L1']]]))
+    pip_plot_haps(susie_pip, X, b, pos, haplotypes, susie_cs=names(susie_pip[fitted$sets$cs[['L1']]]))
 } else {
-    pip_plot(susie_pip, X, b, susie_cs=names(susie_pip[fitted$sets$cs[['L1']]]))
+    pip_plot(susie_pip, X, b, pos, susie_cs=names(susie_pip[fitted$sets$cs[['L1']]]))
 }
 ggsave(paste0(out,'/susie.pdf'), width=10, height=5, device='pdf')
 dev.off()
@@ -185,9 +198,9 @@ dev.off()
 if (!is.null(finemap_results)) {
     write("Creating PIP plot for FINEMAP", stderr())
     if (hap) {
-        pip_plot_haps(finemap_pip, X, b, haplotypes)
+        pip_plot_haps(finemap_pip, X, b, pos, haplotypes)
     } else {
-        pip_plot(finemap_pip, X, b)
+        pip_plot(finemap_pip, X, b, pos)
     }
     ggsave(paste0(out,'/finemap.pdf'), width=10, height=5, device='pdf')
     while (!is.null(dev.list())) dev.off()
