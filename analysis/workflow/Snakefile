@@ -52,6 +52,7 @@ if mode in ("snp", "hap"):
     }
     if mode == "hap":
         happler_config["snps"] = config["modes"][mode]["alleles"]
+        happler_config["causal_gt"] = rules.simulate_transform.output.pgen
     module happler:
         snakefile: "rules/happler.smk"
         config: happler_config
@@ -88,7 +89,7 @@ rule all:
             [
                 rules.happler_tree.output.png,
                 rules.happler_manhattan.output.png,
-                rules.happler_results.output.susie_pdf,
+                # rules.happler_results.output.susie_pdf,
                 rules.finemappers_results.output.susie_pdf,
             ],
             causal=(("ex",) if mode == "hap" else ("ex", "in")),

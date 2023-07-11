@@ -134,7 +134,7 @@ rule results:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         exclude_causal=lambda wildcards: 0,
         causal_hap=config["hap_file"],
-        causal_gt="",
+        causal_gt=config["causal_gt"],
     output:
         susie_pdf = out + "/susie.pdf",
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
