@@ -45,6 +45,13 @@ modes:
  hap:
   alleles: [rs36046716:G, rs1046282:G] # 45892145, 45910672
   beta: [0.05]
+ ld_range:
+  reps: 3
+  min_ld: 0
+  max_ld: 1
+  step: 0.1
+  min_af: 0.25
+  max_af: 0.75
 mode: hap
 
 # locus: 1:98001984-99001984

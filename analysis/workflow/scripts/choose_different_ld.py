@@ -65,6 +65,41 @@ def find_haps(gts: Genotypes, log: Logger, min_ld: float, max_ld: float, reps: f
     help="The number of replicates to perform within each LD bin",
 )
 @click.option(
+    "--min-ld",
+    type=float,
+    default=0,
+    show_default=True,
+    help="The minimum LD value to allow",
+)
+@click.option(
+    "--max-ld",
+    type=float,
+    default=1,
+    show_default=True,
+    help="The maximum LD value to allow",
+)
+@click.option(
+    "--step",
+    type=float,
+    default=0.1,
+    show_default=True,
+    help="The step size between each LD bin",
+)
+@click.option(
+    "--min-af",
+    type=float,
+    default=0.25,
+    show_default=True,
+    help="The minimum LD value to allow",
+)
+@click.option(
+    "--max-af",
+    type=float,
+    default=0.75,
+    show_default=True,
+    help="The maximum LD value to allow",
+)
+@click.option(
     "-v",
     "--verbosity",
     type=click.Choice(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
@@ -72,7 +107,15 @@ def find_haps(gts: Genotypes, log: Logger, min_ld: float, max_ld: float, reps: f
     show_default=True,
     help="The level of verbosity desired",
 )
-def main(gts: Path, reps: int = 1):
+def main(
+    gts: Path,
+    reps: int = 1,
+    min_ld: float = 0,
+    max_ld: float = 1,
+    step: float = 0.1,
+    min_af: float = 0.25,
+    max_af: float = 0.75
+):
     """
     Create a column in the GT matrix from the provided haplotype pseudogenotypes
 
@@ -93,11 +136,11 @@ def main(gts: Path, reps: int = 1):
     gts.check_phase()
 
     af = gts.check_maf()
-    af_thresh = (af > 0.25) & (af < 0.75)
+    af_thresh = (af > min_af) & (af < max_af)
     gts.subset(variants=gts.variants['id'][af_thresh], inplace=True)
 
     hps = Haplotypes("/dev/stdout", log=log, haplotype=Haplotype)
-    hps.data = {hp.id: hp for hp in find_haps(gts, log, min_ld=0, max_ld=1, reps=reps)}
+    hps.data = {hp.id: hp for hp in find_haps(gts, log, min_ld=min_ld, max_ld=max_ld, reps=reps, step=step)}
     hps.write()
 
 

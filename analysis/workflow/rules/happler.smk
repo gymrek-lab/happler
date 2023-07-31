@@ -27,8 +27,9 @@ rule run:
     conda:
         "happler"
     shell:
-        "happler run -o {output.hap} --verbosity DEBUG --discard-multiallelic"
-        " -t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
+        "happler run -o {output.hap} --verbosity DEBUG "
+        "--discard-multiallelic "
+        "-t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
 
 
 rule tree:

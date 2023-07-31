@@ -29,28 +29,58 @@ rule create_haps_ld_range:
         "../scripts/choose_different_ld.py {input.gts} > {output.hap}"
 
 
-rule create_hap:
-    """ create a hap file suitable for haptools transform and simphenotype """
-    input:
-        gts=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
-    params:
-        ignore="this", # the first parameter is always ignored for some reason
-        chrom=locus_chr,
-        locus=config["locus"].split(":")[1].replace('-', '\t'),
-        beta=0.99,
-        alleles=lambda wildcards: config["modes"]["hap"]["alleles"],
-    output:
-        hap=out + "/hap/haplotype.hap"
-    resources:
-        runtime="0:05:00"
-    log:
-        logs + "/hap/create_hap",
-    benchmark:
-        bench + "/hap/create_hap",
-    conda:
-        "../envs/default.yml"
-    script:
-        "../scripts/create_hap_file.sh"
+if config["mode"] == "ld_range":
+
+    rule create_hap:
+        """ create a hap file suitable for haptools transform and simphenotype """
+        input:
+            gts=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
+        params:
+            reps = config["modes"]["ld_range"]["reps"],
+            min_ld = config["modes"]["ld_range"]["min_ld"],
+            max_ld = config["modes"]["ld_range"]["max_ld"],
+            step = config["modes"]["ld_range"]["step"],
+            min_af = config["modes"]["ld_range"]["min_af"],
+            max_af = config["modes"]["ld_range"]["max_af"],
+        output:
+            hap=out + "/hap/haplotype.hap"
+        resources:
+            runtime="0:05:00"
+        log:
+            logs + "/hap/create_hap",
+        benchmark:
+            bench + "/hap/create_hap",
+        conda:
+            "happler"
+        shell:
+            "../scripts/choose_different_ld.py -r {params.reps} "
+            "--min-ld {params.min_ld} --max-ld {params.max_ld} "
+            "--step {params.step} --min-af {params.min_af} "
+            "--max-af {params.max_af} {input.gts}"
+else:
+
+    rule create_hap:
+        """ create a hap file suitable for haptools transform and simphenotype """
+        input:
+            gts=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
+        params:
+            ignore="this", # the first parameter is always ignored for some reason
+            chrom=locus_chr,
+            locus=config["locus"].split(":")[1].replace('-', '\t'),
+            beta=0.99,
+            alleles=lambda wildcards: config["modes"]["hap"]["alleles"],
+        output:
+            hap=out + "/hap/haplotype.hap"
+        resources:
+            runtime="0:05:00"
+        log:
+            logs + "/hap/create_hap",
+        benchmark:
+            bench + "/hap/create_hap",
+        conda:
+            "../envs/default.yml"
+        script:
+            "../scripts/create_hap_file.sh"
 
 
 rule transform:
