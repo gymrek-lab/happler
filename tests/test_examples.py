@@ -144,6 +144,7 @@ def test_one_snp_not_causal():
     assert len(haps) == 0
 
 
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_two_snps_single_association():
     """
     One causal SNP with a perfect phenotype association and one SNP that isn't causal
@@ -335,6 +336,7 @@ def test_two_snps_one_branch_perfect_opposite_direction():
     assert haps[1][1] == ("snp1", 0)
 
 
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_three_snps_one_branch_one_snp_not_causal():
     """
     Twp causal SNPs with perfect phenotype association and one SNP that isn't causal
@@ -588,6 +590,7 @@ def test_two_snps_one_branch_perfect_bic():
     assert haps[1][0] == ("snp0", 1)
 
 
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_two_snps_two_branches_perfect_one_snp_not_causal():
     """
     Two causal SNPs on a single haplotype with perfect phenotype associations
