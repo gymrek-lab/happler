@@ -12,7 +12,6 @@ from happler.tree import (
     Haplotypes,
     Tree,
     TreeBuilder,
-    AssocTestSimple,
     NodeResults,
 )
 

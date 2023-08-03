@@ -6,7 +6,7 @@ import numpy as np
 from scipy.stats import t as t_dist
 from haptools.logging import getLogger
 
-from .tree import NodeResults, NodeResultsExtra
+from .assoc_test import NodeResults, NodeResultsExtra
 
 
 class Terminator(ABC):

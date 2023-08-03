@@ -1,5 +1,4 @@
 from __future__ import annotations
-from pathlib import Path
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
@@ -7,6 +6,61 @@ import numpy as np
 from scipy import stats
 import numpy.typing as npt
 import statsmodels.api as sm
+from scipy.stats import t as t_dist
+
+
+# We declare this class to be a dataclass to automatically define __init__ and a few
+# other methods. We use frozen=True to make it immutable.
+@dataclass(frozen=True)
+class NodeResults:
+    """
+    The results of testing SNPs at a node in the tree
+
+    Attributes
+    ----------
+    beta : float
+        The best effect size among all of the SNPs tried
+    pval : float
+        The best p-value among all of the SNPs tried
+    stderr: float
+        The standard error of beta
+    """
+
+    beta: float
+    pval: float
+    stderr: float
+
+    def __getitem__(self, item):
+        """
+        Define a getter so that we can access elements like this:
+
+        ``obj['field_name']``
+
+        in addition to this:
+
+        ``obj.field_name``
+        """
+        return getattr(self, item)
+
+    def __repr__(self):
+        return (
+            "{" + ", ".join("{}={:.2e}".format(*i) for i in self.__dict__.items()) + "}"
+        )
+
+    @classmethod
+    def from_np(cls, np_mixed_arr_var: np.void) -> NodeResults:
+        class_attributes = cls.__dict__["__dataclass_fields__"].keys()
+        return cls(**dict(zip(class_attributes, np_mixed_arr_var)))
+
+
+@dataclass(frozen=True, repr=False)
+class NodeResultsExtra(NodeResults):
+    bic: float
+
+
+@dataclass(frozen=True, repr=False)
+class NodeResultsTScore(NodeResults):
+    tscore: float
 
 
 # We declare this class to be a dataclass to automatically define __init__ and a few

@@ -5,11 +5,11 @@ import numpy as np
 from haptools.logging import getLogger
 from haptools.data import Genotypes, Phenotypes
 
+from .tree import Tree
 from .variant import Variant
 from .haplotypes import Haplotype
-from .tree import Tree, NodeResults
-from .assoc_test import AssocTest, AssocTestSimple
 from .terminator import Terminator, TTestTerminator, BICTerminator
+from .assoc_test import AssocTest, NodeResults, NodeResultsExtra, NodeResultsTScore, AssocTestSimple, AssocTestSimpleSMTScore
 
 
 class TreeBuilder:
@@ -53,7 +53,12 @@ class TreeBuilder:
         self.phens = phenotypes
         self.method = method
         self.terminator = terminator
-        self.results_type = results_type
+        if method.with_bic:
+            self.results_type = NodeResultsExtra
+        elif isinstance(method, AssocTestSimpleSMTScore):
+            self.results_type = NodeResultsTScore
+        else:
+            self.results_type = NodeResults
         self.tree = None
         self.log = log or getLogger(self.__class__.__name__)
 
