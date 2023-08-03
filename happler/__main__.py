@@ -100,9 +100,16 @@ def main():
     "--threshold",
     type=float,
     default=0.05,
-    show_default=0.05,
+    show_default=True,
     hidden=True,
     help="The alpha threshold used to determine when to terminate tree building",
+)
+@click.option(
+    "--ld-prune-thresh",
+    type=float,
+    default=0.50,
+    show_default=True,
+    help="The LD threshold used to prune leaf nodes based on LD with their siblings",
 )
 @click.option(
     "--show-tree",
@@ -145,6 +152,7 @@ def run(
     maf: float = None,
     phased: bool = False,
     threshold: float = 0.05,
+    ld_prune_thresh: float = None,
     show_tree: bool = False,
     covars: Path = None,
     output: Path = Path("/dev/stdout"),
@@ -227,10 +235,13 @@ def run(
             )
         test_method = tree.assoc_test.AssocTestSimpleCovariates(covars=cv.data)
     else:
-        test_method = tree.assoc_test.AssocTestSimpleSM()
+        if ld_prune_thresh is None:
+            test_method = tree.assoc_test.AssocTestSimpleSM()
+        else:
+            test_method = tree.assoc_test.AssocTestSimpleSMTScore()
     terminator = tree.terminator.TTestTerminator(thresh=threshold, log=log)
     hap_tree = tree.TreeBuilder(
-        gt, ph, method=test_method, terminator=terminator, log=log
+        gt, ph, method=test_method, terminator=terminator, ld_prune_thresh=ld_prune_thresh, log=log
     ).run()
     log.info("Outputting haplotypes")
     tree.Haplotypes.from_tree(fname=output, tree=hap_tree, gts=gt, log=log).write()

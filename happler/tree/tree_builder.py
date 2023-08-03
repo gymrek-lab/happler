@@ -4,6 +4,7 @@ from logging import Logger
 import numpy as np
 from haptools.logging import getLogger
 from haptools.data import Genotypes, Phenotypes
+from haptools.ld import pearson_corr_ld
 
 from .tree import Tree
 from .variant import Variant
@@ -46,7 +47,7 @@ class TreeBuilder:
         phenotypes: Phenotypes,
         method: AssocTest = AssocTestSimple(),
         terminator: Terminator = TTestTerminator(),
-        results_type: type[NodeResults] = NodeResults,
+        ld_prune_thresh: float = None,
         log: Logger = None,
     ):
         self.gens = genotypes
@@ -126,7 +127,40 @@ class TreeBuilder:
             new_parent_hap = parent_hap.append(variant, allele, variant_gts)
             self._create_tree(new_parent_hap, new_node_idx, results)
 
-    def _find_split(
+    def prune_tree(self):
+        """
+        Remove any leaf nodes that are in strong LD with their sibling branches
+        """
+        count = 0
+        leaves = self.tree.leaves()
+        self.log.debug(f"Considering {len(leaves)} leaves for pruning")
+        # step 1: get all leaf nodes and their siblings
+        for leaf_idx, leaf in leaves.items():
+            leaf_var = leaf["variant"]
+            # step 2: get the siblings of this leaf and check if they are leaves
+            sibs = list(self.tree.siblings(leaf_idx).items())
+            if not len(sibs):
+                continue
+            sib_idx, sibling = sibs[0]
+            if sib_idx in leaves and sibling["results"].pval > leaf["results"].pval:
+                self.log.debug(f"Left leaf {leaf_var.id} unpruned since it is better")
+                # keep it if our p-value is better
+                continue
+            # step 3: get the genotypes for the leaf node and its sibling
+            leaf_gts = self.gens.data[:, leaf_var.idx, :] == leaf["allele"]
+            sibling_gts = self.gens.data[:, sibling["variant"].idx, :] == sibling["allele"]
+            # step 4: check whether the leaf node is in strong LD with its sibling
+            ld = pearson_corr_ld(leaf_gts.sum(axis=1), sibling_gts.sum(axis=1))
+            if np.abs(ld) > self.ld_prune_thresh:
+                self.log.debug(f"Pruning {leaf_var.id} with LD {ld}")
+                count += 1
+                # step 5: if it is, remove it
+                self.tree.remove_leaf_node(leaf_idx)
+            else:
+                self.log.debug(f"Left leaf {leaf_var.id} (with LD {ld}) unpruned")
+        self.log.info(f"Pruned {count} leaves with LD > {self.ld_prune_thresh} with their siblings")
+
+    def _find_split_flexible(
         self, parent: Haplotype, parent_res: NodeResults = None
     ) -> tuple[Variant, np.void]:
         """
