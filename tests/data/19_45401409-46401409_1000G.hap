@@ -1,0 +1,6 @@
+#	orderH	beta
+#	version	0.1.0
+#H	beta	.2f	Effect size in linear model
+H	19	45892145	45910673	hap	0.35
+V	hap	45892145	45892146	rs36046716	G
+V	hap	45910672	45910673	rs1046282	G
