@@ -157,10 +157,17 @@ class TreeBuilder:
                 yield None, allele, None
                 continue
             # step 2: run all association tests on all of the haplotypes
-            results = self.method.run(
-                hap_matrix.sum(axis=2),
-                self.phens.data[:, 0],
-            )
+            if isinstance(self.method, AssocTestSimpleSMTScore):
+                results = self.method.run(
+                    hap_matrix.sum(axis=2),
+                    self.phens.data[:, 0],
+                    parent_res=parent_res,
+                )
+            else:
+                results = self.method.run(
+                    hap_matrix.sum(axis=2),
+                    self.phens.data[:, 0],
+                )
             # step 3: record the best p-value among all the SNPs with this allele
             best_var_idx = results.data["pval"].argmin()
             node_res = self.results_type.from_np(results.data[best_var_idx])

@@ -142,6 +142,13 @@ class AssocTest(ABC):
 class AssocTestSimple(AssocTest):
     def __init__(self, with_bic=False):
         self.with_bic = with_bic
+        self.return_dtype = [
+            ("beta", np.float64),
+            ("pval", np.float64),
+            ("stderr", np.float64),
+        ]
+        if with_bic:
+            self.return_dtype.append(("bic", np.float64))
         super().__init__()
 
     def bic(self, n, residuals) -> float:
@@ -227,12 +234,7 @@ class AssocTestSimple(AssocTest):
                     self.perform_test(X[:, variant_idx], y)
                     for variant_idx in range(X.shape[1])
                 ],
-                dtype=[
-                    ("beta", np.float64),
-                    ("pval", np.float64),
-                    ("stderr", np.float64),
-                ]
-                + ([("bic", np.float64)] if self.with_bic else []),
+                dtype=self.return_dtype,
             )
         )
 
@@ -298,3 +300,91 @@ class AssocTestSimpleCovariates(AssocTestSimpleSM):
     ) -> sm.regression.linear_model.RegressionResults:
         X = sm.add_constant(np.column_stack((self.covars, x)))
         return sm.OLS(y, X).fit()
+
+
+class AssocTestSimpleSMTScore(AssocTestSimpleSM):
+    def __init__(self, with_bic=False):
+        """
+        Implement a subclass of AssocTestSimple with covariates.
+
+        Parameters
+        ----------
+        covars : npt.NDArray[np.float64]
+            Covariates to be included in the linear model. This should have shape
+            n x m where each row (n) is sample and each column (m) is a covariate.
+        """
+        super().__init__(with_bic=with_bic)
+        self.return_dtype.append(("tscore", np.float64))
+
+    def perform_test(
+        self,
+        x: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+        parent_res: NodeResults = None,
+    ) -> tuple:
+        """
+        Perform the test for a single haplotype.
+
+        Parameters
+        ----------
+        x : npt.NDArray[np.float64]
+            The genotypes with shape n x 1 (for a single haplotype)
+        y : npt.NDArray[np.float64]
+            The phenotypes, with shape n x 1
+
+        Returns
+        -------
+        tuple
+            The slope, p-value, and stderr obtained from the test. The delta BIC is
+            appended to the end if ``self.with_bic`` is True.
+        """
+        if self.with_bic:
+            beta, pval, stderr, bic = super().perform_test(x, y)
+        else:
+            beta, pval, stderr = super().perform_test(x, y)
+        if parent_res is None:
+            t_score = np.inf
+        else:
+            std_err = np.sqrt(((stderr**2) + (parent_res.stderr**2)) / 2)
+            t_score = (np.abs(beta) - np.abs(parent_res.beta)) / std_err
+            # TODO: use df=2 * (num_samps - 2) instead
+            pval = t_dist.cdf(-t_score, df=2)
+        if self.with_bic:
+            return beta, pval, stderr, bic, t_score
+        else:
+            return beta, pval, stderr, t_score
+
+    def run(
+        self,
+        X: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+        parent_res: NodeResults = None,
+    ) -> AssocResults:
+        """
+        Implement AssocTest for a simple linear regression.
+
+        Parameters
+        ----------
+        X : npt.NDArray[np.float64]
+            The genotypes, with shape n x p. There are only two dimensions.
+            Each row is a sample and each column is a haplotype.
+        y : npt.NDArray[np.float64]
+            The phenotypes, with shape n x 1
+
+        Returns
+        -------
+        npt.NDArray[np.float64]
+            The results from testing each haplotype, with shape p x 3
+        """
+        X = self.standardize(X)
+        # use ordinary least squares for a simple regression
+        # return an array of p-values
+        return AssocResults(
+            np.array(
+                [
+                    self.perform_test(X[:, variant_idx], y, parent_res)
+                    for variant_idx in range(X.shape[1])
+                ],
+                dtype=self.return_dtype,
+            )
+        )
