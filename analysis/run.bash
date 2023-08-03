@@ -40,6 +40,7 @@ fi
 if [ "$ENVIRONMENT" = "BATCH" ]; then
     snakemake \
     --cluster "qsub -d . -V -q {resources.queue} -l walltime={resources.runtime} -l nodes=1:ppn={threads} -j oe -o /dev/null -W group_list=gymreklab-group -A gymreklab-group " \
+    --cluster-cancel "qdel {cluster.jobid}" \
     --default-resources 'runtime="00:30:00"' 'queue="condo"' \
     --latency-wait 60 \
     --use-conda \
