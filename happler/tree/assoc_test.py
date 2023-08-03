@@ -109,10 +109,10 @@ class AssocTest(ABC):
         std = np.std(X, axis=0)
         standardized = (X - np.mean(X, axis=0)) / std
         # # for variants where the stdev is 0, just set all values to 0 instead of nan
-        # zero_elements = std == 0
-        # standardized[:, zero_elements] = np.zeros(
-        #     (X.shape[0], np.sum(zero_elements))
-        # )
+        zero_elements = std == 0
+        standardized[:, zero_elements] = np.zeros(
+            (X.shape[0], np.sum(zero_elements))
+        )
         return standardized
 
     @abstractmethod
@@ -226,6 +226,7 @@ class AssocTestSimple(AssocTest):
         npt.NDArray[np.float64]
             The results from testing each haplotype, with shape p x 3
         """
+        X = self.standardize(X)
         # use ordinary least squares for a simple regression
         # return an array of p-values
         return AssocResults(
