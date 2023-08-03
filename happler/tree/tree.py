@@ -86,6 +86,60 @@ class Tree:
         self.graph.add_edge(parent_idx, new_node_idx, label=allele)
         return new_node_idx
 
+    def remove_leaf_node(self, node_idx: int):
+        """
+        Remove a leaf node from the tree
+
+        Parameters
+        ----------
+        node_idx : int
+            The index of the node to remove
+        """
+        # check that this node is a leaf
+        if self.graph.out_degree[node_idx]:
+            raise ValueError("Cannot remove non-leaf node.")
+        variant = self.graph.nodes[node_idx]['variant']
+        # remove the node from the graph
+        self.graph.remove_node(node_idx)
+        self.variant_locs[variant].remove(node_idx)
+
+    def siblings(self, node_idx: int) -> list[Variant]:
+        """
+        Locate sibling(s) of this node in the tree
+
+        Parameters
+        ----------
+        node_idx : int
+            The index of a node in the tree
+
+        Returns
+        -------
+        list[Variant]
+            The variants at the sibling nodes
+        """
+        return {
+            node: self.graph.nodes[node]
+            for node in self.graph.successors(next(self.graph.predecessors(node_idx)))
+            if node != node_idx
+        }
+
+    def leaves(self):
+        """
+        Return all leaves of this tree
+
+        Returns
+        -------
+        tuple[int, Variant, int]
+            The variant at each leaf node of the tree. Returns the index in the tree,
+            the Variant object, and the allele of the variant.
+        """
+        return {
+            node: self.graph.nodes[node]
+            for node, degree in self.graph.out_degree
+            if degree == 0
+        }
+
+
     def haplotypes(self, root: int = 0) -> list[deque[dict]]:
         """
         Return the haplotypes at the leaves of the tree rooted at the index "root"

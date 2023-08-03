@@ -110,6 +110,69 @@ def test_get_haplotypes_from_tree():
     assert [haps[1][i]["variant"] for i in range(2)] == [snp1, snp2]
 
 
+def test_remove_leaf_node():
+    # create three new nodes
+    snp1 = Variant(idx=0, id="SNP1", pos=1)
+    snp2 = Variant(idx=1, id="SNP2", pos=2)
+    snp3 = Variant(idx=2, id="SNP3", pos=3)
+
+    # create a tree composed of the three variants
+    tree = Tree()
+    snp1_idx = tree.add_node(snp1, parent_idx=0, allele=0)
+    snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=0)
+    tree.add_node(snp2, parent_idx=snp1_idx, allele=1)
+    snp3_idx = tree.add_node(snp3, parent_idx=snp2_idx, allele=1)
+
+    # try to remove a leaf node
+    tree.remove_leaf_node(snp3_idx)
+
+    # try to remove a non-leaf node
+    with pytest.raises(ValueError):
+        tree.remove_leaf_node(snp1_idx)
+
+
+def test_siblings():
+    # create three new nodes
+    snp1 = Variant(idx=0, id="SNP1", pos=1)
+    snp2 = Variant(idx=1, id="SNP2", pos=2)
+    snp3 = Variant(idx=2, id="SNP3", pos=3)
+
+    # create a tree composed of the three variants
+    tree = Tree()
+    snp1_idx = tree.add_node(snp1, parent_idx=0, allele=0)
+    snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=0)
+    tree.add_node(snp3, parent_idx=snp1_idx, allele=1)
+
+    # the sibling of snp2 should be snp3
+    siblings = tree.siblings(snp2_idx)
+    assert len(siblings) == 1
+    assert siblings[3]["variant"] == snp3
+    assert siblings[3]["allele"] == 1
+
+
+def test_leaves():
+    # create three new nodes
+    snp1 = Variant(idx=0, id="SNP1", pos=1)
+    snp2 = Variant(idx=1, id="SNP2", pos=2)
+    snp3 = Variant(idx=2, id="SNP3", pos=3)
+    snp4 = Variant(idx=3, id="SNP4", pos=4)
+
+    # create a tree composed of the four variants
+    tree = Tree()
+    snp1_idx = tree.add_node(snp1, parent_idx=0, allele=0)
+    snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=0)
+    tree.add_node(snp4, parent_idx=snp2_idx, allele=0)
+    tree.add_node(snp3, parent_idx=snp1_idx, allele=1)
+
+    # the leaves should be SNPs 3 and 4
+    leaves = tree.leaves()
+    assert len(leaves) == 2
+    assert leaves[3]["variant"] == snp4
+    assert leaves[3]["allele"] == 0
+    assert leaves[4]["variant"] == snp3
+    assert leaves[4]["allele"] == 1
+
+
 @pytest.mark.skip(reason="test not completely written yet")
 def test_tree_builder():
     gens = Genotypes.load(DATADIR.joinpath("simple.vcf"))
