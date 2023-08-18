@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 
-import sys
 import click
 from pathlib import Path
-from typing import TextIO
-from typing import Union, Tuple
+from typing import Tuple
 
 from . import tree
 from haptools import data
@@ -107,7 +105,7 @@ def main():
 @click.option(
     "--ld-prune-thresh",
     type=float,
-    default=0.50,
+    default=None,
     show_default=True,
     help="The LD threshold used to prune leaf nodes based on LD with their siblings",
 )
@@ -235,10 +233,11 @@ def run(
             )
         test_method = tree.assoc_test.AssocTestSimpleCovariates(covars=cv.data)
     else:
-        if ld_prune_thresh is None:
-            test_method = tree.assoc_test.AssocTestSimpleSM()
+        # if ld_prune_thresh is None:
+        if False:
+            test_method = tree.assoc_test.AssocTestSimpleSM(with_bic=True)
         else:
-            test_method = tree.assoc_test.AssocTestSimpleSMTScore()
+            test_method = tree.assoc_test.AssocTestSimpleSMTScore(with_bic=True)
     terminator = tree.terminator.TTestTerminator(thresh=threshold, log=log)
     hap_tree = tree.TreeBuilder(
         gt, ph, method=test_method, terminator=terminator, ld_prune_thresh=ld_prune_thresh, log=log

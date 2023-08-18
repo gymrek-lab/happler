@@ -10,7 +10,7 @@ from .tree import Tree
 from .variant import Variant
 from .haplotypes import Haplotype
 from .terminator import Terminator, TTestTerminator, BICTerminator
-from .assoc_test import AssocTest, NodeResults, NodeResultsExtra, NodeResultsTScore, AssocTestSimple, AssocTestSimpleSMTScore
+from .assoc_test import AssocTest, NodeResults, NodeResultsExtra, NodeResultsExtraTScore, NodeResultsTScore, AssocTestSimple, AssocTestSimpleSMTScore
 
 
 class TreeBuilder:
@@ -55,7 +55,10 @@ class TreeBuilder:
         self.method = method
         self.terminator = terminator
         if method.with_bic:
-            self.results_type = NodeResultsExtra
+            if isinstance(method, AssocTestSimpleSMTScore):
+                self.results_type = NodeResultsExtraTScore
+            else:
+                self.results_type = NodeResultsExtra
         elif isinstance(method, AssocTestSimpleSMTScore):
             self.results_type = NodeResultsTScore
         else:

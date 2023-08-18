@@ -63,6 +63,11 @@ class NodeResultsTScore(NodeResults):
     tscore: float
 
 
+@dataclass(frozen=True, repr=False)
+class NodeResultsExtraTScore(NodeResultsExtra):
+    tscore: float
+
+
 # We declare this class to be a dataclass to automatically define __init__ and a few
 # other methods
 @dataclass
