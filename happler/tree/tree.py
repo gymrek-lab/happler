@@ -1,13 +1,12 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from collections.abc import Iterable
+from logging import Logger, DEBUG
 from collections import defaultdict, deque
 
-import numpy as np
 import networkx as nx
+from haptools.logging import getLogger
 
 from .variant import Variant
-from .assoc_test import NodeResults, NodeResultsExtra
+from .assoc_test import NodeResults
 
 class Tree:
     """
@@ -24,9 +23,10 @@ class Tree:
         The indices of each variant within the tree's list of nodes
     """
 
-    def __init__(self):
+    def __init__(self, log: Logger = None):
         self.graph = nx.DiGraph()
         self.variant_locs = defaultdict(set)
+        self.log = log or getLogger(self.__class__.__name__)
         self._add_root_node()
 
     def __repr__(self):
@@ -187,6 +187,7 @@ class Tree:
             Nodes are labeled by their variant ID and edges are labeled by their allele
         """
         dot = nx.drawing.nx_pydot.to_pydot(self.graph)
+        dot.obj_dict["attributes"]["forcelabels"] = "true"
         # iterate through all of the nodes, treating the root specially
         for idx, node in enumerate(dot.get_nodes()):
             # node.set_name(node.get('label'))
@@ -195,6 +196,9 @@ class Tree:
             if attrs["variant"] == "None" and idx == 0:
                 # treat the root node specially, since it isn't a real variant
                 node.obj_dict["attributes"] = {"label": "root"}
+            elif self.log.getEffectiveLevel() == DEBUG:
+                node.obj_dict["attributes"] = {"label": attrs["label"]+"\n"+attrs["results"]}
             else:
                 node.obj_dict["attributes"] = {"label": attrs["label"]}
+
         return dot.to_string()
