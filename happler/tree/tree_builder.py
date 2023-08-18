@@ -79,7 +79,7 @@ class TreeBuilder:
                 "A tree already exists for this TreeBuilder. Please create a new one."
             )
         # step one: initialize the tree
-        self.tree = Tree()
+        self.tree = Tree(log=self.log)
         # step two: create a haplotype
         # we're at the root of tree, so we need to create a new, empty haplotype
         parent_hap = Haplotype(num_samples=len(self.gens.samples))
@@ -87,7 +87,8 @@ class TreeBuilder:
         self._create_tree(parent_hap, parent_idx=0)
         # step four: prune nodes from the tree that are in strong LD
         if self._split_method == self._find_split_flexible:
-            self.prune_tree()
+            # self.prune_tree()
+            pass
         return self.tree
 
     def _create_tree(
@@ -198,19 +199,21 @@ class TreeBuilder:
                 yield None, allele, None
                 continue
             # step 2: run all association tests on all of the haplotypes
-            if isinstance(self.method, AssocTestSimpleSMTScore):
+            if isinstance(self.method, AssocTestSimpleSMTScore) and not (parent_res is None):
                 results = self.method.run(
                     hap_matrix.sum(axis=2),
                     self.phens.data[:, 0],
                     parent_res=parent_res,
                 )
+                # step 3: record the best t-score among all the SNPs with this allele
+                best_var_idx = np.abs(results.data["tscore"]).argmax()
             else:
                 results = self.method.run(
                     hap_matrix.sum(axis=2),
                     self.phens.data[:, 0],
                 )
-            # step 3: record the best p-value among all the SNPs with this allele
-            best_var_idx = results.data["pval"].argmin()
+                # step 3: record the best p-value among all the SNPs with this allele
+                best_var_idx = results.data["pval"].argmin()
             node_res = self.results_type.from_np(results.data[best_var_idx])
             num_tests = len(parent.nodes) + 1
             # step 4: find the index of the best variant within the genotype matrix
@@ -272,26 +275,33 @@ class TreeBuilder:
                 yield None, allele, None
                 continue
             # step 2: run all association tests on all of the haplotypes
-            if isinstance(self.method, AssocTestSimpleSMTScore):
+            if isinstance(self.method, AssocTestSimpleSMTScore) and not (parent_res is None):
                 results[allele] = self.method.run(
                     hap_matrix.sum(axis=2),
                     self.phens.data[:, 0],
                     parent_res=parent_res,
                 )
+                # also, record the best t-score among all the SNPs with this allele
+                best_p_idx[allele] = np.abs(results[allele].data["tscore"]).argmax()
             else:
                 results[allele] = self.method.run(
                     hap_matrix.sum(axis=2),
                     self.phens.data[:, 0],
                 )
-            # also, record the best p-value among all the SNPs with this allele
-            best_p_idx[allele] = results[allele].data["pval"].argmin()
+                # also, record the best p-value among all the SNPs with this allele
+                best_p_idx[allele] = results[allele].data["pval"].argmin()
         # exit if neither of the alleles worked
         if not len(best_p_idx):
             return
         # step 3: find the index of the best variant within the haplotype matrix
-        best_allele = min(
-            best_p_idx, key=lambda a: results[a].data["pval"][best_p_idx[a]]
-        )
+        if isinstance(self.method, AssocTestSimpleSMTScore):
+            best_allele = max(
+                best_p_idx, key=lambda a: results[a].data["tscore"][best_p_idx[a]]
+            )
+        else:
+            best_allele = min(
+                best_p_idx, key=lambda a: results[a].data["pval"][best_p_idx[a]]
+            )
         best_var_idx = best_p_idx[best_allele]
         num_tests = len(parent.nodes) + 1
         # step 4: find the index of the best variant within the genotype matrix

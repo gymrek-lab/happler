@@ -75,7 +75,7 @@ class TTestTerminator(Terminator):
                 or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
             ):
                 # terminate if the effect sizes have gone in the opposite direction
-                self.log.debug("Terminated b/c effect size went in wrong direction")
+                self.log.debug("Terminated b/c effect size did not improve")
                 return True
             # perform a two tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
@@ -134,7 +134,7 @@ class BICTerminator(Terminator):
                 or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
             ):
                 # terminate if the effect sizes have gone in the opposite direction
-                self.log.debug("Terminated b/c effect size went in wrong direction")
+                self.log.debug("Terminated b/c effect size did not improve")
                 return True
             stat = node_res.bic - parent_res.bic
             # just choose an arbitrary threshold

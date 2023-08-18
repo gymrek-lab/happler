@@ -344,12 +344,10 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
         else:
             beta, pval, stderr = super().perform_test(x, y)
         if parent_res is None:
-            t_score = np.inf
+            t_score = 0
         else:
             std_err = np.sqrt(((stderr**2) + (parent_res.stderr**2)) / 2)
             t_score = (np.abs(beta) - np.abs(parent_res.beta)) / std_err
-            # TODO: use df=2 * (num_samps - 2) instead
-            pval = t_dist.cdf(-t_score, df=2)
         if self.with_bic:
             return beta, pval, stderr, bic, t_score
         else:
