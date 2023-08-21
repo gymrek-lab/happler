@@ -101,6 +101,24 @@ def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str):
     return fig
 
 
+def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str):
+    """
+    Plot vals against only a single column of parameter values
+
+    Parameters
+    ----------
+    params: npt.NDArray
+        A numpy array containing the values of a parameter
+    vals: npt.NDArray
+        A numpy array containing the values of the plot
+    """
+    fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
+    ax.plot(params, vals,  "go-")
+    ax.set_xlabel(params.dtype.names[0])
+    ax.set_ylabel(val_title)
+    return fig
+
+
 @click.command()
 @click.argument("genotypes", type=click.Path(exists=True, path_type=Path))
 @click.argument("observed_hap", type=click.Path(path_type=Path))
@@ -183,7 +201,13 @@ def main(genotypes: Path, observed_hap: Path, causal_hap: Path, region: str = No
         for idx in range(len(params))
     ])
 
-    fig = plot_params(params, ld_vals, "LD with causal hap")
+    if len(dtypes) > 1:
+        fig = plot_params(params, ld_vals, "LD with causal hap")
+    elif len(dtypes) == 1:
+        fig = plot_params_simple(params, ld_vals, "LD with causal hap")
+    else:
+        raise ValueError("No parameter values found")
+
     fig.tight_layout()
     fig.savefig(output)
 
