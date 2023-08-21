@@ -105,7 +105,7 @@ def main():
 @click.option(
     "--ld-prune-thresh",
     type=float,
-    default=None,
+    default=0.5,
     show_default=True,
     help="The LD threshold used to prune leaf nodes based on LD with their siblings",
 )
@@ -233,8 +233,7 @@ def run(
             )
         test_method = tree.assoc_test.AssocTestSimpleCovariates(covars=cv.data)
     else:
-        # if ld_prune_thresh is None:
-        if False:
+        if ld_prune_thresh is None:
             test_method = tree.assoc_test.AssocTestSimpleSM(with_bic=True)
         else:
             test_method = tree.assoc_test.AssocTestSimpleSMTScore(with_bic=True)

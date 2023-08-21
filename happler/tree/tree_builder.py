@@ -65,10 +65,13 @@ class TreeBuilder:
             self.results_type = NodeResults
         self.tree = None
         self._split_method = self._find_split_rigid
+        split_method = "rigid"
         self.ld_prune_thresh = ld_prune_thresh
         if self.ld_prune_thresh is not None:
             self._split_method = self._find_split_flexible
+            split_method = "flexible"
         self.log = log or getLogger(self.__class__.__name__)
+        self.log.info(f"Using {split_method} branching strategy")
 
     def __repr__(self):
         return str((self.gens, self.phens))
