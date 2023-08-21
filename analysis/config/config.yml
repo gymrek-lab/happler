@@ -18,7 +18,7 @@ str_panel: "/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pas
 
 # Path to a list of samples to exclude from the analysis
 # There should be one sample ID per line
-exclude_samples: data/ukb_withdrawals.tsv
+exclude_samples: data/ukb_random_samples_exclude.tsv
 
 # If SNPs are unphased, provide the path to a SHAPEIT4 map file like these:
 # https://github.com/odelaneau/shapeit4/tree/master/maps
@@ -44,7 +44,7 @@ modes:
   pos: 19:45910672 # rs1046282
  hap:
   alleles: [rs36046716:G, rs1046282:G] # 45892145, 45910672
-  beta: [0.05]
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
  ld_range:
   reps: 3
   min_ld: 0
