@@ -136,7 +136,7 @@ def main(
     output_dir.mkdir()
 
     for combo_ld, hp in find_haps(gts, log, min_ld=min_ld, max_ld=max_ld, reps=reps, step=step):
-        out_dir = output_dir / f"ld_{combo_ld:.2f}"
+        out_dir = output_dir / f"ld_{round(combo_ld, 2)}"
         out_dir.mkdir()
         hps = Haplotypes(out_dir / "haplotype.hap", log=log, haplotype=Haplotype)
         hps.data = {hp.id: hp}
