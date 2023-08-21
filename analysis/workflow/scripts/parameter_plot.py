@@ -17,6 +17,7 @@ from snakemake_io import glob_wildcards
 
 DTYPES = {
     "beta": np.float64,
+    "ld": np.float64,
 }
 
 
@@ -91,12 +92,12 @@ def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str):
     """
     fig, axs = plt.subplots(nrows=len(params.dtype)+1, ncols=1, sharex=True)
     # create a plot for the vals, first
-    axs[0].plot(vals, "go-")
+    axs[0].plot(vals, "g-")
     axs[0].set_ylabel(val_title)
     axs[0].set_xticklabels([])
     # now, plot each of the parameter values on the other axes
     for idx, param in enumerate(params.dtype.names):
-        axs[idx+1].plot(params[param], "o-")
+        axs[idx+1].plot(params[param], "-")
         axs[idx+1].set_ylabel(param)
     return fig
 
@@ -113,7 +114,7 @@ def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str):
         A numpy array containing the values of the plot
     """
     fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
-    ax.plot(params, vals,  "go-")
+    ax.plot(params, vals,  "g-")
     ax.set_xlabel(params.dtype.names[0])
     ax.set_ylabel(val_title)
     return fig
@@ -188,7 +189,7 @@ def main(genotypes: Path, observed_hap: Path, causal_hap: Path, region: str = No
     params.sort()
 
     # compute LD between the causal hap and the best observed hap across param vals
-    ld_vals = np.array([
+    ld_vals = np.abs(np.array([
         get_best_ld(
             gts,
             Path(str(observed_hap).format(**dict(zip(dtypes.keys(), params[idx])))),
@@ -199,7 +200,7 @@ def main(genotypes: Path, observed_hap: Path, causal_hap: Path, region: str = No
             log=log
         )
         for idx in range(len(params))
-    ])
+    ]))
 
     if len(dtypes) > 1:
         fig = plot_params(params, ld_vals, "LD with causal hap")
