@@ -239,7 +239,12 @@ def run(
             test_method = tree.assoc_test.AssocTestSimpleSMTScore(with_bic=True)
     terminator = tree.terminator.TTestTerminator(thresh=threshold, log=log)
     hap_tree = tree.TreeBuilder(
-        gt, ph, method=test_method, terminator=terminator, ld_prune_thresh=ld_prune_thresh, log=log
+        gt,
+        ph,
+        method=test_method,
+        terminator=terminator,
+        ld_prune_thresh=ld_prune_thresh,
+        log=log,
     ).run()
     log.info("Outputting haplotypes")
     tree.Haplotypes.from_tree(fname=output, tree=hap_tree, gts=gt, log=log).write()

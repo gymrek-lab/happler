@@ -257,8 +257,8 @@ class Haplotypes(HaplotypesBase):
             results = haplotype[-1]["results"]
             haps.data[hap_id] = HapplerHaplotype(
                 chrom=gts.variants[haplotype[0]["variant"].idx]["chrom"],
-                start=0, # this is filled out later
-                end=0, # this is filled out later
+                start=0,  # this is filled out later
+                end=0,  # this is filled out later
                 id=hap_id,
                 beta=results["beta"],
                 pval=-np.log10(results["pval"]),

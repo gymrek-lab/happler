@@ -10,7 +10,15 @@ from .tree import Tree
 from .variant import Variant
 from .haplotypes import Haplotype
 from .terminator import Terminator, TTestTerminator, BICTerminator
-from .assoc_test import AssocTest, NodeResults, NodeResultsExtra, NodeResultsExtraTScore, NodeResultsTScore, AssocTestSimple, AssocTestSimpleSMTScore
+from .assoc_test import (
+    AssocTest,
+    NodeResults,
+    NodeResultsExtra,
+    NodeResultsExtraTScore,
+    NodeResultsTScore,
+    AssocTestSimple,
+    AssocTestSimpleSMTScore,
+)
 
 
 class TreeBuilder:
@@ -162,7 +170,9 @@ class TreeBuilder:
                 continue
             # step 3: get the genotypes for the leaf node and its sibling
             leaf_gts = self.gens.data[:, leaf_var.idx, :] == leaf["allele"]
-            sibling_gts = self.gens.data[:, sibling["variant"].idx, :] == sibling["allele"]
+            sibling_gts = (
+                self.gens.data[:, sibling["variant"].idx, :] == sibling["allele"]
+            )
             # step 4: check whether the leaf node is in strong LD with its sibling
             ld = pearson_corr_ld(leaf_gts.sum(axis=1), sibling_gts.sum(axis=1))
             if np.abs(ld) > self.ld_prune_thresh:
@@ -172,7 +182,10 @@ class TreeBuilder:
                 self.tree.remove_leaf_node(leaf_idx)
             else:
                 self.log.debug(f"Left leaf {leaf_var.id} (with LD {ld}) unpruned")
-        self.log.info(f"Pruned {count} leaves with LD > {self.ld_prune_thresh} with their siblings")
+        self.log.info(
+            f"Pruned {count} leaves with LD > {self.ld_prune_thresh} with their"
+            " siblings"
+        )
 
     def _find_split_flexible(
         self, parent: Haplotype, parent_res: NodeResults = None
@@ -205,7 +218,9 @@ class TreeBuilder:
                 yield None, allele, None
                 continue
             # step 2: run all association tests on all of the haplotypes
-            if isinstance(self.method, AssocTestSimpleSMTScore) and not (parent_res is None):
+            if isinstance(self.method, AssocTestSimpleSMTScore) and not (
+                parent_res is None
+            ):
                 results = self.method.run(
                     hap_matrix.sum(axis=2),
                     self.phens.data[:, 0],
@@ -232,7 +247,9 @@ class TreeBuilder:
                     break
                 best_var_idx += 1
             # step 5: retrieve the Variant with the best p-value
-            best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
+            best_variant = Variant.from_np(
+                self.gens.variants[best_var_idx], best_var_idx
+            )
             self.log.debug("Chose variant {}".format(best_variant.id))
             # step 6: check if this allele is significant and whether we should terminate the branch
             self.log.debug(
@@ -281,7 +298,9 @@ class TreeBuilder:
                 yield None, allele, None
                 continue
             # step 2: run all association tests on all of the haplotypes
-            if isinstance(self.method, AssocTestSimpleSMTScore) and not (parent_res is None):
+            if isinstance(self.method, AssocTestSimpleSMTScore) and not (
+                parent_res is None
+            ):
                 results[allele] = self.method.run(
                     hap_matrix.sum(axis=2),
                     self.phens.data[:, 0],

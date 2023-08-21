@@ -8,6 +8,7 @@ from haptools.logging import getLogger
 from .variant import Variant
 from .assoc_test import NodeResults
 
+
 class Tree:
     """
     A tree where
@@ -98,7 +99,7 @@ class Tree:
         # check that this node is a leaf
         if self.graph.out_degree[node_idx]:
             raise ValueError("Cannot remove non-leaf node.")
-        variant = self.graph.nodes[node_idx]['variant']
+        variant = self.graph.nodes[node_idx]["variant"]
         # remove the node from the graph
         self.graph.remove_node(node_idx)
         self.variant_locs[variant].remove(node_idx)
@@ -138,7 +139,6 @@ class Tree:
             for node, degree in self.graph.out_degree
             if degree == 0
         }
-
 
     def haplotypes(self, root: int = 0) -> list[deque[dict]]:
         """
@@ -197,7 +197,9 @@ class Tree:
                 # treat the root node specially, since it isn't a real variant
                 node.obj_dict["attributes"] = {"label": "root"}
             elif self.log.getEffectiveLevel() == DEBUG:
-                node.obj_dict["attributes"] = {"label": attrs["label"]+"\n"+attrs["results"]}
+                node.obj_dict["attributes"] = {
+                    "label": attrs["label"] + "\n" + attrs["results"]
+                }
             else:
                 node.obj_dict["attributes"] = {"label": attrs["label"]}
 
