@@ -40,6 +40,8 @@ rule tree:
         file_ext = lambda wildcards, output: Path(output.png).suffix[1:],
     output:
         png=out + "/happler.png",
+    resources:
+        runtime="0:04:00",
     log:
         logs + "/tree",
     benchmark:

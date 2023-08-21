@@ -43,27 +43,30 @@ module simulate:
     config: config
 use rule * from simulate as simulate_*
 
-if mode in ("snp", "hap"):
+if mode in ("snp", "hap", "ld_range"):
     happler_config = {
         "pheno": rules.simulate_simphenotype.output.pheno,
-        "hap_file": rules.create_hap.output.hap,
+        "hap_file": rules.simulate_transform.input.hap,
         "snp_panel": config["gts_snp_panel"],
         "out": config["out"] + "/happler/"+mode+"/{beta}",
     }
-    if mode == "hap":
-        happler_config["snps"] = config["modes"][mode]["alleles"]
+    if mode in ("hap", "ld_range"):
+        happler_config["snps"] = []
+        if mode == "hap":
+            happler_config["snps"] = config["modes"][mode]["alleles"]
         happler_config["causal_gt"] = rules.simulate_transform.output.pgen
-    module happler:
-        snakefile: "rules/happler.smk"
-        config: happler_config
-    use rule * from happler as happler_*
-    merged_happler = rules.happler_merge.output.pgen
+    if mode == "ld_range":
+        happler_config["out"] = config["out"] + "/happler/"+mode+"/ld_{ld}/{beta}"
 elif "str" == mode:
-    pass
-elif "ld_range" == mode:
     pass
 else:
     raise ValueError("Unsupported operating 'mode' in config")
+
+module happler:
+    snakefile: "rules/happler.smk"
+    config: happler_config
+use rule * from happler as happler_*
+merged_happler = rules.happler_merge.output.pgen
 
 if mode in ("hap", "str"):
     finemappers_config = {
@@ -79,9 +82,26 @@ if mode in ("hap", "str"):
         snakefile: "rules/finemappers.smk"
         config: finemappers_config
     use rule * from finemappers as finemappers_*
+elif "ld_range" == mode:
+    pass
 else:
     raise ValueError(f"Unsupported operating mode '{mode}' in config")
 
+plots_config = {
+    "out": config["out"] + "/plots",
+    "mode": mode,
+    "mode_attrs": config["modes"][mode],
+    "happler_hap": rules.happler_run.output.hap,
+    "causal_hap": rules.simulate_transform.input.hap,
+    "snp_panel": config["gts_snp_panel"],
+}
+if mode == "ld_range":
+    plots_config["ld_range_checkpoint"] = checkpoints.simulate_create_hap_ld_range
+
+module plots:
+    snakefile: "rules/plots.smk"
+    config: plots_config
+use rule * from plots as plots_*
 
 rule all:
     input:
@@ -89,10 +109,10 @@ rule all:
             [
                 rules.happler_tree.output.png,
                 rules.happler_manhattan.output.png,
-                # rules.happler_results.output.susie_pdf,
                 rules.finemappers_results.output.susie_pdf,
+                # rules.happler_results.output.susie_pdf,
             ],
             causal=(("ex",) if mode == "hap" else ("ex", "in")),
             beta=config["modes"]["hap"]["beta"],
-        )
+        ) if mode != "ld_range" else [rules.plots_params.output.png]
     default_target: True
