@@ -80,7 +80,7 @@ if mode in ("hap", "str"):
         config: finemappers_config
     use rule * from finemappers as finemappers_*
 else:
-    raise ValueError("Unsupported operating 'mode' in config")
+    raise ValueError(f"Unsupported operating mode '{mode}' in config")
 
 
 rule all:

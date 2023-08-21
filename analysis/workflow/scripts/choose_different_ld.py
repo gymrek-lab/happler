@@ -117,15 +117,7 @@ def main(
     max_af: float = 0.75
 ):
     """
-    Create a column in the GT matrix from the provided haplotype pseudogenotypes
-
-    Output the column to stdout
-
-    \f
-    Parameters
-    ----------
-    gts: Path
-        The path to the pgen file containing bialleleic SNP alleles
+    Create haplotypes with a range of LD values between their alleles
     """
     log = getLogger("choose", "DEBUG")
 

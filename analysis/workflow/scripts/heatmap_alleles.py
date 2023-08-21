@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-import click
-import dataclasses
 from pathlib import Path
 
 # Allow us to edit fonts in Illustrator
+import click
 import matplotlib
 import numpy as np
 matplotlib.use('Agg')
