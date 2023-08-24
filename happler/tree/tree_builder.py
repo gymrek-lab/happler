@@ -101,8 +101,7 @@ class TreeBuilder:
         self._create_tree(parent_hap, parent_idx=0)
         # step four: prune nodes from the tree that are in strong LD
         if self._split_method == self._find_split_flexible:
-            # self.prune_tree()
-            pass
+            self.prune_tree()
         return self.tree
 
     def _create_tree(
@@ -149,12 +148,17 @@ class TreeBuilder:
             new_parent_hap = parent_hap.append(variant, allele, variant_gts)
             self._create_tree(new_parent_hap, new_node_idx, results)
 
-    def prune_tree(self):
+    def prune_tree(self, from_root: bool = True):
         """
         Remove any leaf nodes that are in strong LD with their sibling branches
+
+        Parameters
+        ----------
+        from_root: bool, optional
+            Whether to only prune leaves attached to the root of the tree
         """
         count = 0
-        leaves = self.tree.leaves()
+        leaves = self.tree.leaves(from_root=from_root)
         self.log.debug(f"Considering {len(leaves)} leaves for pruning")
         # step 1: get all leaf nodes and their siblings
         for leaf_idx, leaf in leaves.items():

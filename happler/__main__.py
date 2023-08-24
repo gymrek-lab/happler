@@ -105,7 +105,7 @@ def main():
 @click.option(
     "--ld-prune-thresh",
     type=float,
-    default=0.5,
+    default=0.95,
     show_default=True,
     help="The LD threshold used to prune leaf nodes based on LD with their siblings",
 )

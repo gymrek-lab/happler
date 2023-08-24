@@ -124,9 +124,14 @@ class Tree:
             if node != node_idx
         }
 
-    def leaves(self):
+    def leaves(self, from_root : bool = False):
         """
         Return all leaves of this tree
+
+        Parameters
+        ----------
+        from_root: bool, optional
+            Whether to only return leaves attached to the root of the tree
 
         Returns
         -------
@@ -134,10 +139,14 @@ class Tree:
             The variant at each leaf node of the tree. Returns the index in the tree,
             the Variant object, and the allele of the variant.
         """
+        if from_root:
+            from_root = lambda node: next(self.graph.predecessors(node)) == 0
+        else:
+            from_root = lambda node: True
         return {
             node: self.graph.nodes[node]
             for node, degree in self.graph.out_degree
-            if degree == 0
+            if degree == 0 and from_root(node)
         }
 
     def haplotypes(self, root: int = 0) -> list[deque[dict]]:
