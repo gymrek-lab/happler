@@ -227,7 +227,7 @@ class TreeBuilder:
                     parent_res=parent_res,
                 )
                 # step 3: record the best t-score among all the SNPs with this allele
-                best_var_idx = np.abs(results.data["tscore"]).argmax()
+                best_var_idx = results.data["tscore"].argmax()
             else:
                 results = self.method.run(
                     hap_matrix.sum(axis=2),
@@ -307,7 +307,7 @@ class TreeBuilder:
                     parent_res=parent_res,
                 )
                 # also, record the best t-score among all the SNPs with this allele
-                best_p_idx[allele] = np.abs(results[allele].data["tscore"]).argmax()
+                best_p_idx[allele] = results[allele].data["tscore"].argmax()
             else:
                 results[allele] = self.method.run(
                     hap_matrix.sum(axis=2),
