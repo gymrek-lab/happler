@@ -90,7 +90,7 @@ rule keep_samps:
             else config["snp_panel"] + ".tbi",
         str_vcf=expand(config["str_panel"], chr=locus_chr),
         str_vcf_idx=expand(config["str_panel"], chr=locus_chr),
-        samp=config["exclude_samples"],
+        samp=lambda wildcards: config["exclude_samples"],
     output:
         samples=out+"/samples.tsv"
     log:
@@ -109,7 +109,7 @@ rule vcf2plink:
             else config["snp_panel"],
         vcf_idx=lambda wildcards: rules.phase_gt.output.phased_idx if check_config('phase_map')
             else config["snp_panel"] + ".tbi",
-        samples=rules.keep_samps.output.samples,
+        samples=rules.keep_samps.output.samples if check_config('exclude_samples') else [],
     params:
         maf=config["min_maf"],
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
@@ -128,7 +128,8 @@ rule vcf2plink:
         "../envs/default.yml"
     shell:
         "plink2 --bcf {input.vcf} --maf {params.maf} --make-pgen "
-        "--keep {input.samples} --out {params.prefix} &>{log}"
+        "--keep {input.samples} " if check_config('exclude_samples') else ""
+        " --out {params.prefix} &>{log}"
 
 
 rule subset_str:

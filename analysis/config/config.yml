@@ -14,16 +14,17 @@
 # required!
 # ref_panel: "/projects/ps-gymreklab/resources/datasets/snpstr/1kg.snp.str.chr{chr}.vcf.gz"
 snp_panel: "/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
+snp_panel: "../tests/data/19_45401409-46401409_1000G.pgen"
 str_panel: "/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
 
 # Path to a list of samples to exclude from the analysis
 # There should be one sample ID per line
-exclude_samples: data/ukb_random_samples_exclude.tsv
+# exclude_samples: data/ukb_random_samples_exclude.tsv
 
 # If SNPs are unphased, provide the path to a SHAPEIT4 map file like these:
 # https://github.com/odelaneau/shapeit4/tree/master/maps
 # The map file should use the same reference genome as the reference panel VCFs
-phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
+# phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
 
 # A "locus" is a string with a contig name, a colon, the start position, a dash, and
 # the end position

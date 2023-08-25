@@ -34,7 +34,10 @@ module genotypes:
     config: config
 
 use rule * from genotypes as genotypes_*
-config["gts_snp_panel"] = rules.genotypes_vcf2plink.output.pgen
+if check_config("phase_map") or check_config("exclude_samples") or not config["snp_panel"].endswith(".pgen"):
+    config["gts_snp_panel"] = rules.genotypes_vcf2plink.output.pgen
+else:
+    config["gts_snp_panel"] = config["snp_panel"]
 config["gts_str_panel"] = rules.genotypes_subset_str.output.vcf
 
 
