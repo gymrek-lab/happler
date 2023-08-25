@@ -259,7 +259,6 @@ def test_two_snps_one_branch_perfect_bic():
         phens,
         method=AssocTestSimple(with_bic=True),
         terminator=BICTerminator(),
-        results_type=NodeResultsExtra,
     ).run()
     haps = _view_tree_haps(tree)
 
@@ -576,7 +575,6 @@ def test_two_snps_one_branch_perfect_bic():
         phens,
         method=AssocTestSimple(with_bic=True),
         terminator=BICTerminator(),
-        results_type=NodeResultsExtra,
     ).run()
     haps = _view_tree_haps(tree)
 

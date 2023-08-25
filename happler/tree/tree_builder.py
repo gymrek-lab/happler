@@ -9,7 +9,7 @@ from haptools.ld import pearson_corr_ld
 from .tree import Tree
 from .variant import Variant
 from .haplotypes import Haplotype
-from .terminator import Terminator, TTestTerminator, BICTerminator
+from .terminator import Terminator, TTestTerminator
 from .assoc_test import (
     AssocTest,
     NodeResults,
@@ -37,8 +37,8 @@ class TreeBuilder:
         The type of association test to perform at each node when constructing the tree
     terminator: Terminator, optional
         The type of test to use for deciding whether to terminate a branch
-    results: type[NodeResults]
-        The class to use when instantiating the results of a node association test
+    ld_prune_thresh: float, optional
+        Any leaf nodes with a greater LD with their sibling than this value will be pruned
     log: Logger
         A logging instance for recording debug statements.
 
