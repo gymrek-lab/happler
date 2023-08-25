@@ -30,7 +30,7 @@ checkpoint create_hap_ld_range:
         min_af = config["modes"]["ld_range"]["min_af"],
         max_af = config["modes"]["ld_range"]["max_af"],
     output:
-        hap=directory(out + "/haplotypes")
+        hap=directory(out)
     resources:
         runtime="0:05:00"
     log:
