@@ -103,15 +103,15 @@ def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str, hap_coun
     fig, axs = plt.subplots(nrows=len(params.dtype)+1+also_plot_counts, ncols=1, sharex=True)
     # create a plot for the vals, first
     axs[0].plot(vals, "g-")
-    axs[0].set_ylabel(val_title, color="g")
+    axs[0].set_ylabel(val_title)
     axs[0].set_xticklabels([])
+    if also_plot_counts:
+        axs[1].plot(hap_counts, "m-")
+        axs[1].set_ylabel("num_haps")
     # now, plot each of the parameter values on the other axes
     for idx, param in enumerate(params.dtype.names):
-        axs[idx+1].plot(params[param], "-")
-        axs[idx+1].set_ylabel(param)
-    if also_plot_counts:
-        axs[idx+1].plot(hap_counts, "m-")
-        axs[idx+1].set_ylabel("Number of observed haplotypes", color="m")
+        axs[idx+1+also_plot_counts].plot(params[param], "-")
+        axs[idx+1+also_plot_counts].set_ylabel(param)
     return fig
 
 
