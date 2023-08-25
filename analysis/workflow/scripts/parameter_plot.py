@@ -21,6 +21,11 @@ DTYPES = {
 }
 
 
+def get_num_haps(hap: Path, log: Logger = None):
+    hap = Haplotypes(hap, log=log)
+    hap.read()
+    return len(hap.data)
+
 def get_best_ld(gts: GenotypesVCF, observed_hap: Path, causal_hap: Path, region: str = None, observed_id: str = None, causal_id: str = None, log: Logger = None):
     """
     Compute the best LD between the observed haplotypes and the causal haplotype
@@ -79,7 +84,7 @@ def get_best_ld(gts: GenotypesVCF, observed_hap: Path, causal_hap: Path, region:
     return observed_ld[best_observed_hap_idx]
 
 
-def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str):
+def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str, hap_counts: npt.NDArray = None):
     """
     Plot vals against parameter values
 
@@ -89,20 +94,28 @@ def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str):
         A numpy array of mixed dtype. Each column contains the values of a parameter
     vals: npt.NDArray
         A numpy array containing the values of the plot
+    val_title: str
+        The name of the value that we are plotting
+    hap_counts: npt.NDArray, optional
+        The number of haplotypes present in each hap file
     """
-    fig, axs = plt.subplots(nrows=len(params.dtype)+1, ncols=1, sharex=True)
+    also_plot_counts = hap_counts is not None
+    fig, axs = plt.subplots(nrows=len(params.dtype)+1+also_plot_counts, ncols=1, sharex=True)
     # create a plot for the vals, first
     axs[0].plot(vals, "g-")
-    axs[0].set_ylabel(val_title)
+    axs[0].set_ylabel(val_title, color="g")
     axs[0].set_xticklabels([])
     # now, plot each of the parameter values on the other axes
     for idx, param in enumerate(params.dtype.names):
         axs[idx+1].plot(params[param], "-")
         axs[idx+1].set_ylabel(param)
+    if also_plot_counts:
+        axs[idx+1].plot(hap_counts, "m-")
+        axs[idx+1].set_ylabel("Number of observed haplotypes", color="m")
     return fig
 
 
-def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str):
+def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str, hap_counts: npt.NDArray = None):
     """
     Plot vals against only a single column of parameter values
 
@@ -112,11 +125,21 @@ def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str):
         A numpy array containing the values of a parameter
     vals: npt.NDArray
         A numpy array containing the values of the plot
+    val_title: str
+        The name of the value that we are plotting
+    hap_counts: npt.NDArray, optional
+        The number of haplotypes present in each hap file
     """
     fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
+    # plot params against vals
     ax.plot(params, vals,  "g-")
     ax.set_xlabel(params.dtype.names[0])
-    ax.set_ylabel(val_title)
+    ax.set_ylabel(val_title, color="g")
+    # also plot hap_counts as a second y-axis
+    if hap_counts is not None:
+        ax = ax.twinx()
+        ax.plot(params, hap_counts, "m-")
+        ax.set_ylabel("Number of observed haplotypes", color="m")
     return fig
 
 
@@ -148,6 +171,14 @@ def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str):
     help="A haplotype ID from the causal .hap file",
 )
 @click.option(
+    "-n",
+    "--num-haps",
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help="Whether to also depict the total number of haplotypes in the file",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -163,7 +194,17 @@ def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str):
     show_default=True,
     help="The level of verbosity desired",
 )
-def main(genotypes: Path, observed_hap: Path, causal_hap: Path, region: str = None, observed_id: str = None, causal_id: str = None, output: Path = Path("/dev/stdout"), verbosity: str = "ERROR"):
+def main(
+    genotypes: Path,
+    observed_hap: Path,
+    causal_hap: Path,
+    region: str = None,
+    observed_id: str = None,
+    causal_id: str = None,
+    num_haps: bool = True,
+    output: Path = Path("/dev/stdout"),
+    verbosity: str = "ERROR"
+):
     """
     Create a plot summarizing the LD between the observed and causal haplotypes across
     a range of parameters
@@ -202,10 +243,17 @@ def main(genotypes: Path, observed_hap: Path, causal_hap: Path, region: str = No
         for idx in range(len(params))
     ]))
 
+    hap_counts = None
+    if num_haps:
+        hap_counts = np.array([
+            get_num_haps(Path(str(observed_hap).format(**dict(zip(dtypes.keys(), params[idx])))))
+            for idx in range(len(params))
+        ])
+
     if len(dtypes) > 1:
-        fig = plot_params(params, ld_vals, "LD with causal hap")
+        fig = plot_params(params, ld_vals, "LD with causal hap", hap_counts)
     elif len(dtypes) == 1:
-        fig = plot_params_simple(params, ld_vals, "LD with causal hap")
+        fig = plot_params_simple(params, ld_vals, "LD with causal hap", hap_counts)
     else:
         raise ValueError("No parameter values found")
 
