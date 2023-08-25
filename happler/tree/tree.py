@@ -124,7 +124,7 @@ class Tree:
             if node != node_idx
         }
 
-    def leaves(self, from_root : bool = False):
+    def leaves(self, from_root: bool = False):
         """
         Return all leaves of this tree
 
