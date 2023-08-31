@@ -1,62 +1,12 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from collections.abc import Iterable
+from logging import Logger, DEBUG
 from collections import defaultdict, deque
 
-import pydot
-import numpy as np
 import networkx as nx
+from haptools.logging import getLogger
 
 from .variant import Variant
-
-
-# We declare this class to be a dataclass to automatically define __init__ and a few
-# other methods. We use frozen=True to make it immutable.
-@dataclass(frozen=True)
-class NodeResults:
-    """
-    The results of testing SNPs at a node in the tree
-
-    Attributes
-    ----------
-    beta : float
-        The best effect size among all of the SNPs tried
-    pval : float
-        The best p-value among all of the SNPs tried
-    stderr: float
-        The standard error of beta
-    """
-
-    beta: float
-    pval: float
-    stderr: float
-
-    def __getitem__(self, item):
-        """
-        Define a getter so that we can access elements like this:
-
-        ``obj['field_name']``
-
-        in addition to this:
-
-        ``obj.field_name``
-        """
-        return getattr(self, item)
-
-    def __repr__(self):
-        return (
-            "{" + ", ".join("{}={:.2e}".format(*i) for i in self.__dict__.items()) + "}"
-        )
-
-    @classmethod
-    def from_np(cls, np_mixed_arr_var: np.void) -> NodeResults:
-        class_attributes = cls.__dict__["__dataclass_fields__"].keys()
-        return cls(**dict(zip(class_attributes, np_mixed_arr_var)))
-
-
-@dataclass(frozen=True, repr=False)
-class NodeResultsExtra(NodeResults):
-    bic: float
+from .assoc_test import NodeResults
 
 
 class Tree:
@@ -74,9 +24,10 @@ class Tree:
         The indices of each variant within the tree's list of nodes
     """
 
-    def __init__(self):
+    def __init__(self, log: Logger = None):
         self.graph = nx.DiGraph()
         self.variant_locs = defaultdict(set)
+        self.log = log or getLogger(self.__class__.__name__)
         self._add_root_node()
 
     def __repr__(self):
@@ -136,6 +87,68 @@ class Tree:
         self.graph.add_edge(parent_idx, new_node_idx, label=allele)
         return new_node_idx
 
+    def remove_leaf_node(self, node_idx: int):
+        """
+        Remove a leaf node from the tree
+
+        Parameters
+        ----------
+        node_idx : int
+            The index of the node to remove
+        """
+        # check that this node is a leaf
+        if self.graph.out_degree[node_idx]:
+            raise ValueError("Cannot remove non-leaf node.")
+        variant = self.graph.nodes[node_idx]["variant"]
+        # remove the node from the graph
+        self.graph.remove_node(node_idx)
+        self.variant_locs[variant].remove(node_idx)
+
+    def siblings(self, node_idx: int) -> list[Variant]:
+        """
+        Locate sibling(s) of this node in the tree
+
+        Parameters
+        ----------
+        node_idx : int
+            The index of a node in the tree
+
+        Returns
+        -------
+        list[Variant]
+            The variants at the sibling nodes
+        """
+        return {
+            node: self.graph.nodes[node]
+            for node in self.graph.successors(next(self.graph.predecessors(node_idx)))
+            if node != node_idx
+        }
+
+    def leaves(self, from_root: bool = False):
+        """
+        Return all leaves of this tree
+
+        Parameters
+        ----------
+        from_root: bool, optional
+            Whether to only return leaves attached to the root of the tree
+
+        Returns
+        -------
+        tuple[int, Variant, int]
+            The variant at each leaf node of the tree. Returns the index in the tree,
+            the Variant object, and the allele of the variant.
+        """
+        if from_root:
+            from_root = lambda node: next(self.graph.predecessors(node)) == 0
+        else:
+            from_root = lambda node: True
+        return {
+            node: self.graph.nodes[node]
+            for node, degree in self.graph.out_degree
+            if degree == 0 and from_root(node)
+        }
+
     def haplotypes(self, root: int = 0) -> list[deque[dict]]:
         """
         Return the haplotypes at the leaves of the tree rooted at the index "root"
@@ -183,6 +196,7 @@ class Tree:
             Nodes are labeled by their variant ID and edges are labeled by their allele
         """
         dot = nx.drawing.nx_pydot.to_pydot(self.graph)
+        dot.obj_dict["attributes"]["forcelabels"] = "true"
         # iterate through all of the nodes, treating the root specially
         for idx, node in enumerate(dot.get_nodes()):
             # node.set_name(node.get('label'))
@@ -191,6 +205,11 @@ class Tree:
             if attrs["variant"] == "None" and idx == 0:
                 # treat the root node specially, since it isn't a real variant
                 node.obj_dict["attributes"] = {"label": "root"}
+            elif self.log.getEffectiveLevel() == DEBUG:
+                node.obj_dict["attributes"] = {
+                    "label": attrs["label"] + "\n" + attrs["results"]
+                }
             else:
                 node.obj_dict["attributes"] = {"label": attrs["label"]}
+
         return dot.to_string()

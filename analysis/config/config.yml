@@ -13,17 +13,18 @@
 # The VCF(s) must be sorted and indexed (with a .tbi file in the same directory)
 # required!
 # ref_panel: "/projects/ps-gymreklab/resources/datasets/snpstr/1kg.snp.str.chr{chr}.vcf.gz"
-snp_panel: "/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
+# snp_panel: "/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
+snp_panel: "../tests/data/19_45401409-46401409_1000G.pgen"
 str_panel: "/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
 
 # Path to a list of samples to exclude from the analysis
 # There should be one sample ID per line
-exclude_samples: data/ukb_withdrawals.tsv
+# exclude_samples: data/ukb_random_samples_exclude.tsv
 
 # If SNPs are unphased, provide the path to a SHAPEIT4 map file like these:
 # https://github.com/odelaneau/shapeit4/tree/master/maps
 # The map file should use the same reference genome as the reference panel VCFs
-phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
+# phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
 
 # A "locus" is a string with a contig name, a colon, the start position, a dash, and
 # the end position
@@ -44,8 +45,16 @@ modes:
   pos: 19:45910672 # rs1046282
  hap:
   alleles: [rs36046716:G, rs1046282:G] # 45892145, 45910672
-  beta: [0.05]
-mode: hap
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
+ ld_range:
+  reps: 1
+  min_ld: 0
+  max_ld: 1
+  step: 0.1
+  min_af: 0.25
+  max_af: 0.75
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
+mode: ld_range
 
 # locus: 1:98001984-99001984
 # modes:

@@ -5,28 +5,45 @@ out = config["out"] + "/simulate"
 logs = out + "/logs"
 bench = out + "/bench"
 
+mode = config["mode"]
+out += "/" + mode
+logs += "/" + mode
+bench += "/" + mode
+
 
 locus_chr = config["locus"].split(":")[0]
 locus_start = config["locus"].split(":")[1].split('-')[0]
 locus_end = config["locus"].split(":")[1].split('-')[1]
 
 
-rule create_haps_ld_range:
-    """ create a hap file with haplotypes that are in a range of LD with their SNPs """
+checkpoint create_hap_ld_range:
+    """ create a hap file suitable for haptools transform and simphenotype """
     input:
-        gts=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
+        gts=Path(config["gts_snp_panel"]),
+        gts_pvar=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
+        gts_psam=Path(config["gts_snp_panel"]).with_suffix(".psam"),
+    params:
+        reps = config["modes"]["ld_range"]["reps"],
+        min_ld = config["modes"]["ld_range"]["min_ld"],
+        max_ld = config["modes"]["ld_range"]["max_ld"],
+        step = config["modes"]["ld_range"]["step"],
+        min_af = config["modes"]["ld_range"]["min_af"],
+        max_af = config["modes"]["ld_range"]["max_af"],
     output:
-        hap=out + "/ld_range/random.hap"
+        hap=directory(out)
     resources:
         runtime="0:05:00"
     log:
-        logs + "/ld_range/create_haps_ld_range",
+        logs + "/create_hap_ld_range",
     benchmark:
-        bench + "/ld_range/create_haps_ld_range",
+        bench + "/create_hap_ld_range",
     conda:
         "happler"
     shell:
-        "../scripts/choose_different_ld.py {input.gts} > {output.hap}"
+        "workflow/scripts/choose_different_ld.py -r {params.reps} "
+        "--min-ld {params.min_ld} --max-ld {params.max_ld} "
+        "--step {params.step} --min-af {params.min_af} "
+        "--max-af {params.max_af} {input.gts} {output.hap} &> {log}"
 
 
 rule create_hap:
@@ -40,36 +57,44 @@ rule create_hap:
         beta=0.99,
         alleles=lambda wildcards: config["modes"]["hap"]["alleles"],
     output:
-        hap=out + "/hap/haplotype.hap"
+        hap=out + "/haplotype.hap"
     resources:
         runtime="0:05:00"
     log:
-        logs + "/hap/create_hap",
+        logs + "/create_hap",
     benchmark:
-        bench + "/hap/create_hap",
+        bench + "/create_hap",
     conda:
         "../envs/default.yml"
     script:
         "../scripts/create_hap_file.sh"
 
+transform_input = rules.create_hap.output.hap
+if mode == "ld_range":
+    transform_input = rules.create_hap_ld_range.output.hap + "/ld_{ld}/haplotype.hap"
+
+if mode == "ld_range":
+    out += "/ld_{ld}"
+    logs += "/ld_{ld}"
+    bench += "/ld_{ld}"
 
 rule transform:
     """ use the hap file to create a pgen of the haplotype """
     input:
-        hap=rules.create_hap.output.hap,
+        hap=transform_input,
         pgen=config["gts_snp_panel"],
         pvar=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["gts_snp_panel"]).with_suffix(".psam"),
     output:
-        pgen=temp(out + "/hap/transform.pgen"),
-        pvar=temp(out + "/hap/transform.pvar"),
-        psam=temp(out + "/hap/transform.psam"),
+        pgen=temp(out + "/transform.pgen"),
+        pvar=temp(out + "/transform.pvar"),
+        psam=temp(out + "/transform.psam"),
     resources:
         runtime="0:05:00"
     log:
-        logs + "/hap/transform",
+        logs + "/transform",
     benchmark:
-        bench + "/hap/transform",
+        bench + "/transform",
     conda:
         "happler"
     shell:
@@ -86,13 +111,13 @@ rule simphenotype:
     params:
         beta=lambda wildcards: wildcards.beta,
     output:
-        pheno=out + "/hap/{beta}.pheno",
+        pheno=out + "/{beta}.pheno",
     resources:
         runtime="0:05:00"
     log:
-        logs + "/hap/{beta}/simphenotype",
+        logs + "/{beta}/simphenotype",
     benchmark:
-        bench + "/hap/{beta}/simphenotype",
+        bench + "/{beta}/simphenotype",
     conda:
         "happler"
     shell:

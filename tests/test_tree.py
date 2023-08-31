@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from logging import getLogger
 
 import pytest
 import numpy as np
@@ -12,7 +13,6 @@ from happler.tree import (
     Haplotypes,
     Tree,
     TreeBuilder,
-    AssocTestSimple,
     NodeResults,
 )
 
@@ -71,13 +71,18 @@ def test_tree_dot():
     snp3 = Variant(idx=3, id="SNP3", pos=4)
     tree.add_node(snp3, node_idx, 0)
     tree.add_node(snp3, node_idx, 1)
+
+    log = getLogger()
+    log_level = log.getEffectiveLevel()
+    log.setLevel("INFO")
     assert (
         tree.dot()
-        == "strict digraph  {\n0 [label=root];\n1 [label=SNP0];\n2 [label=SNP1];\n3"
-        " [label=SNP2];\n4 [label=SNP3];\n5 [label=SNP3];\n0 -> 1  [label=0];\n1 ->"
-        " 2  [label=0];\n2 -> 3  [label=1];\n3 -> 4  [label=0];\n3 -> 5 "
-        " [label=1];\n}\n"
+        == "strict digraph  {\nforcelabels=true;\n0 [label=root];\n1 [label=SNP0];\n2"
+        " [label=SNP1];\n3 [label=SNP2];\n4 [label=SNP3];\n5 [label=SNP3];\n0 -> 1 "
+        " [label=0];\n1 -> 2  [label=0];\n2 -> 3  [label=1];\n3 -> 4  [label=0];\n3"
+        " -> 5  [label=1];\n}\n"
     )
+    log.setLevel(log_level)
 
 
 def test_get_haplotypes_from_tree():
@@ -109,6 +114,69 @@ def test_get_haplotypes_from_tree():
     assert tuple([len(hap) for hap in haps]) == (3, 2)
     assert [haps[0][i]["variant"] for i in range(3)] == [snp1, snp2, snp3]
     assert [haps[1][i]["variant"] for i in range(2)] == [snp1, snp2]
+
+
+def test_remove_leaf_node():
+    # create three new nodes
+    snp1 = Variant(idx=0, id="SNP1", pos=1)
+    snp2 = Variant(idx=1, id="SNP2", pos=2)
+    snp3 = Variant(idx=2, id="SNP3", pos=3)
+
+    # create a tree composed of the three variants
+    tree = Tree()
+    snp1_idx = tree.add_node(snp1, parent_idx=0, allele=0)
+    snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=0)
+    tree.add_node(snp2, parent_idx=snp1_idx, allele=1)
+    snp3_idx = tree.add_node(snp3, parent_idx=snp2_idx, allele=1)
+
+    # try to remove a leaf node
+    tree.remove_leaf_node(snp3_idx)
+
+    # try to remove a non-leaf node
+    with pytest.raises(ValueError):
+        tree.remove_leaf_node(snp1_idx)
+
+
+def test_siblings():
+    # create three new nodes
+    snp1 = Variant(idx=0, id="SNP1", pos=1)
+    snp2 = Variant(idx=1, id="SNP2", pos=2)
+    snp3 = Variant(idx=2, id="SNP3", pos=3)
+
+    # create a tree composed of the three variants
+    tree = Tree()
+    snp1_idx = tree.add_node(snp1, parent_idx=0, allele=0)
+    snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=0)
+    tree.add_node(snp3, parent_idx=snp1_idx, allele=1)
+
+    # the sibling of snp2 should be snp3
+    siblings = tree.siblings(snp2_idx)
+    assert len(siblings) == 1
+    assert siblings[3]["variant"] == snp3
+    assert siblings[3]["allele"] == 1
+
+
+def test_leaves():
+    # create three new nodes
+    snp1 = Variant(idx=0, id="SNP1", pos=1)
+    snp2 = Variant(idx=1, id="SNP2", pos=2)
+    snp3 = Variant(idx=2, id="SNP3", pos=3)
+    snp4 = Variant(idx=3, id="SNP4", pos=4)
+
+    # create a tree composed of the four variants
+    tree = Tree()
+    snp1_idx = tree.add_node(snp1, parent_idx=0, allele=0)
+    snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=0)
+    tree.add_node(snp4, parent_idx=snp2_idx, allele=0)
+    tree.add_node(snp3, parent_idx=snp1_idx, allele=1)
+
+    # the leaves should be SNPs 3 and 4
+    leaves = tree.leaves()
+    assert len(leaves) == 2
+    assert leaves[3]["variant"] == snp4
+    assert leaves[3]["allele"] == 0
+    assert leaves[4]["variant"] == snp3
+    assert leaves[4]["allele"] == 1
 
 
 @pytest.mark.skip(reason="test not completely written yet")
@@ -202,15 +270,15 @@ def test_haplotypes_write():
             "#\torderV\tscore",
             "#\tversion\t0.1.0",
             "#H\tbeta\t.2f\tEffect size in linear model",
-            "#H\tpval\t.2f\tP-value in linear model",
-            "#V\tscore\t.2f\tScore assigned to this variant",
-            "H\t1\t1\t4\tH0\t0.00\t0.00",
-            "H\t1\t1\t3\tH1\t0.00\t0.00",
-            "V\tH0\t1\t2\tSNP1\tA\t0.10",
-            "V\tH0\t2\t3\tSNP2\tC\t0.10",
-            "V\tH0\t3\t4\tSNP3\tT\t0.10",
-            "V\tH1\t1\t2\tSNP1\tG\t0.10",
-            "V\tH1\t2\t3\tSNP2\tT\t0.10",
+            "#H\tpval\t.2f\t-log(pval) in linear model",
+            "#V\tscore\t.2f\t-log(pval) assigned to this variant",
+            "H\t1\t1\t4\tH0\t0.10\t1.00",
+            "H\t1\t1\t3\tH1\t0.10\t1.00",
+            "V\tH0\t1\t2\tSNP1\tA\t1.00",
+            "V\tH0\t2\t3\tSNP2\tC\t1.00",
+            "V\tH0\t3\t4\tSNP3\tT\t1.00",
+            "V\tH1\t1\t2\tSNP1\tG\t1.00",
+            "V\tH1\t2\t3\tSNP2\tT\t1.00",
         ]
 
     # remove the file

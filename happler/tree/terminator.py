@@ -6,7 +6,7 @@ import numpy as np
 from scipy.stats import t as t_dist
 from haptools.logging import getLogger
 
-from .tree import NodeResults, NodeResultsExtra
+from .assoc_test import NodeResults, NodeResultsExtra
 
 
 class Terminator(ABC):
@@ -75,7 +75,7 @@ class TTestTerminator(Terminator):
                 or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
             ):
                 # terminate if the effect sizes have gone in the opposite direction
-                self.log.debug("Terminated b/c effect size went in wrong direction")
+                self.log.debug("Terminated b/c effect size did not improve")
                 return True
             # perform a two tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
@@ -90,7 +90,7 @@ class TTestTerminator(Terminator):
             t_stat = (np.abs(node_res.beta) - np.abs(parent_res.beta)) / std_err
             # use a one-tailed test here b/c either the effect size becomes more
             # negative or it becomes more positive
-            pval = t_dist.cdf(-t_stat, df=2 * (num_samps - 2))
+            pval = t_dist.sf(t_stat, df=2 * (num_samps - 2))
         else:
             # parent_res = None when the parent node is the root node
             pval = node_res.pval
@@ -134,7 +134,7 @@ class BICTerminator(Terminator):
                 or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
             ):
                 # terminate if the effect sizes have gone in the opposite direction
-                self.log.debug("Terminated b/c effect size went in wrong direction")
+                self.log.debug("Terminated b/c effect size did not improve")
                 return True
             stat = node_res.bic - parent_res.bic
             # just choose an arbitrary threshold

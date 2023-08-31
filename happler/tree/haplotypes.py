@@ -174,7 +174,7 @@ class HapplerVariant(VariantBase):
     _extras: tuple = field(
         repr=False,
         init=False,
-        default=(Extra("score", ".2f", "Score assigned to this variant"),),
+        default=(Extra("score", ".2f", "-log(pval) assigned to this variant"),),
     )
 
 
@@ -192,7 +192,7 @@ class HapplerHaplotype(HaplotypeBase):
         init=False,
         default=(
             Extra("beta", ".2f", "Effect size in linear model"),
-            Extra("pval", ".2f", "P-value in linear model"),
+            Extra("pval", ".2f", "-log(pval) in linear model"),
         ),
     )
 
@@ -254,13 +254,14 @@ class Haplotypes(HaplotypesBase):
         haps.data = {}
         for hap_idx, haplotype in enumerate(tree.haplotypes()):
             hap_id = "H" + str(hap_idx)
+            results = haplotype[-1]["results"]
             haps.data[hap_id] = HapplerHaplotype(
                 chrom=gts.variants[haplotype[0]["variant"].idx]["chrom"],
-                start=0,
-                end=0,
+                start=0,  # this is filled out later
+                end=0,  # this is filled out later
                 id=hap_id,
-                beta=0,
-                pval=0,
+                beta=results["beta"],
+                pval=-np.log10(results["pval"]),
             )
             alleles = {
                 node["variant"].idx: gts.variants[node["variant"].idx]["alleles"][
@@ -274,7 +275,7 @@ class Haplotypes(HaplotypesBase):
                     end=node["variant"].pos + len(alleles[node["variant"].idx]),
                     id=node["variant"].id,
                     allele=alleles[node["variant"].idx],
-                    score=cls._handle_nan(node["results"], "pval"),
+                    score=-np.log10(cls._handle_nan(node["results"], "pval")),
                 )
                 for node in haplotype
             )
