@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import random
 from pathlib import Path
 from logging import Logger
 from itertools import combinations, product
@@ -12,7 +13,25 @@ from haptools.sim_phenotype import Haplotype
 from haptools.data import Genotypes, GenotypesPLINK, Haplotypes, Variant
 
 
-def find_haps(gts: Genotypes, log: Logger, min_ld: float, max_ld: float, reps: float = 1, step: float = 0.1):
+def random_combinations(iterable, r):
+    """
+        Random selection from itertools.combinations(iterable, r)
+        Copied from the ex recipe at https://docs.python.org/library/itertools.html
+    """
+    pool = tuple(iterable)
+    n = len(pool)
+    indices = sorted(random.sample(range(n), r))
+    return tuple(pool[i] for i in indices)
+
+
+def find_haps(
+    gts: Genotypes,
+    log: Logger,
+    min_ld: float,
+    max_ld: float,
+    reps: float = 1,
+    step: float = 0.1,
+):
     log.info(f"Using min_ld {min_ld}, max_ld {max_ld}, reps {reps}, and step {step}")
     sum_gts = gts.data.sum(axis=2)
 
@@ -26,9 +45,11 @@ def find_haps(gts: Genotypes, log: Logger, min_ld: float, max_ld: float, reps: f
 
     combos = np.array(list(range(len(gts.variants))))
     np.random.shuffle(combos)
-    combo_ids = combinations(combos, 2)
-    for combo_id in combo_ids:
-        snp_vars = gts.variants[list(combo_id)]
+    for combo_id1 in combos:
+        combo_id = [combo_id1, combo_id1]
+        while combo_id[0] == combo_id[1]:
+            combo_id[1] = np.random.choice(combos)
+        snp_vars = gts.variants[combo_id]
         hp_id = "-".join(snp_vars['id'])
         log.debug(f"Trying {hp_id}")
         pos1, pos2 = snp_vars["pos"]
@@ -38,13 +59,12 @@ def find_haps(gts: Genotypes, log: Logger, min_ld: float, max_ld: float, reps: f
                 Variant(start=vr["pos"], end=vr["pos"]+1, id=vr['id'], allele=al)
                 for vr, al in zip(snp_vars, allele_combo)
             )
-            trans_hp = hp.transform(gts).sum(axis=1)
-            combo_ld = np.abs(np.array([pearson_corr_ld(trans_hp, sum_gts[:, snp_id]) for snp_id in combo_id]))
-            # we arbitrarily just choose the first value
-            bin_idx = np.argmax(combo_ld[0] < intervals)
-            if ld_bins[bin_idx] < reps and np.abs(combo_ld[1] - combo_ld[0]) < step:
-                log.info(f"Outputting {hp_id} with LD {tuple(combo_ld)} for bin {intervals[bin_idx]}")
-                yield np.mean(combo_ld), hp
+            combo_ld = np.abs(pearson_corr_ld(*tuple(sum_gts[:, snp_id] for snp_id in combo_id)))
+            # which bin does this LD value fall in?
+            bin_idx = np.argmax(combo_ld < intervals)
+            if ld_bins[bin_idx] < reps:
+                log.info(f"Outputting {hp_id} with LD {combo_ld} for bin {intervals[bin_idx]}")
+                yield combo_ld, hp
                 ld_bins[bin_idx] += 1
                 count -= 1
                 break
@@ -135,10 +155,19 @@ def main(
     # create output directory
     output_dir.mkdir()
 
-    for combo_ld, hp in find_haps(gts, log, min_ld=min_ld, max_ld=max_ld, reps=reps, step=step):
+    for combo_ld, hp in find_haps(
+        gts,
+        log,
+        min_ld=min_ld,
+        max_ld=max_ld,
+        reps=reps,
+        step=step,
+    ):
         out_dir = output_dir / f"ld_{round(combo_ld, 2)}"
         out_dir.mkdir()
-        hps = Haplotypes(out_dir / "haplotype.hap", log=log, haplotype=Haplotype)
+        hps = Haplotypes(out_dir / "haplotype.hap",
+        log=log,
+        haplotype=Haplotype)
         hps.data = {hp.id: hp}
         hps.write()
 
