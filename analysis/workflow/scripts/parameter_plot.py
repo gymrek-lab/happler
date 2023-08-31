@@ -18,6 +18,8 @@ from snakemake_io import glob_wildcards
 DTYPES = {
     "beta": np.float64,
     "ld": np.float64,
+    "rep": np.uint8,
+    "gt": "U5",
 }
 
 
@@ -104,14 +106,19 @@ def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str, hap_coun
     # create a plot for the vals, first
     axs[0].plot(vals, "g-")
     axs[0].set_ylabel(val_title)
+    axs[0].set_xticks(range(0, len(vals)))
     axs[0].set_xticklabels([])
+    axs[0].grid(axis="x")
+    axs[0].set_ylim(None, 1)
     if also_plot_counts:
         axs[1].plot(hap_counts, "m-")
         axs[1].set_ylabel("num_haps")
+        axs[1].grid(axis="x")
     # now, plot each of the parameter values on the other axes
     for idx, param in enumerate(params.dtype.names):
         axs[idx+1+also_plot_counts].plot(params[param], "-")
         axs[idx+1+also_plot_counts].set_ylabel(param)
+        axs[idx+1+also_plot_counts].grid(axis="x")
     return fig
 
 
@@ -140,6 +147,8 @@ def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str, h
         ax = ax.twinx()
         ax.plot(params, hap_counts, "m-")
         ax.set_ylabel("Number of observed haplotypes", color="m")
+        ax.set_yticks(list(range(max(hap_counts)+1)))
+        ax.set_yticklabels(list(range(max(hap_counts)+1)))
     return fig
 
 
@@ -229,12 +238,14 @@ def main(
     params = np.array(list(zip(*params.values())), dtype=list(dtypes.items()))
     params.sort()
 
+    get_hap_fname = lambda hap_path, param_set: Path(str(hap_path).format(**dict(zip(dtypes.keys(), param_set))))
+
     # compute LD between the causal hap and the best observed hap across param vals
     ld_vals = np.abs(np.array([
         get_best_ld(
             gts,
-            Path(str(observed_hap).format(**dict(zip(dtypes.keys(), params[idx])))),
-            Path(str(causal_hap).format(**dict(zip(dtypes.keys(), params[idx])))),
+            get_hap_fname(observed_hap, params[idx]),
+            get_hap_fname(causal_hap, params[idx]),
             region=region,
             observed_id=observed_id,
             causal_id=causal_id,
@@ -246,9 +257,12 @@ def main(
     hap_counts = None
     if num_haps:
         hap_counts = np.array([
-            get_num_haps(Path(str(observed_hap).format(**dict(zip(dtypes.keys(), params[idx])))))
+            get_num_haps(get_hap_fname(observed_hap, params[idx]))
             for idx in range(len(params))
         ])
+        # if they're all 1, then there's no reason to depict it
+        if (hap_counts == 1).all():
+            hap_counts = None
 
     if len(dtypes) > 1:
         fig = plot_params(params, ld_vals, "LD with causal hap", hap_counts)
