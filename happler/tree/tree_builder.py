@@ -9,6 +9,7 @@ from haptools.ld import pearson_corr_ld
 from .tree import Tree
 from .variant import Variant
 from .haplotypes import Haplotype
+from .corrector import Corrector, Bonferroni
 from .terminator import Terminator, TTestTerminator
 from .assoc_test import (
     AssocTest,
@@ -55,6 +56,7 @@ class TreeBuilder:
         phenotypes: Phenotypes,
         method: AssocTest = AssocTestSimple(),
         terminator: Terminator = TTestTerminator(),
+        corrector: Corrector = Bonferroni(),
         ld_prune_thresh: float = None,
         log: Logger = None,
     ):
@@ -62,6 +64,7 @@ class TreeBuilder:
         self.phens = phenotypes
         self.method = method
         self.terminator = terminator
+        self.corrector = corrector
         if method.with_bic:
             if isinstance(method, AssocTestSimpleSMTScore):
                 self.results_type = NodeResultsExtraTScore
