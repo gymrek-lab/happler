@@ -95,6 +95,11 @@ class AssocTest(ABC):
     pval_thresh : float, optional
         The threshold of significance
     """
+    def __init__(self, with_bic: bool = False):
+        self.with_bic = with_bic
+        self.results_type = NodeResults
+        if self.with_bic:
+            self.results_type = NodeResultsExtra
 
     def standardize(self, X: npt.NDArray[np.uint8]) -> npt.NDArray[np.float64]:
         """
@@ -143,16 +148,15 @@ class AssocTest(ABC):
 
 
 class AssocTestSimple(AssocTest):
-    def __init__(self, with_bic=False):
-        self.with_bic = with_bic
+    def __init__(self, with_bic: bool = False):
+        super().__init__(with_bic=with_bic)
         self.return_dtype = [
             ("beta", np.float64),
             ("pval", np.float64),
             ("stderr", np.float64),
         ]
-        if with_bic:
+        if self.with_bic:
             self.return_dtype.append(("bic", np.float64))
-        super().__init__()
 
     def bic(self, n, residuals) -> float:
         """
@@ -284,7 +288,7 @@ class AssocTestSimpleSM(AssocTestSimple):
 
 
 class AssocTestSimpleCovariates(AssocTestSimpleSM):
-    def __init__(self, covars: npt.NDArray[np.float64], with_bic=False):
+    def __init__(self, covars: npt.NDArray[np.float64], with_bic: bool = False):
         """
         Implement a subclass of AssocTestSimple with covariates.
 
@@ -307,7 +311,7 @@ class AssocTestSimpleCovariates(AssocTestSimpleSM):
 
 
 class AssocTestSimpleSMTScore(AssocTestSimpleSM):
-    def __init__(self, with_bic=False):
+    def __init__(self, with_bic: bool = False):
         """
         Implement a subclass of AssocTestSimple with covariates.
 
@@ -319,6 +323,9 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
         """
         super().__init__(with_bic=with_bic)
         self.return_dtype.append(("tscore", np.float64))
+        self.results_type = NodeResultsTScore
+        if self.with_bic:
+            self.results_type = NodeResultsExtraTScore
 
     def perform_test(
         self,

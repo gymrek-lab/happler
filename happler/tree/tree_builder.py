@@ -65,15 +65,7 @@ class TreeBuilder:
         self.method = method
         self.terminator = terminator
         self.corrector = corrector
-        if method.with_bic:
-            if isinstance(method, AssocTestSimpleSMTScore):
-                self.results_type = NodeResultsExtraTScore
-            else:
-                self.results_type = NodeResultsExtra
-        elif isinstance(method, AssocTestSimpleSMTScore):
-            self.results_type = NodeResultsTScore
-        else:
-            self.results_type = NodeResults
+        self.results_type = method.results_type
         self.tree = None
         self._split_method = self._find_split_rigid
         split_method = "rigid"
@@ -243,6 +235,7 @@ class TreeBuilder:
                 # step 3: record the best p-value among all the SNPs with this allele
                 best_var_idx = results.data["pval"].argmin()
             node_res = self.results_type.from_np(results.data[best_var_idx])
+            best_res_idx = best_var_idx
             num_tests = len(parent.nodes) + 1
             # step 4: find the index of the best variant within the genotype matrix
             # We need to account for indices that we removed when running transform()
@@ -263,7 +256,7 @@ class TreeBuilder:
                 "Testing variant {} / allele {} with parent_res {} and node_res {}"
                 .format(best_variant.id, allele, parent_res, node_res)
             )
-            if self.terminator.check(parent_res, node_res, num_samps, num_tests):
+            if self.terminator.check(parent_res, node_res, results, best_res_idx, num_samps, num_tests):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res
@@ -335,6 +328,7 @@ class TreeBuilder:
                 best_p_idx, key=lambda a: results[a].data["pval"][best_p_idx[a]]
             )
         best_var_idx = best_p_idx[best_allele]
+        best_res_idx = best_var_idx
         num_tests = len(parent.nodes) + 1
         # step 4: find the index of the best variant within the genotype matrix
         # we need to account for indices that we removed when running transform()
@@ -358,7 +352,7 @@ class TreeBuilder:
                 "Testing variant {} / allele {} with parent_res {} and node_res {}"
                 .format(best_variant.id, allele, parent_res, node_res)
             )
-            if self.terminator.check(parent_res, node_res, num_samps, num_tests):
+            if self.terminator.check(parent_res, node_res, results[allele], best_res_idx, num_samps, num_tests):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res
