@@ -24,7 +24,7 @@ class Terminator(ABC):
     def __init__(
             self,
             thresh: float = 0.05,
-            corrector: Corrector = Bonferroni(),
+            corrector: Corrector = Bonferroni,
             log: Logger = None
         ):
         self.thresh = thresh
@@ -108,7 +108,8 @@ class TTestTerminator(Terminator):
         # correct for multiple hypothesis testing as branching grows
         # For now, we use the Bonferroni correction
         thresh = self.thresh / num_tests
-        pval = self.corrector.correct(pval, num_samps, len(results.data))[best_idx]
+        corrector = self.corrector(thresh=thresh, log=self.log)
+        pval = corrector.correct(pval, num_samps, len(results.data))[best_idx]
         if t_stat is not None:
             t_stat = t_stat[best_idx]
         if np.isnan(pval):

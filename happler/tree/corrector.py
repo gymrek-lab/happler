@@ -71,7 +71,9 @@ class Bonferroni(Corrector):
 
         This class implements the Bonferroni correction
         """
-        return pvals * num_tests
+        pvals = pvals * num_tests
+        pvals[pvals > 1] = 1
+        return pvals
 
 
 class BH(Corrector):

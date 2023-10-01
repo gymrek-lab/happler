@@ -118,9 +118,13 @@ class Tree:
         list[Variant]
             The variants at the sibling nodes
         """
+        try:
+            parent = next(self.graph.predecessors(node_idx))
+        except StopIteration:
+            return {}
         return {
             node: self.graph.nodes[node]
-            for node in self.graph.successors(next(self.graph.predecessors(node_idx)))
+            for node in self.graph.successors(parent)
             if node != node_idx
         }
 
@@ -146,7 +150,7 @@ class Tree:
         return {
             node: self.graph.nodes[node]
             for node, degree in self.graph.out_degree
-            if degree == 0 and from_root(node)
+            if degree == 0 and node != 0 and from_root(node)
         }
 
     def haplotypes(self, root: int = 0) -> list[deque[dict]]:

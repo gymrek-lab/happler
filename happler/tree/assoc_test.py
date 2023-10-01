@@ -83,7 +83,7 @@ class AssocResults:
         It has shape num_variants x num_fields
     """
 
-    data: npt.NDArray[np.float64, np.float64, np.float64]
+    data: npt.NDArray
 
 
 class AssocTest(ABC):

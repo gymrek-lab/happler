@@ -4,10 +4,6 @@ import click
 from pathlib import Path
 from typing import Tuple
 
-from . import tree
-from haptools import data
-from haptools import logging
-
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
@@ -123,6 +119,13 @@ def main():
     help="Any covariates to include in the model (as a PLINK2 .covar) file",
 )
 @click.option(
+    "--corrector",
+    type=click.Choice(["b", "bh"]),
+    default="b",
+    show_default=True,
+    help="Correct p-vals via either bonferroni (b) or benjamini-hochberg (bh)"
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -153,6 +156,7 @@ def run(
     ld_prune_thresh: float = None,
     show_tree: bool = False,
     covars: Path = None,
+    corrector: str = "b",
     output: Path = Path("/dev/stdout"),
     verbosity: str = "INFO",
 ):
@@ -166,6 +170,10 @@ def run(
 
     Ex: happler run tests/data/simple.vcf tests/data/simple.tsv > simple.hap
     """
+    from . import tree
+    from haptools import data
+    from haptools import logging
+
     log = logging.getLogger(name="happler", level=verbosity)
     # handle samples
     if samples and samples_file:
@@ -220,7 +228,7 @@ def run(
         log.warning("Ignoring all but the first trait in the phenotypes file")
         ph.names = ph.names[:1]
         ph.data = ph.data[:, :1]
-    log.info("Running tree builder")
+    log.debug("Setting up tree builder settings")
     if covars:
         cv = data.Covariates(fname=covars, log=log)
         cv.read(samples=gt_samples_set)
@@ -237,7 +245,18 @@ def run(
             test_method = tree.assoc_test.AssocTestSimpleSM(with_bic=True)
         else:
             test_method = tree.assoc_test.AssocTestSimpleSMTScore(with_bic=True)
-    terminator = tree.terminator.TTestTerminator(thresh=threshold, log=log)
+    if corrector == "b":
+        log.debug("Using Bonferroni correction procedure")
+        corrector = tree.corrector.Bonferroni
+    elif corrector == "bh":
+        log.debug("Using Benjamini Hochberg correction procedure")
+        corrector = tree.corrector.BHSM
+    else:
+        corrector = tree.corrector.Bonferroni
+        log.warning("Couldn't interpret correction method. Using Bonferroni...")
+    log.debug(f"Using alpha threshold of {threshold}")
+    terminator = tree.terminator.TTestTerminator(thresh=threshold, corrector=corrector, log=log)
+    log.info("Running tree builder")
     hap_tree = tree.TreeBuilder(
         gt,
         ph,
