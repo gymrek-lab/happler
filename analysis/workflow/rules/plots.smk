@@ -16,6 +16,7 @@ def agg_ld_range_obs(wildcards):
         return expand(
             config["happler_hap"],
             ld=glob_wildcards(Path(checkpoint_output) / "ld_{ld}/haplotype.hap").ld,
+            alpha=config["mode_attrs"]["alpha"],
             beta=config["mode_attrs"]["beta"],
         )
     else:

@@ -12,7 +12,7 @@ rule run:
         gts=config["snp_panel"],
         pts=config["pheno"],
     params:
-        thresh=0.05,
+        thresh=lambda wildcards: 0.05 if "alpha" not in wildcards else wildcards.alpha,
     output:
         hap=out + "/happler.hap",
         dot=out + "/happler.dot",

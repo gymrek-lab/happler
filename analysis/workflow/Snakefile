@@ -59,7 +59,7 @@ if mode in ("snp", "hap", "ld_range"):
             happler_config["snps"] = config["modes"][mode]["alleles"]
         happler_config["causal_gt"] = rules.simulate_transform.output.pgen
     if mode == "ld_range":
-        happler_config["out"] = config["out"] + "/happler/"+mode+"/ld_{ld}/{beta}"
+        happler_config["out"] = config["out"] + "/happler/"+mode+"/ld_{ld}/beta_{beta}/alpha_{alpha}"
 elif "str" == mode:
     pass
 else:

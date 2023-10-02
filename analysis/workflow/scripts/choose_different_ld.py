@@ -165,9 +165,9 @@ def main(
     ):
         out_dir = output_dir / f"ld_{round(combo_ld, 2)}"
         out_dir.mkdir()
-        hps = Haplotypes(out_dir / "haplotype.hap",
-        log=log,
-        haplotype=Haplotype)
+        hps = Haplotypes(
+            out_dir / "haplotype.hap", log=log, haplotype=Haplotype,
+        )
         hps.data = {hp.id: hp}
         hps.write()
 

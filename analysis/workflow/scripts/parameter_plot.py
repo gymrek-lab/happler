@@ -20,7 +20,10 @@ DTYPES = {
     "ld": np.float64,
     "rep": np.uint8,
     "gt": "U5",
+    "alpha": np.float64,
 }
+
+LOG_SCALE = {"alpha",}
 
 
 def get_num_haps(hap: Path, log: Logger = None):
@@ -82,7 +85,11 @@ def get_best_ld(gts: GenotypesVCF, observed_hap: Path, causal_hap: Path, region:
     ])
 
     # return the strongest LD among all haps
-    best_observed_hap_idx = np.abs(observed_ld).argmax()
+    try:
+        best_observed_hap_idx = np.abs(observed_ld).argmax()
+    except ValueError:
+        # this can happen when there weren't any haplotypes output by happler
+        return 0
     return observed_ld[best_observed_hap_idx]
 
 
@@ -102,7 +109,10 @@ def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str, hap_coun
         The number of haplotypes present in each hap file
     """
     also_plot_counts = hap_counts is not None
-    fig, axs = plt.subplots(nrows=len(params.dtype)+1+also_plot_counts, ncols=1, sharex=True)
+    fig, axs = plt.subplots(
+        nrows=len(params.dtype)+1+also_plot_counts, ncols=1,
+        sharex=True, figsize=(len(params)/15, 5),
+    )
     # create a plot for the vals, first
     axs[0].plot(vals, "g-")
     axs[0].set_ylabel(val_title)
@@ -116,8 +126,12 @@ def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str, hap_coun
         axs[1].grid(axis="x")
     # now, plot each of the parameter values on the other axes
     for idx, param in enumerate(params.dtype.names):
+        val_title = param
+        if param in LOG_SCALE:
+            params[param] = -np.log10(params[param])
+            val_title = "-log " + val_title
         axs[idx+1+also_plot_counts].plot(params[param], "-")
-        axs[idx+1+also_plot_counts].set_ylabel(param)
+        axs[idx+1+also_plot_counts].set_ylabel(val_title)
         axs[idx+1+also_plot_counts].grid(axis="x")
     return fig
 
@@ -138,10 +152,14 @@ def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str, h
         The number of haplotypes present in each hap file
     """
     fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
+    val_xlabel = params.dtype.names[0]
+    if val_xlabel in LOG_SCALE:
+        params = -np.log10(params)
+        val_xlabel = "-log " + val_xlabel
     # plot params against vals
     ax.plot(params, vals,  "g-")
-    ax.set_xlabel(params.dtype.names[0])
     ax.set_ylabel(val_title, color="g")
+    ax.set_xlabel(val_xlabel)
     # also plot hap_counts as a second y-axis
     if hap_counts is not None:
         ax = ax.twinx()
@@ -265,9 +283,9 @@ def main(
             hap_counts = None
 
     if len(dtypes) > 1:
-        fig = plot_params(params, ld_vals, "LD with causal hap", hap_counts)
+        fig = plot_params(params, ld_vals, "causal LD", hap_counts)
     elif len(dtypes) == 1:
-        fig = plot_params_simple(params, ld_vals, "LD with causal hap", hap_counts)
+        fig = plot_params_simple(params, ld_vals, "causal LD", hap_counts)
     else:
         raise ValueError("No parameter values found")
 
