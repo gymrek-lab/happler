@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 
-import numpy as np
-from haptools import data
-import numpy.typing as npt
-from happler.tree.assoc_test import AssocTestSimpleCovariates as AssocTest
-
 # COMMAND TO TEST AGAINST PLINK2:
 
 # tests/validate_linreg_methods.py > fake.tsv && \
 # ~/miniconda3/envs/plink2/bin/plink2 --glm omit-ref hide-covar --covar iid-only fake.covar \
 # --pheno iid-only fake.pheno --pfile fake --no-pheno --out fake &>/dev/null && \
 # diff -sy -W 67 <(sort -k1,1 fake.tsv | column -t) <(cut -f3,9,12 fake.bmi.glm.linear | sort -k1,1 | column -t)
+
+
+import numpy as np
+from haptools import data
+import numpy.typing as npt
+from happler.tree.assoc_test import AssocTestSimpleCovariates as AssocTest
 
 sample_size = 100
 num_variants = 5
@@ -45,7 +46,7 @@ pts.write()
 pts = data.Phenotypes(pts.fname)
 pts.read()
 pts.subset(samples=gts.samples, inplace=True)
-# pts.standardize()
+pts.standardize()
 
 cvs = data.Covariates("fake.covar")
 cvs.data = np.random.normal(size=gts.data.shape[0]) * 0.01 + 2

@@ -29,7 +29,7 @@ def find_haps(
     log: Logger,
     min_ld: float,
     max_ld: float,
-    reps: float = 1,
+    reps: int = 1,
     step: float = 0.1,
 ):
     log.info(f"Using min_ld {min_ld}, max_ld {max_ld}, reps {reps}, and step {step}")
