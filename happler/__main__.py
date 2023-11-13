@@ -23,6 +23,20 @@ def main():
 @click.argument("genotypes", type=click.Path(exists=True, path_type=Path))
 @click.argument("phenotypes", type=click.Path(exists=True, path_type=Path))
 @click.option(
+    "--pheno",
+    type=str,
+    default="0",
+    show_default=True,
+    help="Which phenotype from the .pheno file should we use?",
+)
+@click.option(
+    "--pheno-name",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Treat the --pheno argument as a column name instead of an index",
+)
+@click.option(
     "--region",
     type=str,
     default=None,
@@ -147,6 +161,8 @@ def main():
 def run(
     genotypes: Path,
     phenotypes: Path,
+    pheno: str = "0",
+    pheno_name: bool = False,
     region: str = None,
     samples: Tuple[str] = tuple(),
     samples_file: Path = None,
@@ -191,6 +207,25 @@ def run(
         samples = list(samples)
     else:
         samples = None
+
+    log.info("Loading phenotypes")
+    ph = data.Phenotypes(fname=phenotypes, log=log)
+    ph.read(samples=(set(samples) if samples is not None else None))
+    if not pheno_name:
+        try:
+            pheno = int(pheno)
+        except ValueError:
+            log.warning("--pheno cannot be cast to int. Treating as a string, instead")
+        else:
+            pheno = ph.names[pheno]
+    ph.standardize()
+    if samples is not None and len(ph.samples) < len(samples):
+        diff = set(samples) - set(ph.samples)
+        log.error(
+            f"The phenotypes file is missing {len(diff)} samples. Here are the first "
+            f"few: {list(diff)[:5]}"
+        )
+
     # load data
     log.info("Loading genotypes")
     if genotypes.suffix == ".pgen":
@@ -198,8 +233,14 @@ def run(
     else:
         gt = data.GenotypesVCF(fname=genotypes, log=log)
     gt._prephased = phased
-    gt.read(region=region, samples=samples)
+    gt.read(region=region, samples=list(ph.samples))
     num_variants, num_samples = len(gt.variants), len(gt.samples)
+    if samples is not None and len(gt.samples) < len(samples):
+        diff = set(samples) - set(gt.samples)
+        log.error(
+            f"The genotypes file is missing {len(diff)} samples. Here are the first "
+            f"few: {list(diff)[:5]}"
+        )
     gt.check_missing(discard_also=discard_missing)
     removed = num_samples - len(gt.samples)
     if removed:
@@ -215,29 +256,23 @@ def run(
         log.info(f"Ignoring {removed} variants with MAF < {maf}")
     gt.check_phase()
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
-    gt_samples_set = set(gt.samples)
-    log.info("Loading phenotypes")
-    ph = data.Phenotypes(fname=phenotypes, log=log)
-    ph.read(samples=gt_samples_set)
-    ph.standardize()
-    ph.subset(samples=gt.samples, inplace=True)
-    if len(ph.samples) < len(gt.samples):
-        diff = gt_samples_set - set(ph.samples)
-        log.error(
-            f"The phenotypes file is missing {len(diff)} samples. Here are the first "
-            f"few: {list(diff)[:5]}"
-        )
+
+    # subset to just one phenotype
     if len(ph.names) > 1:
         log.warning("Ignoring all but the first trait in the phenotypes file")
         ph.names = ph.names[:1]
         ph.data = ph.data[:, :1]
+    # also reorder and subset samples in Phenotypes to match those in the Genotypes
+    # TODO: use inplace once haptools is updated
+    ph = ph.subset(samples=tuple(gt.samples), names=(pheno,))
+
     log.debug("Setting up tree builder settings")
     if covars:
         cv = data.Covariates(fname=covars, log=log)
-        cv.read(samples=gt_samples_set)
+        cv.read(samples=set(gt.samples))
         cv.subset(samples=gt.samples, inplace=True)
         if len(cv.samples) < len(gt.samples):
-            diff = gt_samples_set - set(ph.samples)
+            diff = set(gt.samples) - set(ph.samples)
             log.error(
                 f"The covariates file is missing {len(diff)} samples. Here are the"
                 f" first few: {list(diff)[:5]}"
