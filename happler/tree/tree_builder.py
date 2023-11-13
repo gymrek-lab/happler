@@ -159,11 +159,24 @@ class TreeBuilder:
             sibs = list(self.tree.siblings(leaf_idx).items())
             if not len(sibs):
                 continue
+            # just use the first sibling for now
+            # TODO: use a for-loop if we allow more than two branches per node
             sib_idx, sibling = sibs[0]
-            if sib_idx in leaves and sibling["results"].pval > leaf["results"].pval:
-                self.log.debug(f"Left leaf {leaf_var.id} unpruned since it is better")
-                # keep it if our p-value is better
-                continue
+            if sib_idx in leaves:
+                sib_p = sibling["results"].pval
+                leaf_p = leaf["results"].pval
+                if sib_p > leaf_p and not np.isclose(sib_p, leaf_p):
+                    self.log.debug(
+                        f"Left leaf {leaf_var.id} unpruned since it has a better pval"
+                    )
+                    # keep it if our p-value is better
+                    continue
+                elif np.isclose(sib_p, leaf_p) and leaf["results"].beta > 0:
+                    self.log.debug(
+                        f"Left leaf {leaf_var.id} unpruned since it's beta is positive"
+                    )
+                    # also if the p-values are the same but our effect size is positive
+                    continue
             # step 3: get the genotypes for the leaf node and its sibling
             leaf_gts = self.gens.data[:, leaf_var.idx, :] == leaf["allele"]
             sibling_gts = (
