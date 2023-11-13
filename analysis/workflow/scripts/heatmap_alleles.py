@@ -11,7 +11,15 @@ import matplotlib.pyplot as plt
 from haptools.data import GenotypesVCF, GenotypesPLINK, Haplotypes, Phenotypes
 
 
-def plot_hapmatrix(hpmt, hap_id, snps):
+CAUSAL_COLOR_KEY = {
+    "blue": "right SNP, right allele",
+    "purple": "right SNP, wrong allele",
+    "red": "observed wrong SNP",
+    "black": "unobserved causal SNP",
+}
+
+
+def plot_hapmatrix(hpmt, hap_id, snps, colors = None):
     """
     Adapted from this script by Shubham Saini
     https://github.com/shubhamsaini/pgc_analysis/blob/master/viz-snp-hap.py
@@ -28,6 +36,10 @@ def plot_hapmatrix(hpmt, hap_id, snps):
     ax.set_yticklabels([])
     ax.set_xticks(np.arange(0, len(snps), 1))
     ax.set_xticklabels(snps)
+    # map between list of indices and list of colors from CAUSAL_COLOR_KEY
+    colors = map(list(CAUSAL_COLOR_KEY.keys()).__getitem__, colors)
+    for xtick, color in zip(ax.get_xticklabels(), colors):
+        xtick.set_color(color)
     ax.set_title("All haplotypes" if hap_id == "ALL" else "Haplotype %s"%hap_id)
     return fig
 
@@ -56,6 +68,17 @@ def plot_hapmatrix(hpmt, hap_id, snps):
     ),
 )
 @click.option(
+    "-c",
+    "--causal",
+    type=click.Path(path_type=Path, exists=True),
+    default=None,
+    show_default=True,
+    help=(
+        "The path to a .hap file containing haplotypes simulated to be causal. "
+        "These will be added to the plot and highlited differently."
+    )
+)
+@click.option(
     "--use-hap-alleles",
     is_flag=True,
     default=False,
@@ -78,7 +101,17 @@ def plot_hapmatrix(hpmt, hap_id, snps):
     show_default=True,
     help="The level of verbosity desired",
 )
-def main(genotypes: Path, haplotypes: Path, phenotypes: Path, region: str = None, hap_id: str = None, use_hap_alleles: bool = False, output: Path = Path("/dev/stdout"), verbosity: str = "INFO"):
+def main(
+    genotypes: Path,
+    haplotypes: Path,
+    phenotypes: Path,
+    region: str = None,
+    hap_id: str = None,
+    causal: Path = None,
+    use_hap_alleles: bool = False,
+    output: Path = Path("/dev/stdout"),
+    verbosity: str = "INFO"
+):
     """
     Create a heatmap plot that visualizes a haplotype from a .hap file
     """
@@ -101,6 +134,32 @@ def main(genotypes: Path, haplotypes: Path, phenotypes: Path, region: str = None
             log.warning("A hap ID wasn't given. Setting --use-hap-alleles to False")
             use_hap_alleles = False
 
+    snp_colors = None
+    if causal is not None:
+        hps_causal = Haplotypes(causal, log=log)
+        hps_causal.read()
+        # if there is more than one haplotype
+        if len(hps_causal.data) != 1:
+            raise ValueError("The causal .hap file must contain only one haplotype")
+        # extract causal alleles
+        causal_hap_id = list(hps_causal.data.keys())[0]
+        causal_hps_vars = {
+            var.id: var.allele
+            for var in hps_causal.data[causal_hap_id].variants
+        }
+        # mark whether observed alleles are correct/incorrect
+        snp_colors = {
+            var_id: (
+                int(allele != causal_hps_vars[var_id])
+                if var_id in causal_hps_vars else 2
+            )
+            for var_id, allele in hps_vars.items()
+        }
+        # add unobserved causal alleles to hps_vars and snp_colors
+        for var_id in (causal_hps_vars.keys() - hps_vars.keys()):
+            hps_vars[var_id] = causal_hps_vars[var_id]
+            snp_colors[var_id] = 3
+
     pts = Phenotypes(phenotypes, log=log)
     pts.read()
 
@@ -116,6 +175,8 @@ def main(genotypes: Path, haplotypes: Path, phenotypes: Path, region: str = None
         for var_idx, var in enumerate(gts.variants):
             # is it the REF or ALT allele?
             allele = var["alleles"][1] == hps_vars[var["id"]]
+            if snp_colors is not None and (snp_colors[var["id"]] == 1):
+                allele = not allele
             # modify the genotype matrix to contain 1s only when the allele is present
             gts.data[:, var_idx] = gts.data[:, var_idx] == allele
             gts.variants[var_idx]["id"] += f":{int(allele)}"
@@ -132,7 +193,9 @@ def main(genotypes: Path, haplotypes: Path, phenotypes: Path, region: str = None
     pts = (pts-pts.min())/(pts.max()-pts.min())
     hpmt = np.append(hpmt, pts[:, np.newaxis], axis=1)
 
-    fig = plot_hapmatrix(hpmt, hap_id, list(gts.variants["id"])+["pheno"])
+    fig = plot_hapmatrix(
+        hpmt, hap_id, list(gts.variants["id"])+["pheno"], snp_colors.values()
+    )
     fig.tight_layout()
     fig.savefig(output)
 
