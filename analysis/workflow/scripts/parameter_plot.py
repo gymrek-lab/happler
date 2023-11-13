@@ -21,6 +21,7 @@ DTYPES = {
     "rep": np.uint8,
     "gt": "U5",
     "alpha": np.float64,
+    "samp": np.uint32,
 }
 
 LOG_SCALE = {"alpha",}
@@ -60,7 +61,7 @@ def get_best_ld(gts: GenotypesVCF, observed_hap: Path, causal_hap: Path, region:
         causal_hap.subset(haplotypes=(causal_id,), inplace=True)
     causal_hap = causal_hap.data[causal_id]
 
-    # load the observed haplotype given by 'observed_id' or just the first hap
+    # load the observed haplotype given by 'observed_id' or just all of the haps
     observed_hap = Haplotypes(observed_hap, log=log)
     observed_hap.read(haplotypes=(set((observed_id,)) if observed_id is not None else None))
 
@@ -93,7 +94,13 @@ def get_best_ld(gts: GenotypesVCF, observed_hap: Path, causal_hap: Path, region:
     return observed_ld[best_observed_hap_idx]
 
 
-def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str, hap_counts: npt.NDArray = None):
+def plot_params(
+        params: npt.NDArray,
+        vals: npt.NDArray,
+        val_title: str,
+        hap_counts: npt.NDArray = None,
+        sign: bool = False
+    ):
     """
     Plot vals against parameter values
 
@@ -107,14 +114,23 @@ def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str, hap_coun
         The name of the value that we are plotting
     hap_counts: npt.NDArray, optional
         The number of haplotypes present in each hap file
+    sign: bool, optional
+        If True, depict positive LD values via a special marker symbol for the point
     """
     also_plot_counts = hap_counts is not None
+    figsize = None
+    if len(params) > 75:
+        figsize = (len(params)/15, 5)
     fig, axs = plt.subplots(
         nrows=len(params.dtype)+1+also_plot_counts, ncols=1,
-        sharex=True, figsize=(len(params)/15, 5),
+        sharex=True, figsize=figsize,
     )
     # create a plot for the vals, first
-    axs[0].plot(vals, "g-")
+    axs[0].plot(np.abs(vals), "g-")
+    if sign:
+        axs[0].scatter(
+            np.squeeze(np.where(vals > 0)), vals[vals > 0], c="g", marker="o",
+        )
     axs[0].set_ylabel(val_title)
     axs[0].set_xticks(range(0, len(vals)))
     axs[0].set_xticklabels([])
@@ -136,7 +152,13 @@ def plot_params(params: npt.NDArray, vals: npt.NDArray, val_title: str, hap_coun
     return fig
 
 
-def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str, hap_counts: npt.NDArray = None):
+def plot_params_simple(
+        params: npt.NDArray,
+        vals: npt.NDArray,
+        val_title: str,
+        hap_counts: npt.NDArray = None,
+        sign: bool = False
+    ):
     """
     Plot vals against only a single column of parameter values
 
@@ -150,6 +172,8 @@ def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str, h
         The name of the value that we are plotting
     hap_counts: npt.NDArray, optional
         The number of haplotypes present in each hap file
+    sign: bool, optional
+        If True, depict positive LD values via a special marker symbol for the point
     """
     fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
     val_xlabel = params.dtype.names[0]
@@ -157,7 +181,11 @@ def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str, h
         params = -np.log10(params)
         val_xlabel = "-log " + val_xlabel
     # plot params against vals
-    ax.plot(params, vals,  "g-")
+    ax.plot(params, np.abs(vals),  "g-")
+    if sign:
+        ax.scatter(
+            params[vals > 0], vals[vals > 0], c="g", marker="o",
+        )
     ax.set_ylabel(val_title, color="g")
     ax.set_xlabel(val_xlabel)
     # also plot hap_counts as a second y-axis
@@ -206,6 +234,13 @@ def plot_params_simple(params: npt.NDArray, vals: npt.NDArray, val_title: str, h
     help="Whether to also depict the total number of haplotypes in the file",
 )
 @click.option(
+    "--sign",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Depict the sign (pos vs neg) of the LD via the shape of the points",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -229,6 +264,7 @@ def main(
     observed_id: str = None,
     causal_id: str = None,
     num_haps: bool = True,
+    sign: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "ERROR"
 ):
@@ -259,7 +295,7 @@ def main(
     get_hap_fname = lambda hap_path, param_set: Path(str(hap_path).format(**dict(zip(dtypes.keys(), param_set))))
 
     # compute LD between the causal hap and the best observed hap across param vals
-    ld_vals = np.abs(np.array([
+    ld_vals = np.array([
         get_best_ld(
             gts,
             get_hap_fname(observed_hap, params[idx]),
@@ -270,7 +306,7 @@ def main(
             log=log
         )
         for idx in range(len(params))
-    ]))
+    ])
 
     hap_counts = None
     if num_haps:
@@ -283,9 +319,9 @@ def main(
             hap_counts = None
 
     if len(dtypes) > 1:
-        fig = plot_params(params, ld_vals, "causal LD", hap_counts)
+        fig = plot_params(params, ld_vals, "causal LD", hap_counts, sign)
     elif len(dtypes) == 1:
-        fig = plot_params_simple(params, ld_vals, "causal LD", hap_counts)
+        fig = plot_params_simple(params, ld_vals, "causal LD", hap_counts, sign)
     else:
         raise ValueError("No parameter values found")
 
