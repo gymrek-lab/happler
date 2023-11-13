@@ -318,6 +318,195 @@ def run(
             dot_file.write(hap_tree.dot())
 
 
+@main.command(context_settings=CONTEXT_SETTINGS)
+@click.argument("genotypes", type=click.Path(exists=True, path_type=Path))
+@click.argument("haplotypes", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--region",
+    type=str,
+    default=None,
+    show_default="all genotypes",
+    help="""
+    The region from which to extract genotypes; ex: 'chr1:1234-34566' or 'chr7'\n
+    For this to work, the VCF must be indexed and the seqname must match!""",
+)
+@click.option(
+    "-s",
+    "--sample",
+    "samples",
+    type=str,
+    multiple=True,
+    show_default="all samples",
+    help=(
+        "A list of the samples to subset from the genotypes file (ex: '-s sample1 -s"
+        " sample2')"
+    ),
+)
+@click.option(
+    "-S",
+    "--samples-file",
+    type=click.File("r"),
+    show_default="all samples",
+    help=(
+        "A single column txt file containing a list of the samples (one per line) to"
+        " subset from the genotypes file"
+    ),
+)
+@click.option(
+    "--discard-multiallelic",
+    is_flag=True,
+    show_default="do not discard multi-allelic variants",
+    help="Whether to discard multi-allelic variants or just complain about them.",
+)
+@click.option(
+    "--discard-missing",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Ignore any samples that are missing genotypes for the required variants",
+)
+@click.option(
+    "-c",
+    "--chunk-size",
+    type=int,
+    default=None,
+    show_default="all variants",
+    help="If using a PGEN file, read genotypes in chunks of X variants; reduces memory",
+)
+@click.option(
+    "--maf",
+    type=float,
+    default=None,
+    show_default="no filtering",
+    help="Ignore variants with a MAF below this threshold",
+)
+@click.option(
+    "-i",
+    "--hap-id",
+    type=str,
+    default=None,
+    show_default="the first haplotype",
+    help="Which haplotype to use from the .hap file",
+)
+@click.option(
+    "-a",
+    "--allele",
+    type=int,
+    default=0,
+    show_default=True,
+    help="The allele of the next causal SNP",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(path_type=Path),
+    default=Path("/dev/stdout"),
+    show_default="stdout",
+    help="A transformed genotypes file",
+)
+@click.option(
+    "-v",
+    "--verbosity",
+    type=click.Choice(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
+    default="INFO",
+    show_default=True,
+    help="The level of verbosity desired",
+)
+def transform(
+    genotypes: Path,
+    haplotypes: Path,
+    region: str = None,
+    samples: Tuple[str] = tuple(),
+    samples_file: Path = None,
+    discard_multiallelic: bool = False,
+    discard_missing: bool = False,
+    chunk_size: int = None,
+    maf: float = None,
+    hap_id: str = None,
+    allele: int = 0,
+    output: Path = Path("/dev/stdout"),
+    verbosity: str = "INFO",
+):
+    """
+    Transform a genotype matrix via a haplotype
+
+    GENOTYPES must be formatted as a VCF or PGEN file
+
+    HAPLOTYPES must be formatted as a .hap file
+
+    Ex: happler transform tests/data/simple.vcf tests/data/simple.hap > simple.vcf
+    """
+    from . import tree
+    import numpy as np
+    from haptools import data
+    from haptools import logging
+
+    log = logging.getLogger(name="happler.transform", level=verbosity)
+    # handle samples
+    if samples and samples_file:
+        raise click.UsageError(
+            "You may only use one of --sample or --samples-file but not both."
+        )
+    if samples_file:
+        with samples_file as samps_file:
+            samples = samps_file.read().splitlines()
+    elif samples:
+        # needs to be converted from tuple to list
+        samples = list(samples)
+    else:
+        samples = None
+    # load data
+    log.info("Loading genotypes")
+    if genotypes.suffix == ".pgen":
+        gt = data.GenotypesPLINK(fname=genotypes, log=log, chunk_size=chunk_size)
+    else:
+        gt = data.GenotypesVCF(fname=genotypes, log=log)
+    gt.read(region=region, samples=samples)
+    num_variants, num_samples = len(gt.variants), len(gt.samples)
+    gt.check_missing(discard_also=discard_missing)
+    removed = num_samples - len(gt.samples)
+    if removed:
+        log.info(f"Ignoring {removed} samples that are missing variants")
+    gt.check_biallelic(discard_also=discard_multiallelic)
+    removed = num_variants - len(gt.variants)
+    if removed:
+        log.info(f"Ignoring {removed} multiallelic variants")
+        num_variants = len(gt.variants)
+    gt.check_maf(threshold=maf, discard_also=True)
+    removed = num_variants - len(gt.variants)
+    if maf is not None:
+        log.info(f"Ignoring {removed} variants with MAF < {maf}")
+    gt.check_phase()
+    log.info("There are {} samples and {} variants".format(*gt.data.shape))
+
+    hp = data.Haplotypes(haplotypes, log=log)
+    hp.read(haplotypes=(set((hap_id,)) if hap_id is not None else None))
+    if hap_id is None:
+        hap_id = list(hp.data.keys())[0]
+        hp.subset(haplotypes=(hap_id,))
+
+    tsfm = hp.data[hap_id].transform(gt)
+
+    variants = {var.id: var.allele for hap in hp.data for var in hp.data[hap_id].variants}
+    idxs = np.where(np.isin(gt.variants["id"], tuple(variants.keys())))[0]
+    variants = tuple(
+        (tree.Variant.from_np(gt.variants, i), al == gt.variants[i]["alleles"][0])
+        for i, al in zip(idxs, variants.values())
+    )
+
+    if output.suffix == ".pgen":
+        hp_gt = data.GenotypesPLINK(fname=output, log=log, chunk_size=chunk_size)
+    else:
+        hp_gt = data.GenotypesVCF(fname=output, log=log)
+
+    hp = tree.Haplotype(variants, tsfm)
+    hp_gt.variants = np.delete(gt.variants, hp.node_indices)
+    hp_gt.samples = gt.samples
+    hp_gt.data = hp.transform(gt, allele)
+
+    hp_gt.write()
+
+
 if __name__ == "__main__":
     # run the CLI if someone tries 'python -m happler' on the command line
     main(prog_name="happler")
