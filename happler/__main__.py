@@ -120,10 +120,13 @@ def main():
 )
 @click.option(
     "--corrector",
-    type=click.Choice(["b", "bh"]),
-    default="b",
+    type=click.Choice(["n", "b", "bh"]),
+    default="n",
     show_default=True,
-    help="Correct p-vals via either bonferroni (b) or benjamini-hochberg (bh)"
+    help=(
+        "Correct p-vals via either bonferroni (b), benjamini-hochberg (bh), or "
+        "no correction (n)"
+    ),
 )
 @click.option(
     "-o",
@@ -156,7 +159,7 @@ def run(
     ld_prune_thresh: float = None,
     show_tree: bool = False,
     covars: Path = None,
-    corrector: str = "b",
+    corrector: str = "n",
     output: Path = Path("/dev/stdout"),
     verbosity: str = "INFO",
 ):
@@ -252,8 +255,11 @@ def run(
         log.debug("Using Benjamini Hochberg correction procedure")
         corrector = tree.corrector.BHSM
     else:
-        corrector = tree.corrector.Bonferroni
-        log.warning("Couldn't interpret correction method. Using Bonferroni...")
+        if corrector == "n":
+            log.debug("Disabling corrections")
+        else:
+            log.warning("Couldn't interpret correction method. Disabling corrections")
+        corrector = None
     log.debug(f"Using alpha threshold of {threshold}")
     terminator = tree.terminator.TTestTerminator(thresh=threshold, corrector=corrector, log=log)
     log.info("Running tree builder")

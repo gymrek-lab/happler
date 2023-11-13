@@ -106,10 +106,12 @@ class TTestTerminator(Terminator):
             # parent_res = None when the parent node is the root node
             pval = results.data["pval"]
         # correct for multiple hypothesis testing as branching grows
-        # For now, we use the Bonferroni correction
         thresh = self.thresh / num_tests
-        corrector = self.corrector(thresh=thresh, log=self.log)
-        pval = corrector.correct(pval, num_samps, len(results.data))[best_idx]
+        if self.corrector is not None:
+            corrector = self.corrector(thresh=thresh, log=self.log)
+            pval = corrector.correct(pval, num_samps, len(results.data))[best_idx]
+        else:
+            pval = pval[best_idx]
         if t_stat is not None:
             t_stat = t_stat[best_idx]
         if np.isnan(pval):
@@ -162,8 +164,11 @@ class BICTerminator(Terminator):
             # parent_res = None when the parent node is the root node
             pval = results.data["pval"]
             # correct for multiple hypothesis testing
-            # For now, we use the Bonferroni correction
-            pval = self.corrector.correct(pval, num_samps, len(results.data))[best_idx]
+            if self.corrector is not None:
+                # I dunno why, but this needs None as the first arg for some reason
+                pval = self.corrector.correct(None, pval, num_samps, len(results.data))[best_idx]
+            else:
+                pval = pval[best_idx]
             if pval >= (self.thresh / num_tests):
                 self.log.debug("Terminated with p-value {}".format(pval))
                 return True
