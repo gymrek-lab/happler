@@ -104,19 +104,9 @@ def main(
         "#CHROM": "chromosome",
         "POS": "pos",
         "ID": "id",
-        "REF": "ref",
-        "ALT": "alt",
-        "A1": "allele",
-        "TEST": "test",
-        "OBS_CT": "num_samps",
-        "BETA": "beta",
-        "SE": "se",
-        "T_STAT": "tstat",
         "P": "pval",
-        "ERRCODE": "error",
     }
-    keep_cols = ["chromosome", "pos", "id", "beta", "se", "pval"]
-
+    keep_cols = ["#CHROM", "POS", "ID", "P"]
     # create the plot
     fig, ax = plt.subplots(
         1, len(linear), sharex=True, sharey=True, constrained_layout=True,
@@ -137,9 +127,9 @@ def main(
             linear_fname,
             sep="\t",
             header=0,
-            names=plink_cols.values(),
             usecols=keep_cols,
-        ).sort_values("pos")
+        ).rename(columns=plink_cols)
+        df = df.sort_values("pos")
         pos_range = max(df["pos"]) - min(df["pos"])
         label_distance = pos_range/17
         # replace NaN with inf
@@ -234,7 +224,7 @@ def main(
         fig.supylabel('$-log_{10} P-value$', fontsize=AXIS_FONTSIZE)
     else:
         fig.supxlabel('Chromosomal Position')
-        fig.supxlabel('$-log_{10} P-value$')
+        fig.supylabel('$-log_{10} P-value$')
     if small:
         fig.set_size_inches(2.65, 2.2)
         plt.savefig(output, bbox_inches="tight", pad_inches=0.03)
