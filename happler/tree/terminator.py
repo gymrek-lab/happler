@@ -105,10 +105,8 @@ class TTestTerminator(Terminator):
         else:
             # parent_res = None when the parent node is the root node
             pval = results.data["pval"]
-        # correct for multiple hypothesis testing as branching grows
-        thresh = self.thresh / num_tests
         if self.corrector is not None:
-            corrector = self.corrector(thresh=thresh, log=self.log)
+            corrector = self.corrector(thresh=self.thresh, log=self.log)
             pval = corrector.correct(pval, num_samps, len(results.data))[best_idx]
         else:
             pval = pval[best_idx]
@@ -118,13 +116,13 @@ class TTestTerminator(Terminator):
             raise ValueError(
                 "Encountered an nan p-value! Check your data for irregularities."
             )
-        if pval >= thresh:
+        if pval >= self.thresh:
             self.log.debug(
-                f"Terminated with t-stat {t_stat} and p-value {pval} >= {thresh}"
+                f"Terminated with t-stat {t_stat} and p-value {pval} >= {self.thresh}"
             )
             return True
         self.log.debug(
-            f"Significant with t-stat {t_stat} and p-value {pval} < {thresh}"
+            f"Significant with t-stat {t_stat} and p-value {pval} < {self.thresh}"
         )
         return False
 
@@ -169,7 +167,7 @@ class BICTerminator(Terminator):
                 pval = self.corrector.correct(None, pval, num_samps, len(results.data))[best_idx]
             else:
                 pval = pval[best_idx]
-            if pval >= (self.thresh / num_tests):
+            if pval >= self.thresh:
                 self.log.debug("Terminated with p-value {}".format(pval))
                 return True
         self.log.debug(
