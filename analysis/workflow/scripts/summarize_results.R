@@ -31,6 +31,7 @@ if (nchar(snakemake@params[["causal_gt"]]) > 0) {
     # also load the positions of each of the variants
     pos = c(pos, readPVAR(snakemake@params[["causal_gt"]]))
 }
+write(paste("Loaded", length(pos), "positions"), stderr())
 
 if ("finemap" %in% names(snakemake@input)) {
     finemap_results = readRDS(snakemake@input[["finemap"]])[[1]]
@@ -50,14 +51,14 @@ if (hap) {
     write("Parsing hap files", stderr())
     while(TRUE) {
         line = readLines(happler_haplotype, 1)
-        if (grepl("^H", line)) break
+        if (grepl("^H\\t", line)) break
     }
     # extract the start and end of the haplotype
     happler_hap = as.integer(strsplit(line, "\t")[[1]][c(3,4)])
     names(happler_hap) = c("start", "end")
     while(TRUE) {
         line = readLines(causal_haplotype, 1)
-        if (grepl("^H", line)) break
+        if (grepl("^H\\t", line)) break
     }
     # extract the start, end, and ID of the haplotype
     causal_hap = as.integer(strsplit(line, "\t")[[1]][c(3,4)])
@@ -83,6 +84,7 @@ write("Handling causal variable", stderr())
 b = rep(0, ncol(X))
 names(b) = colnames(X)
 if (exclude_causal) {
+    write("Excluding causal variable", stderr())
     b = b[!(names(b) %in% c(causal_variant))]
     pos = pos[!(names(pos) %in% c(causal_variant))]
     if (hap) {
@@ -113,12 +115,15 @@ pip_plot_data = function(pips, X, b, pos, susie_cs=NULL) {
     } else {
         causal_var = X[,causal_var[1]]
     }
+    ld_causal = as.vector(cor(causal_var, X))^2
     stopifnot(names(b) == names(pos))
+    stopifnot(names(b) == names(pips))
+    stopifnot(length(b) == length(pos))
     data = data.frame(
         pip = pips,
         b = as.character(b),
         pos = pos,
-        ld_causal = as.vector(cor(causal_var, X))^2
+        ld_causal = ld_causal
     )
     if (!is.null(susie_cs)) {
         data$cs = as.integer((names(b) %in% susie_cs))*2
@@ -154,7 +159,7 @@ pip_plot_haps = function(pips, X, b, pos, haplotypes, susie_cs=NULL) {
     # but first, get the data we need for the plot
     data = pip_plot_data(pips, X, b, pos, susie_cs)
     # extract the haplotypes to another data frame
-    data_hap = cbind(data[grepl(".2", rownames(data), fixed=T),], haplotypes)
+    data_hap = cbind(data[grepl("^H\\d+$", rownames(data)),], haplotypes)
     data_hap$color = c("black", "red")[as.integer(data_hap$b)+1]
     # remove the haps from the data
     data = data[!(row.names(data) %in% rownames(data_hap)),]
