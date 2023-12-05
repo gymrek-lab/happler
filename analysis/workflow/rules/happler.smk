@@ -59,7 +59,7 @@ rule transform:
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
     params:
-        hap_id="H1",
+        hap_id="H0",
     output:
         pgen=temp(out + "/happler.pgen"),
         pvar=temp(out + "/happler.pvar"),

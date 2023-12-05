@@ -30,7 +30,7 @@ checkpoint create_hap_ld_range:
         min_af = config["modes"]["ld_range"]["min_af"],
         max_af = config["modes"]["ld_range"]["max_af"],
     output:
-        hap=directory(out)
+        hap=directory(out + "/create_ld_range")
     resources:
         runtime="0:05:00"
     log:
@@ -74,9 +74,9 @@ if mode == "ld_range":
     transform_input = rules.create_hap_ld_range.output.hap + "/ld_{ld}/haplotype.hap"
 
 if mode == "ld_range":
-    out += "/ld_{ld}"
-    logs += "/ld_{ld}"
-    bench += "/ld_{ld}"
+    out += "/pheno/ld_{ld}"
+    logs += "/pheno/ld_{ld}"
+    bench += "/pheno/ld_{ld}"
 
 rule transform:
     """ use the hap file to create a pgen of the haplotype """

@@ -71,22 +71,22 @@ module happler:
 use rule * from happler as happler_*
 merged_happler = rules.happler_merge.output.pgen
 
-if mode in ("hap", "str"):
+if mode in ("hap", "str", "ld_range"):
     finemappers_config = {
         "pheno": rules.simulate_simphenotype.output.pheno,
         "out": config["out"] + "/finemappers/"+mode+"/{beta}",
         "snp_panel": config["gts_snp_panel"],
     }
-    if mode == "hap":
+    if mode in ("hap", "ld_range"):
         finemappers_config["causal_gt"] = rules.simulate_transform.output.pgen
+        if mode == "ld_range":
+            finemappers_config["out"] = config["out"] + "/finemappers/"+mode+"/ld_{ld}/beta_{beta}/alpha_{alpha}"
     else:
         raise ValueError("Not yet implemented operating mode 'str' in config")
     module finemappers:
         snakefile: "rules/finemappers.smk"
         config: finemappers_config
     use rule * from finemappers as finemappers_*
-elif "ld_range" == mode:
-    pass
 else:
     raise ValueError(f"Unsupported operating mode '{mode}' in config")
 

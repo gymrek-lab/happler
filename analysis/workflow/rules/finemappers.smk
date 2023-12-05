@@ -16,7 +16,7 @@ rule susie:
         phen=config["pheno"],
     params:
         outdir=lambda wildcards, output: Path(output.susie).parent,
-        exclude_causal=lambda wildcards: config["causal_gt"] if \
+        exclude_causal=lambda wildcards: expand(config["causal_gt"], **wildcards)[0] if \
             int(exclude_causal[wildcards.causal]) else "NULL",
     output:
         susie=out + "/{causal}clude/susie.rds",
@@ -40,7 +40,7 @@ rule finemap:
         phen=config["pheno"],
     params:
         outdir=lambda wildcards, output: Path(output.finemap).parent,
-        exclude_causal=lambda wildcards: config["causal_gt"] if \
+        exclude_causal=lambda wildcards: expand(config["causal_gt"], **wildcards)[0] if \
             not int(exclude_causal[wildcards.causal]) else "NULL",
     output:
         sumstats=temp(out + "/{causal}clude/sumstats.rds"),
