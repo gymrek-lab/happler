@@ -17,7 +17,7 @@ rule run:
         hap=out + "/happler.hap",
         dot=out + "/happler.dot",
     resources:
-        runtime="0:30:00",
+        runtime_min=30,
         queue="hotel",
     threads: 6
     log:
@@ -41,7 +41,7 @@ rule tree:
     output:
         png=out + "/happler.png",
     resources:
-        runtime="0:04:00",
+        runtime_min=4,
     log:
         logs + "/tree",
     benchmark:
@@ -65,7 +65,7 @@ rule transform:
         pvar=temp(out + "/happler.pvar"),
         psam=temp(out + "/happler.psam"),
     resources:
-        runtime="0:04:00"
+        runtime_min=4,
     log:
         logs + "/transform",
     benchmark:
@@ -90,7 +90,7 @@ rule merge:
         pvar=out + "/merged.pvar",
         psam=out + "/merged.psam",
     resources:
-        runtime="0:04:00"
+        runtime_min=4,
     log:
         logs + "/merge",
     benchmark:
@@ -141,6 +141,8 @@ rule results:
     output:
         susie_pdf = out + "/susie.pdf",
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
+    resources:
+        runtime_min=5,
     log:
         logs + "/results",
     conda:
@@ -163,7 +165,7 @@ rule gwas:
         log = temp(out + "/hap.log"),
         linear = out + "/hap.hap.glm.linear",
     resources:
-        runtime="0:10:00",
+        runtime_min=10,
     log:
         logs + "/gwas",
     benchmark:
@@ -189,7 +191,7 @@ rule manhattan:
     output:
         png = out + "/manhattan.pdf",
     resources:
-        runtime="0:05:00"
+        runtime_min=5,
     log:
         logs + "/manhattan",
     benchmark:

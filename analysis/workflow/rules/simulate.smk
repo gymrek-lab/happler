@@ -32,7 +32,7 @@ checkpoint create_hap_ld_range:
     output:
         hap=directory(out + "/create_ld_range")
     resources:
-        runtime="0:05:00"
+        runtime_min=5,
     log:
         logs + "/create_hap_ld_range",
     benchmark:
@@ -59,7 +59,7 @@ rule create_hap:
     output:
         hap=out + "/haplotype.hap"
     resources:
-        runtime="0:05:00"
+        runtime_min=5,
     log:
         logs + "/create_hap",
     benchmark:
@@ -90,7 +90,7 @@ rule transform:
         pvar=temp(out + "/transform.pvar"),
         psam=temp(out + "/transform.psam"),
     resources:
-        runtime="0:05:00"
+        runtime_min=5,
     log:
         logs + "/transform",
     benchmark:
@@ -113,7 +113,7 @@ rule simphenotype:
     output:
         pheno=out + "/{beta}.pheno",
     resources:
-        runtime="0:05:00"
+        runtime_min=5,
     log:
         logs + "/{beta}/simphenotype",
     benchmark:

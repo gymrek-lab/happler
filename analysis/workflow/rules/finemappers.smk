@@ -21,7 +21,7 @@ rule susie:
     output:
         susie=out + "/{causal}clude/susie.rds",
     resources:
-        runtime="0:15:00",
+        runtime_min=15,
         queue="hotel",
     log:
         logs + "/{causal}clude/susie",
@@ -46,7 +46,7 @@ rule finemap:
         sumstats=temp(out + "/{causal}clude/sumstats.rds"),
         finemap=out + "/{causal}clude/finemap.rds",
     resources:
-        runtime="0:45:00",
+        runtime_min=45,
         queue="hotel",
     log:
         logs + "/{causal}clude/finemap",
@@ -73,7 +73,7 @@ rule results:
         finemap_pdf= out + "/{causal}clude/finemap.pdf",
         susie_pdf= out + "/{causal}clude/susie.pdf",
     resources:
-        runtime="1:00:00",
+        runtime_min=60,
         queue="hotel",
         # susie_eff_pdf=temp( out + "/{causal}clude/susie_eff.pdf"),
     log:

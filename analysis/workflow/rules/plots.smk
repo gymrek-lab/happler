@@ -50,7 +50,7 @@ rule params:
     output:
         png=out + "/happler_params.png",
     resources:
-        runtime="0:10:00",
+        runtime_min=10,
     log:
         logs + "/plot_params",
     benchmark:

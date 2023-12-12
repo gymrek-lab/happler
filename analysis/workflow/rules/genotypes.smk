@@ -33,7 +33,7 @@ rule plink2vcf:
         bcf_idx=out + "/unphased.bcf.csi",
         log=temp(out + "/unphased.log"),
     resources:
-        runtime="0:20:00"
+        runtime_min=20,
     log:
         logs + "/plink2vcf"
     benchmark:
@@ -67,7 +67,7 @@ rule phase_gt:
         phased=out + "/phased.bcf",
         phased_idx=out + "/phased.bcf.csi",
     resources:
-        runtime="4:00:00"
+        runtime_min=60*4,
     threads: 8
     log:
         logs + "/phase_gt"
@@ -93,6 +93,8 @@ rule keep_samps:
         samp=lambda wildcards: config["exclude_samples"],
     output:
         samples=out+"/samples.tsv"
+    resources:
+        runtime_min=3,
     log:
         logs+"/keep_samps"
     conda:
@@ -119,7 +121,7 @@ rule vcf2plink:
         psam=out+"/snps.psam",
         log=temp(out+"/snps.log"),
     resources:
-        runtime="0:03:00"
+        runtime_min=3,
     log:
         logs + "/vcf2plink",
     benchmark:
@@ -142,7 +144,7 @@ rule subset_str:
         vcf=out+"/strs.bcf",
         vcf_idx=out+"/strs.bcf.csi",
     resources:
-        runtime="0:30:00"
+        runtime_min=30,
     log:
         logs + "/subset_str",
     benchmark:
