@@ -12,6 +12,7 @@ dist/
 analysis/data
 analysis/out
 analysis/log
+analysis/Rplots.pdf
 .snakemake
 .ipynb_checkpoints
 # vscode
