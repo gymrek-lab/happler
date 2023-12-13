@@ -36,7 +36,6 @@ checkpoint create_hap_ld_range:
         min_af = config["modes"]["ld_range"]["min_af"],
         max_af = config["modes"]["ld_range"]["max_af"],
         out = lambda wildcards: hap_ld_range_output,
-        seed = 12345,
     output:
         hap=directory(out + "/create_ld_range")
     resources:

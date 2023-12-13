@@ -39,7 +39,7 @@ fi
 # check: are we being executed from within qsub?
 if [ "$ENVIRONMENT" = "BATCH" ]; then
     snakemake \
-    --cluster "qsub -d . -V -q {resources.queue} -l walltime={resources.runtime} -l nodes=1:ppn={threads} -j oe -o /dev/null -W group_list=gymreklab-group -A gymreklab-group " \
+    --cluster "qsub -d . -V -q {resources.queue} -l walltime='00:{resources.runtime_min}:00' -l nodes=1:ppn={threads} -j oe -o /dev/null -W group_list=gymreklab-group -A gymreklab-group " \
     --cluster-cancel "qdel {cluster.jobid}" \
     --default-resources 'runtime_min=30' 'queue="condo"' \
     --latency-wait 60 \

@@ -88,11 +88,11 @@ def merge_hps_input(wildcards):
         return rules.transform.output
     else:
         if exclude_obs[wildcards.ex]:
-            # exclude the causal hap (and use the random hap, instead)
-            return config["random"]
-        else:
-            # include the causal hap
+            # exclude the random hap (and use the causal hap, instead)
             return config["causal_gt"]
+        else:
+            # include the random hap
+            return config["random"]
 
 
 rule merge:
@@ -152,8 +152,8 @@ def results_happler_hap_input(wildcards):
             return []
         return rules.run.output.hap
     elif exclude_obs[wildcards.ex]:
-        return config["hap_file"]
-    return config["random_hap"]
+        return expand(config["hap_file"], **wildcards)
+    return expand(config["random_hap"], **wildcards)
 
 
 rule results:
@@ -169,7 +169,7 @@ rule results:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         exclude_causal=lambda wildcards: 0,
         causal_hap=lambda wildcards: (
-            config["hap_file"] if config["random"] is not None or not exclude_obs[wildcards.ex] else ""
+            expand(config["hap_file"], **wildcards) if config["random"] is not None or not exclude_obs[wildcards.ex] else ""
         ),
         causal_gt=config["causal_gt"].pgen,
     output:
