@@ -92,8 +92,9 @@ b = rep(0, ncol(X))
 names(b) = colnames(X)
 if (exclude_causal) {
     write("Excluding causal variable", stderr())
-    b = b[!(names(b) %in% c(causal_variant))]
-    pos = pos[!(names(pos) %in% c(causal_variant))]
+    causal_var_idx = which.max(names(b) %in% c(causal_variant))
+    b = b[-causal_var_idx]
+    pos = pos[-causal_var_idx]
     if (hap) {
         haplotypes = t(data.frame(haplotypes[c(2),]))
         stopifnot(nrow(haplotypes) == 1)
@@ -119,8 +120,9 @@ pip_plot_data = function(pips, X, b, pos, susie_cs=NULL) {
     causal_var = names(b[b == 1])
     if (length(causal_var) == 0) {
         causal_var = X[,causal_variant]
-        X = X[,!(colnames(X) %in% c(causal_variant))]
+        X = X[,-which.max(colnames(X) %in% c(causal_variant))]
     } else {
+        # TODO: make sure this only outputs a single row?
         causal_var = X[,causal_var[1]]
     }
     ld_causal = as.vector(cor(causal_var, X))^2
