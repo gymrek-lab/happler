@@ -6,6 +6,11 @@ logs = out + "/logs"
 bench = out + "/bench"
 
 
+# whether to include the happler haplotype ("in") or no haplotypes ("ex")
+exclude_obs = {"in": 0, "ex": 1}
+# or, if config["random"] is not None, this denotes
+# whether to include a random haplotype ("in") or the causal haplotype ("ex")
+
 rule run:
     """ execute happler! """
     input:
@@ -77,24 +82,37 @@ rule transform:
         "{input.hap} &>{log}"
 
 
+def merge_hps_input(wildcards):
+    if config["random"] is None:
+        # include the hap that happler found
+        return rules.transform.output
+    else:
+        if exclude_obs[wildcards.ex]:
+            # exclude the causal hap (and use the random hap, instead)
+            return config["random"]
+        else:
+            # include the causal hap
+            return config["causal_gt"]
+
+
 rule merge:
     input:
         gts=config["snp_panel"],
         gts_pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         gts_psam=Path(config["snp_panel"]).with_suffix(".psam"),
-        hps=rules.transform.output.pgen,
-        hps_pvar=rules.transform.output.pvar,
-        hps_psam=rules.transform.output.psam,
+        hps=lambda wildcards: merge_hps_input(wildcards).pgen,
+        hps_pvar=lambda wildcards: merge_hps_input(wildcards).pvar,
+        hps_psam=lambda wildcards: merge_hps_input(wildcards).psam,
     output:
-        pgen=out + "/merged.pgen",
-        pvar=out + "/merged.pvar",
-        psam=out + "/merged.psam",
+        pgen=out + "/{ex}clude/merged.pgen",
+        pvar=out + "/{ex}clude/merged.pvar",
+        psam=out + "/{ex}clude/merged.psam",
     resources:
         runtime_min=4,
     log:
-        logs + "/merge",
+        logs + "/{ex}clude/merge",
     benchmark:
-        bench + "/merge",
+        bench + "/{ex}clude/merge",
     conda:
         "happler"
     shell:
@@ -104,24 +122,38 @@ rule merge:
 rule finemapper:
     """ execute SuSiE using the haplotypes from happler """
     input:
-        gt=rules.merge.output.pgen,
+        gt=lambda wildcards: (
+            rules.transform.input
+            if (exclude_obs[wildcards.ex] and config["random"] is None) else
+            rules.merge.output
+        ).pgen,
         phen=config["pheno"],
     params:
         outdir=lambda wildcards, output: Path(output.susie).parent,
         exclude_causal="NULL",
     output:
-        susie=out + "/susie.rds",
+        susie=out + "/{ex}clude/susie.rds",
     resources:
-        runtime="1:15:00",
+        runtime_min=75,
         queue="hotel",
     log:
-        logs + "/finemapper",
+        logs + "/{ex}clude/finemapper",
     benchmark:
-        bench + "/finemapper",
+        bench + "/{ex}clude/finemapper",
     conda:
         "../envs/susie.yml"
     shell:
         "workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
+
+
+def results_happler_hap_input(wildcards):
+    if config["random"] is None:
+        if exclude_obs[wildcards.ex]:
+            return []
+        return rules.run.output.hap
+    elif exclude_obs[wildcards.ex]:
+        return config["hap_file"]
+    return config["random_hap"]
 
 
 rule results:
@@ -132,19 +164,23 @@ rule results:
     input:
         gt=rules.finemapper.input.gt,
         susie=rules.finemapper.output.susie,
-        happler_hap=rules.run.output.hap,
+        happler_hap=results_happler_hap_input,
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         exclude_causal=lambda wildcards: 0,
-        causal_hap=config["hap_file"],
-        causal_gt=config["causal_gt"],
+        causal_hap=lambda wildcards: (
+            config["hap_file"] if config["random"] is not None or not exclude_obs[wildcards.ex] else ""
+        ),
+        causal_gt=config["causal_gt"].pgen,
     output:
-        susie_pdf = out + "/susie.pdf",
+        susie_pdf = out + "/{ex}clude/susie.pdf",
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
     resources:
         runtime_min=5,
     log:
-        logs + "/results",
+        logs + "/{ex}clude/results",
+    benchmark:
+        bench + "/{ex}clude/results",
     conda:
         "../envs/susie.yml"
     script:

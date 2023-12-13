@@ -39,12 +39,20 @@ if check_config("phase_map") or check_config("exclude_samples") or not config["s
 else:
     config["gts_snp_panel"] = config["snp_panel"]
 config["gts_str_panel"] = rules.genotypes_subset_str.output.vcf
-
+config["random"] = False
 
 module simulate:
     snakefile: "rules/simulate.smk"
     config: config
 use rule * from simulate as simulate_*
+
+if mode == "ld_range" and config["modes"][mode]["random"]:
+    config["random"] = True
+    module simulate_random:
+        snakefile: "rules/simulate.smk"
+        config: config
+    use rule * from simulate_random as simulate_random_*
+del config["random"]
 
 if mode in ("snp", "hap", "ld_range"):
     happler_config = {
@@ -52,12 +60,13 @@ if mode in ("snp", "hap", "ld_range"):
         "hap_file": rules.simulate_transform.input.hap,
         "snp_panel": config["gts_snp_panel"],
         "out": config["out"] + "/happler/"+mode+"/{beta}",
+        "random": None,
     }
     if mode in ("hap", "ld_range"):
         happler_config["snps"] = []
         if mode == "hap":
             happler_config["snps"] = config["modes"][mode]["alleles"]
-        happler_config["causal_gt"] = rules.simulate_transform.output.pgen
+        happler_config["causal_gt"] = rules.simulate_transform.output
     if mode == "ld_range":
         happler_config["out"] = config["out"] + "/happler/"+mode+"/ld_{ld}/beta_{beta}/alpha_{alpha}"
 elif "str" == mode:
@@ -70,6 +79,15 @@ module happler:
     config: happler_config
 use rule * from happler as happler_*
 merged_happler = rules.happler_merge.output.pgen
+
+if mode == "ld_range" and config["modes"][mode]["random"]:
+    happler_config["random"] = rules.simulate_random_transform.output
+    happler_config["random_hap"] = rules.simulate_random_transform.input.hap
+    happler_config["out"] = config["out"] + "/happler/"+mode+"/random/ld_{ld}/beta_{beta}/alpha_{alpha}"
+    module happler_random:
+        snakefile: "rules/happler.smk"
+        config: happler_config
+    use rule * from happler_random as happler_random_*
 
 if mode in ("hap", "str", "ld_range"):
     finemappers_config = {
@@ -113,7 +131,7 @@ rule all:
                 rules.happler_tree.output.png,
                 rules.happler_manhattan.output.png,
                 rules.finemappers_results.output.susie_pdf,
-                # rules.happler_results.output.susie_pdf,
+                rules.happler_results.output.susie_pdf,
             ],
             causal=(("ex",) if mode == "hap" else ("ex", "in")),
             beta=config["modes"]["hap"]["beta"],

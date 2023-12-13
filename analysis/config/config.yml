@@ -56,6 +56,7 @@ modes:
   beta: [0.35]
   # beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
   alpha: [0.05]
+  random: true # whether to also produce random haplotypes
 mode: ld_range
 
 # locus: 1:98001984-99001984
