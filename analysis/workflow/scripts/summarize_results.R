@@ -24,12 +24,12 @@ write("Loading input data", stderr())
 X = readPGEN(snakemake@input[["gt"]])
 # also load the positions of each of the variants
 pos = readPVAR(snakemake@input[["gt"]])
-if (nchar(snakemake@params[["causal_gt"]]) > 0) {
-    causal_gt = readPGEN(snakemake@params[["causal_gt"]])
+if (nchar(snakemake@params[["causal_hap"]]) > 0) {
+    causal_gt = readPGEN(snakemake@input[["causal_gt"]])
     X = cbind(X, causal_gt)
     causal_variant = colnames(causal_gt)[1]
     # also load the positions of each of the variants
-    pos = c(pos, readPVAR(snakemake@params[["causal_gt"]]))
+    pos = c(pos, readPVAR(snakemake@input[["causal_gt"]]))
 }
 write(paste("Loaded", length(pos), "positions"), stderr())
 

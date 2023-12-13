@@ -64,11 +64,11 @@ rule results:
         gt=config["snp_panel"],
         finemap=rules.finemap.output.finemap,
         susie=rules.susie.output.susie,
+        causal_gt=config["causal_gt"],
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         exclude_causal=lambda wildcards: not int(exclude_causal[wildcards.causal]),
         causal_hap="",
-        causal_gt=config["causal_gt"],
     output:
         finemap_pdf= out + "/{causal}clude/finemap.pdf",
         susie_pdf= out + "/{causal}clude/susie.pdf",

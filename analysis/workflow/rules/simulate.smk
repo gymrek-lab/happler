@@ -89,9 +89,9 @@ rule transform:
         pvar=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["gts_snp_panel"]).with_suffix(".psam"),
     output:
-        pgen=temp(out + "/transform.pgen"),
-        pvar=temp(out + "/transform.pvar"),
-        psam=temp(out + "/transform.psam"),
+        pgen=out + "/transform.pgen",
+        pvar=out + "/transform.pvar",
+        psam=out + "/transform.psam",
     resources:
         runtime_min=5,
     log:

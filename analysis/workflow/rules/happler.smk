@@ -165,13 +165,13 @@ rule results:
         gt=rules.finemapper.input.gt,
         susie=rules.finemapper.output.susie,
         happler_hap=results_happler_hap_input,
+        causal_gt=config["causal_gt"].pgen,
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         exclude_causal=lambda wildcards: 0,
         causal_hap=lambda wildcards: (
             expand(config["hap_file"], **wildcards) if config["random"] is not None or not exclude_obs[wildcards.ex] else ""
         ),
-        causal_gt=config["causal_gt"].pgen,
     output:
         susie_pdf = out + "/{ex}clude/susie.pdf",
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
