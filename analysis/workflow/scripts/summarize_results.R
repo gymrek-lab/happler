@@ -51,19 +51,26 @@ if (hap) {
     write("Parsing hap files", stderr())
     while(TRUE) {
         line = readLines(happler_haplotype, 1)
+        # we assume the first line in the hap file that begins with H denotes the haplotype
         if (grepl("^H\\t", line)) break
     }
-    # extract the start and end of the haplotype
+    # extract the start, end, and ID of the haplotype
     happler_hap = as.integer(strsplit(line, "\t")[[1]][c(3,4)])
-    names(happler_hap) = c("start", "end")
+    happler_hap_id = strsplit(line, "\t")[[1]][c(5)]
+
     while(TRUE) {
         line = readLines(causal_haplotype, 1)
+        # we assume the first line in the hap file that begins with H denotes the haplotype
         if (grepl("^H\\t", line)) break
     }
     # extract the start, end, and ID of the haplotype
     causal_hap = as.integer(strsplit(line, "\t")[[1]][c(3,4)])
-    names(causal_hap) = c("start", "end")
-    haplotypes = t(data.frame(causal_hap, happler_hap))
+    causal_hap_id = strsplit(line, "\t")[[1]][c(5)]
+    stopifnot(causal_hap_id == causal_variant)
+    haplotypes = t(data.frame(
+        causal_hap = c("start"=causal_hap[1], "end"=causal_hap[2], "id"=causal_hap_id),
+        happler_hap = c("start"=happler_hap[1], "end"=happler_hap[2], "id"=happler_hap_id)
+    ))
 }
 
 write("Formatting genotypes and creating output dir", stderr())
@@ -89,6 +96,7 @@ if (exclude_causal) {
     pos = pos[!(names(pos) %in% c(causal_variant))]
     if (hap) {
         haplotypes = t(data.frame(haplotypes[c(2),]))
+        stopifnot(nrow(haplotypes) == 1)
     }
 } else {
     b[causal_variant] = 1
@@ -158,8 +166,12 @@ pip_plot_haps = function(pips, X, b, pos, haplotypes, susie_cs=NULL) {
     # create a ggplot of the PIPs
     # but first, get the data we need for the plot
     data = pip_plot_data(pips, X, b, pos, susie_cs)
+    # extract start and end coords
+    # note that we must convert to integer b/c they're characters
+    start_end = t(data.frame(as.integer(haplotypes[1, c("start", "end")])))
+    colnames(start_end) = c("start", "end")
     # extract the haplotypes to another data frame
-    data_hap = cbind(data[grepl("^H\\d+$", rownames(data)),], haplotypes)
+    data_hap = cbind(data[haplotypes[1, "id"],], start_end)
     data_hap$color = c("black", "red")[as.integer(data_hap$b)+1]
     # remove the haps from the data
     data = data[!(row.names(data) %in% rownames(data_hap)),]
