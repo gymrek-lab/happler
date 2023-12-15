@@ -24,13 +24,11 @@ write("Loading input data", stderr())
 X = readPGEN(snakemake@input[["gt"]])
 # also load the positions of each of the variants
 pos = readPVAR(snakemake@input[["gt"]])
-if (nchar(snakemake@params[["causal_hap"]]) > 0) {
-    causal_gt = readPGEN(snakemake@input[["causal_gt"]])
-    X = cbind(X, causal_gt)
-    causal_variant = colnames(causal_gt)[1]
-    # also load the positions of each of the variants
-    pos = c(pos, readPVAR(snakemake@input[["causal_gt"]]))
-}
+causal_gt = readPGEN(snakemake@input[["causal_gt"]])
+X = cbind(X, causal_gt)
+causal_variant = colnames(causal_gt)[1]
+# also load the positions of each of the variants
+pos = c(pos, readPVAR(snakemake@input[["causal_gt"]]))
 write(paste("Loaded", length(pos), "positions"), stderr())
 
 if ("finemap" %in% names(snakemake@input)) {
@@ -126,9 +124,9 @@ pip_plot_data = function(pips, X, b, pos, susie_cs=NULL) {
         causal_var = X[,causal_var[1]]
     }
     ld_causal = as.vector(cor(causal_var, X))^2
+    stopifnot(length(b) == length(pos))
     stopifnot(names(b) == names(pos))
     stopifnot(names(b) == names(pips))
-    stopifnot(length(b) == length(pos))
     data = data.frame(
         pip = pips,
         b = as.character(b),

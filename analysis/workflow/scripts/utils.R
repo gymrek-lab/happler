@@ -5,7 +5,7 @@ readPVAR = function(pfile) {
   if (endsWith(pfile, ".pgen")) {
     pfile = substr(pfile, 1, nchar(pfile)-5)
   }
-  pvar = data.table::fread(paste0(pfile, '.pvar'), sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
+  pvar = data.table::fread(paste0(pfile, '.pvar'), sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE, skip="#CHROM\tPOS")
   pos = as.integer(as.vector(pvar$POS))
   names(pos) = pvar$ID
   pos
