@@ -146,6 +146,27 @@ rule finemapper:
         "workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
 
 
+rule metrics:
+    """ compute summary metrics from the output of the finemapper """
+    input:
+        finemap=expand(rules.finemapper.output.susie, ex="in", allow_missing=True),
+        obs_hap=rules.run.output.hap,
+        caus_hap=config["hap_file"],
+    output:
+        metrics=out + "/susie_metrics.tsv",
+    resources:
+        runtime_min=5,
+        queue="hotel",
+    log:
+        logs + "/metrics",
+    benchmark:
+        bench + "/metrics",
+    conda:
+        "../envs/susie.yml"
+    shell:
+        "workflow/scripts/susie_metrics.R {input} >{output} 2>{log}"
+
+
 def results_happler_hap_input(wildcards):
     if config["random"] is None:
         if exclude_obs[wildcards.ex]:
