@@ -37,6 +37,7 @@ if [ "$ENVIRONMENT" = "BATCH" ]; then
     snakemake \
     --cluster "sbatch --export=ALL --partition={resources.queue} --qos=hotel --output=/dev/null --time='00:{resources.runtime_min}:00' --nodes=1 --ntasks-per-node={threads}" \
     --cluster-cancel "scancel {cluster.jobid}" \
+    --cluster-sync "srun --time {cluster.time} --mem {cluster.mem} --cpus-per-task {cluster.cpus}" \
     --default-resources 'runtime_min=30' 'queue="condo"' \
     --latency-wait 60 \
     --use-conda \
