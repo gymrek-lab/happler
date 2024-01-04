@@ -94,12 +94,63 @@ def get_best_ld(gts: GenotypesVCF, observed_hap: Path, causal_hap: Path, region:
     return observed_ld[best_observed_hap_idx]
 
 
+def get_finemap_metrics(metrics_path: Path, log: Logger = None):
+    """
+    Parse data from a TSV containing metrics from fine-mapping
+
+    Parameters
+    ----------
+    metrics: Path
+        The path to a metrics.tsv file
+    log: Logger, optional
+        A logging module to pass to haptools
+    """
+    # The metrics are:
+    # 1) What is the PIP of the observed hap?
+    # 2) Does the observed hap get the highest PIP?
+    # 3) What is the best PIP among the variants?
+    # 4) Is the observed hap in a credible set?
+    # 5) What is the purity of the credible set?
+    return np.loadtxt(
+        fname=metrics_path,
+        delimiter=" ",
+        dtype=[
+            ("pip", np.float64),
+            ("has_highest_pip", np.bool_),
+            ("best_variant_pip", np.float64),
+            ("in_credible_set", np.bool_),
+            ("cs_purity", np.float64),
+        ],
+    )
+
+
+def count_shared(observed, causal, log, observed_id: str = None, causal_id: str = None):
+    observed = Haplotypes(observed, log=log)
+    observed.read(haplotypes=(set((observed_id,)) if observed_id is not None else None))
+    obs_vars = set(
+        var.id
+        for hap in observed.data
+        for var in observed.data[hap].variants
+    )
+
+    causal = Haplotypes(causal, log=log)
+    causal.read(haplotypes=(set((causal_id,)) if causal_id is not None else None))
+    causal_vars = set(
+        var.id
+        for hap in causal.data
+        for var in causal.data[hap].variants
+    )
+
+    # return the number of shared SNPs and the number of expected SNPs
+    return len(obs_vars & causal_vars), len(causal_vars)
+
+
 def plot_params(
         params: npt.NDArray,
         vals: npt.NDArray,
         val_title: str,
         hap_counts: npt.NDArray = None,
-        sign: bool = False
+        sign: bool = False,
     ):
     """
     Plot vals against parameter values
@@ -118,27 +169,30 @@ def plot_params(
         If True, depict positive LD values via a special marker symbol for the point
     """
     also_plot_counts = hap_counts is not None
-    figsize = None
+    figsize = matplotlib.rcParams["figure.figsize"]
     if len(params) > 75:
-        figsize = (len(params)/15, 5)
+        figsize[0] = len(params) / 15
+    if len(params.dtype) > 5:
+        figsize[1] = len(params.dtype) * 1.25
     fig, axs = plt.subplots(
         nrows=len(params.dtype)+1+also_plot_counts, ncols=1,
         sharex=True, figsize=figsize,
     )
+    fig.subplots_adjust(hspace=0)
     # create a plot for the vals, first
     axs[0].plot(np.abs(vals), "g-")
     if sign:
         axs[0].scatter(
             np.squeeze(np.where(vals > 0)), vals[vals > 0], c="g", marker="o",
         )
-    axs[0].set_ylabel(val_title)
+    axs[0].set_ylabel(val_title, rotation="horizontal", ha="right")
     axs[0].set_xticks(range(0, len(vals)))
     axs[0].set_xticklabels([])
     axs[0].grid(axis="x")
     axs[0].set_ylim(None, 1)
     if also_plot_counts:
         axs[1].plot(hap_counts, "m-")
-        axs[1].set_ylabel("num_haps")
+        axs[1].set_ylabel("num_haps", rotation="horizontal", ha="right")
         axs[1].grid(axis="x")
     # now, plot each of the parameter values on the other axes
     for idx, param in enumerate(params.dtype.names):
@@ -147,7 +201,7 @@ def plot_params(
             params[param] = -np.log10(params[param])
             val_title = "-log " + val_title
         axs[idx+1+also_plot_counts].plot(params[param], "-")
-        axs[idx+1+also_plot_counts].set_ylabel(val_title)
+        axs[idx+1+also_plot_counts].set_ylabel(val_title, rotation="horizontal", ha="right")
         axs[idx+1+also_plot_counts].grid(axis="x")
     return fig
 
@@ -202,6 +256,14 @@ def plot_params_simple(
 @click.argument("genotypes", type=click.Path(exists=True, path_type=Path))
 @click.argument("observed_hap", type=click.Path(path_type=Path))
 @click.argument("causal_hap", type=click.Path(path_type=Path))
+@click.option(
+    "-m",
+    "--metrics",
+    type=Path,
+    default=None,
+    show_default=True,
+    help="Plot fine-mapping metrics, as well",
+)
 @click.option(
     "--region",
     type=str,
@@ -260,13 +322,14 @@ def main(
     genotypes: Path,
     observed_hap: Path,
     causal_hap: Path,
+    metrics: Path,
     region: str = None,
     observed_id: str = None,
     causal_id: str = None,
     num_haps: bool = True,
     sign: bool = False,
     output: Path = Path("/dev/stdout"),
-    verbosity: str = "ERROR"
+    verbosity: str = "ERROR",
 ):
     """
     Create a plot summarizing the LD between the observed and causal haplotypes across
@@ -308,6 +371,16 @@ def main(
         for idx in range(len(params))
     ])
 
+    # extract fine-mapping metrics for the observed hap
+    if metrics is not None:
+        metrics = np.array([
+            get_finemap_metrics(
+                get_hap_fname(metrics, params[idx]),
+                log=log
+            )
+            for idx in range(len(params))
+        ])
+
     hap_counts = None
     if num_haps:
         hap_counts = np.array([
@@ -318,8 +391,11 @@ def main(
         if (hap_counts == 1).all():
             hap_counts = None
 
-    if len(dtypes) > 1:
-        fig = plot_params(params, ld_vals, "causal LD", hap_counts, sign)
+    if len(dtypes) > 1 or metrics is not None:
+        merged = params
+        if metrics is not None:
+            merged = np.lib.recfunctions.merge_arrays([params, metrics], flatten=True)
+        fig = plot_params(merged, ld_vals, "causal LD", hap_counts, sign)
     elif len(dtypes) == 1:
         fig = plot_params_simple(params, ld_vals, "causal LD", hap_counts, sign)
     else:

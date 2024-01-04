@@ -115,6 +115,7 @@ plots_config = {
     "happler_hap": rules.happler_run.output.hap,
     "causal_hap": rules.simulate_transform.input.hap,
     "snp_panel": config["gts_snp_panel"],
+    "happler_metrics": rules.happler_metrics.output.metrics,
 }
 if mode == "ld_range":
     plots_config["ld_range_checkpoint"] = checkpoints.simulate_create_hap_ld_range
@@ -135,5 +136,5 @@ rule all:
             ],
             causal=(("ex",) if mode == "hap" else ("ex", "in")),
             beta=config["modes"]["hap"]["beta"],
-        ) if mode != "ld_range" else [rules.plots_params.output.png]
+        ) if mode != "ld_range" else [rules.plots_params.output.png, rules.plots_metrics.output.png]
     default_target: True

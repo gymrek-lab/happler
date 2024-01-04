@@ -7,6 +7,7 @@
 # param3: The path to a .hap file containing the causal haplotype
 
 # Output will be written in tab-separated format to stdout
+# To debug this script, add a browser() call somewhere in it. Then run it with its command line args but replace the script name with "R --args".
 
 # first, we import the args
 args = commandArgs(trailingOnly = TRUE)
@@ -45,12 +46,12 @@ write("Computing metrics", stderr())
 # The metrics are:
 # 1) What is the PIP of the observed hap?
 # 2) Does the observed hap get the highest PIP?
-# 3) Are there no other variables with this PIP?
+# 3) What is the best PIP among the variants?
 # 4) Is the observed hap in a credible set?
 # 5) What is the purity of the credible set?
 obs_pip = susie_pip[happler_hap_id]
-has_highest_pip = sum(obs_pip < susie_pip) == 0
-no_other_vars_with_pip = !(sum(obs_pip == susie_pip) == 0)
+has_highest_pip = as.integer(sum(obs_pip < susie_pip) == 0)
+best_variant_pip = max(susie_pip[names(susie_pip) != names(obs_pip)])
 credible_set = NULL
 for (cs in names(fitted$sets$cs)) {
     if (happler_hap_idx %in% fitted$sets$cs[cs]) {
@@ -58,10 +59,11 @@ for (cs in names(fitted$sets$cs)) {
         break
     }
 }
-purity = "NA"
+purity = 0
 if (!is.null(credible_set)) {
     purity = fitted$sets$purity[cs, "mean.abs.corr"]
 }
+in_credible_set = as.integer(!is.null(credible_set))
 
 write("Outputting metrics", stderr())
-write(paste(obs_pip, has_highest_pip, no_other_vars_with_pip, !is.null(credible_set), purity), stdout())
+write(paste(obs_pip, has_highest_pip, best_variant_pip, in_credible_set, purity), stdout())
