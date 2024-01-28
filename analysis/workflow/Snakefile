@@ -89,24 +89,24 @@ if mode == "ld_range" and config["modes"][mode]["random"]:
         config: happler_config
     use rule * from happler_random as happler_random_*
 
-if mode in ("hap", "str", "ld_range"):
-    finemappers_config = {
-        "pheno": rules.simulate_simphenotype.output.pheno,
-        "out": config["out"] + "/finemappers/"+mode+"/{beta}",
-        "snp_panel": config["gts_snp_panel"],
-    }
-    if mode in ("hap", "ld_range"):
-        finemappers_config["causal_gt"] = rules.simulate_transform.output.pgen
-        if mode == "ld_range":
-            finemappers_config["out"] = config["out"] + "/finemappers/"+mode+"/ld_{ld}/beta_{beta}/alpha_{alpha}"
-    else:
-        raise ValueError("Not yet implemented operating mode 'str' in config")
-    module finemappers:
-        snakefile: "rules/finemappers.smk"
-        config: finemappers_config
-    use rule * from finemappers as finemappers_*
-else:
-    raise ValueError(f"Unsupported operating mode '{mode}' in config")
+# if mode in ("hap", "str", "ld_range"):
+#     finemappers_config = {
+#         "pheno": rules.simulate_simphenotype.output.pheno,
+#         "out": config["out"] + "/finemappers/"+mode+"/{beta}",
+#         "snp_panel": config["gts_snp_panel"],
+#     }
+#     if mode in ("hap", "ld_range"):
+#         finemappers_config["causal_gt"] = rules.simulate_transform.output.pgen
+#         if mode == "ld_range":
+#             finemappers_config["out"] = config["out"] + "/finemappers/"+mode+"/ld_{ld}/beta_{beta}/alpha_{alpha}"
+#     else:
+#         raise ValueError("Not yet implemented operating mode 'str' in config")
+#     module finemappers:
+#         snakefile: "rules/finemappers.smk"
+#         config: finemappers_config
+#     use rule * from finemappers as finemappers_*
+# else:
+#     raise ValueError(f"Unsupported operating mode '{mode}' in config")
 
 plots_config = {
     "out": config["out"] + "/plots",
@@ -131,10 +131,11 @@ rule all:
             [
                 rules.happler_tree.output.png,
                 rules.happler_manhattan.output.png,
-                rules.finemappers_results.output.susie_pdf,
+                # rules.finemappers_results.output.susie_pdf,
                 rules.happler_results.output.susie_pdf,
+                rules.plots_params.output.png,
             ],
-            causal=(("ex",) if mode == "hap" else ("ex", "in")),
+            ex=(("in",) if mode == "hap" else ("ex", "in")),
             beta=config["modes"]["hap"]["beta"],
         ) if mode != "ld_range" else [rules.plots_params.output.png, rules.plots_metrics.output.png]
     default_target: True

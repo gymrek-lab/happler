@@ -29,7 +29,6 @@ def agg_ld_range_obs(wildcards):
         return expand(
             config["happler_hap"],
             beta=config["mode_attrs"]["beta"],
-            alpha=config["mode_attrs"]["alpha"],
         )
 
 def agg_ld_range_causal(wildcards):
@@ -58,9 +57,7 @@ def agg_ld_range_metrics(wildcards):
         return expand(
             config["happler_metrics"],
             beta=config["mode_attrs"]["beta"],
-            alpha=config["mode_attrs"]["alpha"],
         )
-
 
 rule params:
     """ check how wildcards affect the haplotypes output by happler """

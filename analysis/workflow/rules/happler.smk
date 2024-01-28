@@ -216,14 +216,14 @@ rule gwas:
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
     output:
-        log = temp(out + "/hap.log"),
-        linear = out + "/hap.hap.glm.linear",
+        log = temp(out + "/{ex}clude/hap.log"),
+        linear = out + "/{ex}clude/hap.hap.glm.linear",
     resources:
         runtime_min=10,
     log:
-        logs + "/gwas",
+        logs + "/{ex}clude/gwas",
     benchmark:
-        bench + "/gwas",
+        bench + "/{ex}clude/gwas",
     threads: 1
     conda:
         "../envs/default.yml"
@@ -243,13 +243,13 @@ rule manhattan:
         ],
         orange_ids = lambda wildcards: "-b hap -b H1",
     output:
-        png = out + "/manhattan.pdf",
+        png = out + "/{ex}clude/manhattan.pdf",
     resources:
         runtime_min=5,
     log:
-        logs + "/manhattan",
+        logs + "/{ex}clude/manhattan",
     benchmark:
-        bench + "/manhattan",
+        bench + "/{ex}clude/manhattan",
     conda:
         "happler"
     shell:
