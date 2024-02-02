@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
-#PBS -V
-#PBS -d .
-#PBS -q home-gymrek
-#PBS -j oe
-#PBS -o /dev/null
-#PBS -N run.snakemake
-#PBS -l nodes=1:ppn=1
-#PBS -l walltime=8:00:00
-#PBS -W group_list=gymreklab-group
-#PBS -A gymreklab-group
-
+#SBATCH --export=ALL
+#SBATCH --partition=hotel
+#SBATCH --qos=hotel
+#SBATCH --output=/dev/null
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --time=8:00:00
 
 # An example bash script demonstrating how to run the entire snakemake pipeline
 # This script creates two separate log files in the output dir:
@@ -39,12 +35,11 @@ fi
 # check: are we being executed from within qsub?
 if [ "$ENVIRONMENT" = "BATCH" ]; then
     snakemake \
-    --cluster "qsub -d . -V -q {resources.queue} -l walltime='00:{resources.runtime_min}:00' -l nodes=1:ppn={threads} -j oe -o /dev/null -W group_list=gymreklab-group -A gymreklab-group " \
-    --cluster-cancel "qdel {cluster.jobid}" \
-    --default-resources 'runtime_min=30' 'queue="condo"' \
+    --slurm \
+    --default-resources 'slurm_account=ddp268' 'slurm_partition=condo' "runtime=30" 'nodes=1' 'slurm_extra="--qos=condo"' \
     --latency-wait 60 \
     --use-conda \
-    --conda-frontend mamba \
+    --conda-frontend conda \
     --rerun-trigger {mtime,params,input} \
     -k \
     -j 12 \
@@ -54,7 +49,7 @@ else
     snakemake \
     --latency-wait 60 \
     --use-conda \
-    --conda-frontend mamba \
+    --conda-frontend conda \
     --notemp \
     --rerun-trigger {mtime,params,input} \
     -k \

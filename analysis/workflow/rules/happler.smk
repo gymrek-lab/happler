@@ -22,7 +22,7 @@ rule run:
         hap=out + "/happler.hap",
         dot=out + "/happler.dot",
     resources:
-        runtime_min=30,
+        runtime=30,
         queue="hotel",
     threads: 6
     log:
@@ -46,7 +46,7 @@ rule tree:
     output:
         png=out + "/happler.png",
     resources:
-        runtime_min=4,
+        runtime=4,
     log:
         logs + "/tree",
     benchmark:
@@ -70,7 +70,7 @@ rule transform:
         pvar=temp(out + "/happler.pvar"),
         psam=temp(out + "/happler.psam"),
     resources:
-        runtime_min=4,
+        runtime=4,
     log:
         logs + "/transform",
     benchmark:
@@ -108,7 +108,7 @@ rule merge:
         pvar=out + "/{ex}clude/merged.pvar",
         psam=out + "/{ex}clude/merged.psam",
     resources:
-        runtime_min=4,
+        runtime=4,
     log:
         logs + "/{ex}clude/merge",
     benchmark:
@@ -134,7 +134,7 @@ rule finemapper:
     output:
         susie=out + "/{ex}clude/susie.rds",
     resources:
-        runtime_min=75,
+        runtime=75,
         queue="hotel",
     log:
         logs + "/{ex}clude/finemapper",
@@ -155,7 +155,7 @@ rule metrics:
     output:
         metrics=out + "/susie_metrics.tsv",
     resources:
-        runtime_min=5,
+        runtime=5,
         queue="hotel",
     log:
         logs + "/metrics",
@@ -194,7 +194,7 @@ rule results:
         susie_pdf = out + "/{ex}clude/susie.pdf",
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
     resources:
-        runtime_min=5,
+        runtime=5,
     log:
         logs + "/{ex}clude/results",
     benchmark:
@@ -219,7 +219,7 @@ rule gwas:
         log = temp(out + "/{ex}clude/hap.log"),
         linear = out + "/{ex}clude/hap.hap.glm.linear",
     resources:
-        runtime_min=10,
+        runtime=10,
     log:
         logs + "/{ex}clude/gwas",
     benchmark:
@@ -245,7 +245,7 @@ rule manhattan:
     output:
         png = out + "/{ex}clude/manhattan.pdf",
     resources:
-        runtime_min=5,
+        runtime=5,
     log:
         logs + "/{ex}clude/manhattan",
     benchmark:
