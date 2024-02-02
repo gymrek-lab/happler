@@ -4,7 +4,7 @@ import snakemake.io as io
 from snakemake.utils import min_version
 
 ##### set minimum snakemake version #####
-min_version("7.14.0")
+min_version("7.32.4")
 
 
 # IMPORT CONFIG VARIABLES
@@ -34,11 +34,17 @@ module genotypes:
     config: config
 
 use rule * from genotypes as genotypes_*
-if check_config("phase_map") or check_config("exclude_samples") or not config["snp_panel"].endswith(".pgen"):
-    config["gts_snp_panel"] = rules.genotypes_vcf2plink.output.pgen
-else:
-    config["gts_snp_panel"] = config["snp_panel"]
 config["gts_str_panel"] = rules.genotypes_subset_str.output.vcf
+if check_config("sample_size"):
+    sampsize = config["sample_size"]
+    config["gts_snp_panel"] = expand(
+        rules.genotypes_subset.output.pgen,
+        sampsize=sampsize,
+        allow_missing=True,
+    )[0]
+    config["out"] += "/{sampsize}samples"
+else:
+    config["gts_snp_panel"] = rules.genotypes_subset.input.pgen
 config["random"] = False
 
 module simulate:
@@ -125,17 +131,27 @@ module plots:
     config: plots_config
 use rule * from plots as plots_*
 
+if mode == "ld_range":
+    FINAL_OUTPUT = [rules.plots_params.output.png, rules.plots_metrics.output.png]
+else:
+    FINAL_OUTPUT = expand(
+        [
+            rules.happler_tree.output.png,
+            rules.happler_manhattan.output.png,
+            # rules.finemappers_results.output.susie_pdf,
+            rules.happler_results.output.susie_pdf,
+            rules.plots_params.output.png,
+        ],
+        ex=(("in",) if mode == "hap" else ("ex", "in")),
+        beta=config["modes"]["hap"]["beta"],
+        allow_missing=True,
+    )
+
 rule all:
     input:
-        expand(
-            [
-                rules.happler_tree.output.png,
-                rules.happler_manhattan.output.png,
-                # rules.finemappers_results.output.susie_pdf,
-                rules.happler_results.output.susie_pdf,
-                rules.plots_params.output.png,
-            ],
-            ex=(("in",) if mode == "hap" else ("ex", "in")),
-            beta=config["modes"]["hap"]["beta"],
-        ) if mode != "ld_range" else [rules.plots_params.output.png, rules.plots_metrics.output.png]
+       expand(
+            FINAL_OUTPUT,
+            locus=locus,
+            sampsize=config["sample_size"],
+        ) if check_config("sample_size") else expand(FINAL_OUTPUT, locus=locus)
     default_target: True

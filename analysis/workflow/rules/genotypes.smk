@@ -154,3 +154,44 @@ rule subset_str:
     shell:
         "bcftools view -S {input.samples} --write-index "
         "-Ob -o {output.vcf} {input.vcf}"
+
+
+def subset_input():
+    if check_config("phase_map") or check_config("exclude_samples") or not config["snp_panel"].endswith(".pgen"):
+        return {
+            "pgen": rules.vcf2plink.output.pgen,
+            "pvar": rules.vcf2plink.output.pvar,
+            "psam": rules.vcf2plink.output.psam,
+        }
+    else:
+        return {
+            "pgen": config["snp_panel"],
+            "pvar": Path(config["snp_panel"]).with_suffix(".pvar"),
+            "psam": Path(config["snp_panel"]).with_suffix(".psam"),
+        }
+
+
+rule subset:
+    """subset the simulation dataset if needed"""
+    input:
+        **subset_input()
+    params:
+        prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
+        out=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+        sampsize=lambda wildcards: wildcards.sampsize,
+    output:
+        pgen=out+"/subset/{sampsize}.pgen",
+        pvar=out+"/subset/{sampsize}.pvar",
+        psam=out+"/subset/{sampsize}.psam",
+        log=temp(out+"/subset/{sampsize}.log"),
+    resources:
+        runtime=3,
+    log:
+        logs + "/subset/{sampsize}",
+    benchmark:
+        bench + "/subset/{sampsize}",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "plink2 --keep <(head -n {params.sampsize} {input.psam} | grep -Ev '^#' | cut -f1) "
+        "--make-pgen --pfile {params.prefix} --out {params.out} &>{log}"

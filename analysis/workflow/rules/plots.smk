@@ -24,11 +24,13 @@ def agg_ld_range_obs(wildcards):
             ld=ld_vals,
             alpha=config["mode_attrs"]["alpha"],
             beta=config["mode_attrs"]["beta"],
+            **wildcards,
         )
     else:
         return expand(
             config["happler_hap"],
             beta=config["mode_attrs"]["beta"],
+            **wildcards,
         )
 
 def agg_ld_range_causal(wildcards):
@@ -39,9 +41,14 @@ def agg_ld_range_causal(wildcards):
             str(checkpoint_output),
             ld=ld_vals,
             beta=config["mode_attrs"]["beta"],
+            **wildcards,
         )
     else:
-        return expand(config["causal_hap"], beta=config["mode_attrs"]["beta"])
+        return expand(
+            config["causal_hap"],
+            beta=config["mode_attrs"]["beta"],
+            **wildcards,
+        )
 
 def agg_ld_range_metrics(wildcards):
     """ return a list of metrics files from the LD range checkpoint """
@@ -52,11 +59,13 @@ def agg_ld_range_metrics(wildcards):
             ld=ld_vals,
             beta=config["mode_attrs"]["beta"],
             alpha=config["mode_attrs"]["alpha"],
+            **wildcards,
         )
     else:
         return expand(
             config["happler_metrics"],
             beta=config["mode_attrs"]["beta"],
+            **wildcards,
         )
 
 rule params:
