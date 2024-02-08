@@ -57,6 +57,13 @@ POINT_SIZE = 0.75
     help="Which variant IDs should we highlight in blue?",
 )
 @click.option(
+    "--orange-Hids",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Add any IDs of the form 'H:digit:' to the list of orange IDs",
+)
+@click.option(
     "--label/--no-label",
     is_flag=True,
     default=True,
@@ -92,6 +99,7 @@ def main(
     output=sys.stdout,
     ids=tuple(),
     orange_ids=tuple(),
+    orange_Hids=False,
     label=True,
     small=False,
     titles=tuple(),
@@ -142,6 +150,9 @@ def main(
             CategoricalDtype(sorted(map(int, df.chromosome.dtype.categories)), ordered=True)
         )
         df = df.sort_values('chromosome')
+        # retrieve any haplotype IDs (of the form 'H:digit:')
+        if orange_Hids:
+            breakpoint()
         # create the plot using pandas and add it to the figure
         if small:
             df[~df["id"].isin(red_ids + orange_ids)].plot(

@@ -30,6 +30,9 @@ Merge variants from two PGEN files that have the same set of samples.
 ## [parameter_plot.py](parameter_plot.py)
 Plot the LD between a causal haplotype and a set of observed haplotypes across a range of hyper-parameters.
 
+## [peer_residuals.R](peer_residuals.R)
+Create PEER factors for gene expression phenotypes
+
 ## [plot_phenotypes.py](plot_phenotypes.py)
 Performs a linear regression and outputs a plot for phenotypes from `generate_phenotypes.py`.
 
