@@ -11,13 +11,22 @@ exclude_obs = {"in": 0, "ex": 1}
 # or, if config["random"] is not None, this denotes
 # whether to include a random haplotype ("in") or the causal haplotype ("ex")
 
+def check_config(value, default=False, place=config, as_set=False):
+    """return true if config value exists and is true"""
+    value = place[value] if (value in place and place[value]) else default
+    return (set(value) if isinstance(value, list) else {value}) if as_set else value
+
+
 rule run:
     """ execute happler! """
     input:
         gts=config["snp_panel"],
         pts=config["pheno"],
+        covar=config["covar"],
     params:
         thresh=lambda wildcards: 0.05 if "alpha" not in wildcards else wildcards.alpha,
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else ""
     output:
         hap=out + "/happler.hap",
         dot=out + "/happler.dot",
@@ -33,7 +42,7 @@ rule run:
         "happler"
     shell:
         "happler run -o {output.hap} --verbosity DEBUG "
-        "--discard-multiallelic "
+        "--discard-multiallelic --region {params.region} {params.covar}"
         "-t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
 
 
@@ -65,6 +74,7 @@ rule transform:
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
     params:
         hap_id="H0",
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         pgen=temp(out + "/happler.pgen"),
         pvar=temp(out + "/happler.pvar"),
@@ -78,8 +88,8 @@ rule transform:
     conda:
         "happler"
     shell:
-        "haptools transform -o {output.pgen} --id {params.hap_id} {input.pgen} "
-        "{input.hap} &>{log}"
+        "haptools transform -o {output.pgen} --id {params.hap_id} "
+        "--region {params.region} {input.pgen} {input.hap} &>{log}"
 
 
 def merge_hps_input(wildcards):
@@ -103,6 +113,8 @@ rule merge:
         hps=lambda wildcards: merge_hps_input(wildcards).pgen,
         hps_pvar=lambda wildcards: merge_hps_input(wildcards).pvar,
         hps_psam=lambda wildcards: merge_hps_input(wildcards).psam,
+    params:
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         pgen=out + "/{ex}clude/merged.pgen",
         pvar=out + "/{ex}clude/merged.pvar",
@@ -116,7 +128,8 @@ rule merge:
     conda:
         "happler"
     shell:
-        "workflow/scripts/merge_plink.py {input.gts} {input.hps} {output.pgen} &> {log}"
+        "workflow/scripts/merge_plink.py --region {params.region} "
+        "{input.gts} {input.hps} {output.pgen} &> {log}"
 
 
 rule finemapper:
@@ -186,7 +199,7 @@ rule results:
         gt=rules.finemapper.input.gt,
         susie=rules.finemapper.output.susie,
         happler_hap=results_happler_hap_input,
-        causal_gt=config["causal_gt"].pgen,
+        causal_gt=config["causal_gt"].pgen if "causal_gt" in config else [],
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         causal_hap=lambda wildcards: expand(config["hap_file"], **wildcards) if config["random"] is not None or not exclude_obs[wildcards.ex] else "",
@@ -212,6 +225,7 @@ rule gwas:
         pvar=rules.merge.output.pvar,
         psam=rules.merge.output.psam,
         pts=config["pheno"],
+        covar=config["covar"],
     params:
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
@@ -228,7 +242,7 @@ rule gwas:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --linear allow-no-covars --variance-standardize "
+        "plink2 --linear --variance-standardize --covar 'iid-only' {input.covar} "
         "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
         "--out {params.out_prefix} --threads {threads} &>{log}"
 
@@ -239,7 +253,7 @@ rule manhattan:
     params:
         linear = lambda wildcards, input: f"-l "+input.linear,
         red_ids = lambda wildcards: [
-            f"-i {i.split(':')[0]}" for i in config["snps"]
+            f"-i {i.split(':')[0]}" for i in check_config("snps", default=[])
         ],
         orange_ids = lambda wildcards: "-b hap -b H1",
     output:

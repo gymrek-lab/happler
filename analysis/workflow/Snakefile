@@ -21,12 +21,21 @@ def check_config(value, default=False, place=config, as_set=False):
 config["out"] = check_config("out", "out")
 config["min_maf"] = check_config("min_maf", 0)
 config["exclude_causal"] = check_config("exclude_causal", False, as_set=True)
-locus = config["locus"].replace(":", "_")
-# remove any trailing slashes in directories and set the variables
-config["out"] = str(Path(config["out"])) + f"/{locus}"
+# handle locus
+if Path(config["locus"]).exists() and Path(config["locus"]).with_suffix(".bed"):
+    with open(Path(config["locus"]).with_suffix(".bed")) as f:
+        locus_file = {
+            cols[3]: f"{cols[0]}_{cols[1]}-{cols[2]}"
+            for cols in (line.strip().split() for line in f)
+        }
+    locus = list(locus_file.values())
+else:
+    locus = config["locus"].replace(":", "_")
 # convert the exclude_causal var into a dict for later
 exclude_causal = {("in", "ex")[val]: val for val in config["exclude_causal"]}
 mode = config["mode"]
+# remove any trailing slashes in directories
+config["out"] = str(Path(config["out"])) + "/{locus}"
 
 
 module genotypes:
@@ -60,13 +69,14 @@ if mode == "ld_range" and config["modes"][mode]["random"]:
     use rule * from simulate_random as simulate_random_*
 del config["random"]
 
-if mode in ("snp", "hap", "ld_range"):
+if mode in ("snp", "hap", "ld_range", "run"):
     happler_config = {
         "pheno": rules.simulate_simphenotype.output.pheno,
         "hap_file": rules.simulate_transform.input.hap,
         "snp_panel": config["gts_snp_panel"],
         "out": config["out"] + "/happler/"+mode+"/{beta}",
         "random": None,
+        "covar": check_config("covar", default=[]),
     }
     if mode in ("hap", "ld_range"):
         happler_config["snps"] = []
@@ -75,6 +85,13 @@ if mode in ("snp", "hap", "ld_range"):
         happler_config["causal_gt"] = rules.simulate_transform.output
     if mode == "ld_range":
         happler_config["out"] = config["out"] + "/happler/"+mode+"/ld_{ld}/beta_{beta}/alpha_{alpha}"
+    if mode == "run":
+        happler_config["hap_file"] = []
+        happler_config["pheno"] = lambda wildcards: expand(
+            config["modes"][mode]["pheno"],
+            gene=wildcards.gene,
+        )[0]
+        happler_config["out"] = config["out"] + f"/happler/{mode}/" + "{gene}"
 elif "str" == mode:
     pass
 else:
@@ -133,6 +150,13 @@ use rule * from plots as plots_*
 
 if mode == "ld_range":
     FINAL_OUTPUT = [rules.plots_params.output.png, rules.plots_metrics.output.png]
+elif mode == "run":
+    FINAL_OUTPUT = expand(
+        rules.happler_manhattan.output.png,
+        ex=("in",),
+        gene=glob_wildcards(Path(config["modes"][mode]["pheno"])).gene,
+        allow_missing=True,
+    )
 else:
     FINAL_OUTPUT = expand(
         [

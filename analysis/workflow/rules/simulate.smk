@@ -15,10 +15,12 @@ if mode == "ld_range" and config["random"]:
     logs += "/random"
     bench += "/random"
 
-locus_chr = config["locus"].split(":")[0]
-locus_start = config["locus"].split(":")[1].split('-')[0]
-locus_end = config["locus"].split(":")[1].split('-')[1]
-
+def parse_locus(locus):
+    """parse locus into chrom, start, end"""
+    chrom = locus.split("_")[0]
+    end = locus.split("-")[1]
+    start = locus.split("_")[1].split("-")[0]
+    return chrom, start, end
 
 hap_ld_range_output = out + "/create_ld_range/ld_{ld}/haplotype.hap"
 
@@ -59,8 +61,8 @@ rule create_hap:
         gts=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
     params:
         ignore="this", # the first parameter is always ignored for some reason
-        chrom=locus_chr,
-        locus=config["locus"].split(":")[1].replace('-', '\t'),
+        chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
+        locus=lambda wildcards: wildcards.locus.split("_")[1].replace('-', '\t'),
         beta=0.99,
         alleles=lambda wildcards: config["modes"]["hap"]["alleles"],
     output:

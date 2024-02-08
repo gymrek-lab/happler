@@ -6,27 +6,30 @@ logs = out + "/logs"
 bench = out + "/bench"
 
 
-locus_chr = config["locus"].split(":")[0]
-locus_start = config["locus"].split(":")[1].split('-')[0]
-locus_end = config["locus"].split(":")[1].split('-')[1]
-
-
 def check_config(value, default=False, place=config, as_set=False):
     """return true if config value exists and is true"""
     value = place[value] if (value in place and place[value]) else default
     return (set(value) if isinstance(value, list) else {value}) if as_set else value
 
 
+def parse_locus(locus):
+    """parse locus into chrom, start, end"""
+    chrom = locus.split("_")[0]
+    end = locus.split("-")[1]
+    start = locus.split("_")[1].split("-")[0]
+    return chrom, start, end
+
+
 rule plink2vcf:
     """ convert a PLINK file to VCF """
     input:
-        pgen=lambda wildcards: expand(config["snp_panel"], chr=locus_chr)[0],
+        pgen=lambda wildcards: expand(config["snp_panel"], chr=parse_locus(wildcards.locus)[0])[0],
     params:
         pfile=lambda wildcards, input: str(Path(input.pgen).with_suffix('')),
         out=lambda wildcards, output: str(Path(output.bcf).with_suffix('')),
-        start=locus_start,
-        end=locus_end,
-        chrom=locus_chr,
+        start=lambda wildcards: wildcards.locus.split("_")[1].split("-")[0],
+        end=lambda wildcards: wildcards.locus.split("-")[1],
+        chrom=lambda wilcards: wildcards.locus.split("_")[0],
     output:
         vcf=temp(out + "/unphased.vcf.gz"),
         bcf=out + "/unphased.bcf",
@@ -49,7 +52,7 @@ rule plink2vcf:
 
 
 def phase_gt_input(wildcards):
-    input_files = { 'map': config['phase_map'].format(chr=locus_chr) }
+    input_files = { 'map': config['phase_map'].format(chr=parse_locus(wildcards.locus)[0]) }
     if config["snp_panel"].endswith('.pgen'):
         input_files['unphased'] = rules.plink2vcf.output.bcf
     else:
@@ -88,8 +91,8 @@ rule keep_samps:
             else config["snp_panel"],
         snp_vcf_idx=lambda wildcards: rules.phase_gt.output.phased_idx if check_config('phase_map')
             else config["snp_panel"] + ".tbi",
-        str_vcf=expand(config["str_panel"], chr=locus_chr),
-        str_vcf_idx=expand(config["str_panel"], chr=locus_chr),
+        str_vcf=lambda wildcards: expand(config["str_panel"], chr=parse_locus(wildcards.locus)[0]),
+        str_vcf_idx=lambda wildcards: expand(config["str_panel"], chr=parse_locus(wildcards.locus)[0]),
         samp=lambda wildcards: config["exclude_samples"],
     output:
         samples=out+"/samples.tsv"
@@ -137,8 +140,8 @@ rule vcf2plink:
 rule subset_str:
     """ subset samples from a STR VCF """
     input:
-        vcf=lambda wildcards: expand(config["str_panel"], chr=locus_chr)[0],
-        vcf_idx=lambda wildcards: expand(config["str_panel"] + ".tbi", chr=locus_chr),
+        vcf=lambda wildcards: expand(config["str_panel"], chr=parse_locus(wildcards.locus)[0])[0],
+        vcf_idx=lambda wildcards: expand(config["str_panel"] + ".tbi", chr=parse_locus(wildcards.locus)[0]),
         samples=rules.keep_samps.output.samples,
     output:
         vcf=out+"/strs.bcf",
@@ -179,6 +182,7 @@ rule subset:
         prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
         out=lambda wildcards, output: Path(output.pgen).with_suffix(""),
         sampsize=lambda wildcards: wildcards.sampsize,
+        region=lambda wildcards: locus.replace("_", ":"),
     output:
         pgen=out+"/subset/{sampsize}.pgen",
         pvar=out+"/subset/{sampsize}.pvar",

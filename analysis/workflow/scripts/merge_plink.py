@@ -11,13 +11,19 @@ from haptools.data import GenotypesPLINK
 @click.argument("file2", type=click.Path(exists=True, path_type=Path))
 @click.argument("output", type=click.Path(path_type=Path))
 @click.option(
+    "--region",
+    default=None,
+    show_default=True,
+    help="The region to extract genotypes from",
+)
+@click.option(
     "--replace/--no-replace",
     is_flag=True,
     default=True,
     show_default=True,
     help="Whether to use the variants in file2 to replace those in file1",
 )
-def main(file1: Path, file2: Path, output: Path, replace: bool = True):
+def main(file1: Path, file2: Path, output: Path, region: str = None, replace: bool = True):
     """
     Merge variants from two PGEN files that have the same set of samples
 
@@ -30,6 +36,8 @@ def main(file1: Path, file2: Path, output: Path, replace: bool = True):
         The path to the second pgen file
     output: Path
         The path to the output pgen file
+    region: Path
+        The region to extract genotypes from
     replace: bool, optional
         If True, take the left-inner join of the set of variants, so that
         conflicting IDs from file2 are used to replace the GTs in file1
@@ -41,8 +49,8 @@ def main(file1: Path, file2: Path, output: Path, replace: bool = True):
     gts1 = GenotypesPLINK(file1)
     gts2 = GenotypesPLINK(file2)
 
-    gts1.read()
-    gts2.read()
+    gts1.read(region=region)
+    gts2.read(region=region)
 
     gts1.check_phase()
     gts2.check_phase()
