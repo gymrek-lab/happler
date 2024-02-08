@@ -1,5 +1,6 @@
 channels:
     - conda-forge
+    - bioconda
     - nodefaults
 dependencies:
     - bioconda::bcftools==1.13
@@ -13,3 +14,4 @@ dependencies:
     - bioconda::plink2==2.00a3.3
     - conda-forge::graphviz==2.50.0
     - conda-forge::ipython # for debugging
+    - bioconda::r-peer

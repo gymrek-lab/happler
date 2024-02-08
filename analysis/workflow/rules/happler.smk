@@ -73,7 +73,6 @@ rule transform:
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
     params:
-        hap_id="H0",
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         pgen=temp(out + "/happler.pgen"),
@@ -88,8 +87,8 @@ rule transform:
     conda:
         "happler"
     shell:
-        "haptools transform -o {output.pgen} --id {params.hap_id} "
-        "--region {params.region} {input.pgen} {input.hap} &>{log}"
+        "haptools transform -o {output.pgen} --region {params.region} "
+        "{input.pgen} {input.hap} &>{log}"
 
 
 def merge_hps_input(wildcards):
@@ -229,6 +228,7 @@ rule gwas:
     params:
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
+        covar = lambda wildcards, input: ("--covar 'iid-only' " + input["covar"] + " ") if check_config("covar") else ""
     output:
         log = temp(out + "/{ex}clude/hap.log"),
         linear = out + "/{ex}clude/hap.hap.glm.linear",
@@ -242,7 +242,7 @@ rule gwas:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --linear --variance-standardize --covar 'iid-only' {input.covar} "
+        "plink2 --linear --variance-standardize {params.covar}"
         "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
         "--out {params.out_prefix} --threads {threads} &>{log}"
 
