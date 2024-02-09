@@ -27,9 +27,9 @@ rule plink2vcf:
     params:
         pfile=lambda wildcards, input: str(Path(input.pgen).with_suffix('')),
         out=lambda wildcards, output: str(Path(output.bcf).with_suffix('')),
-        start=lambda wildcards: wildcards.locus.split("_")[1].split("-")[0],
-        end=lambda wildcards: wildcards.locus.split("-")[1],
-        chrom=lambda wilcards: wildcards.locus.split("_")[0],
+        start=lambda wildcards: parse_locus(wildcards.locus)[1],
+        end=lambda wildcards: parse_locus(wildcards.locus)[2],
+        chrom=lambda wilcards: parse_locus(wildcards.locus)[0],
     output:
         vcf=temp(out + "/unphased.vcf.gz"),
         bcf=out + "/unphased.bcf",

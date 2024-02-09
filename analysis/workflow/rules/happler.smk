@@ -16,6 +16,13 @@ def check_config(value, default=False, place=config, as_set=False):
     value = place[value] if (value in place and place[value]) else default
     return (set(value) if isinstance(value, list) else {value}) if as_set else value
 
+def parse_locus(locus):
+    """parse locus into chrom, start, end"""
+    chrom = locus.split("_")[0]
+    end = locus.split("-")[1]
+    start = locus.split("_")[1].split("-")[0]
+    return chrom, start, end
+
 
 rule run:
     """ execute happler! """
@@ -143,6 +150,7 @@ rule finemapper:
     params:
         outdir=lambda wildcards, output: Path(output.susie).parent,
         exclude_causal="NULL",
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         susie=out + "/{ex}clude/susie.rds",
     resources:
@@ -202,6 +210,7 @@ rule results:
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         causal_hap=lambda wildcards: expand(config["hap_file"], **wildcards) if config["random"] is not None or not exclude_obs[wildcards.ex] else "",
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         susie_pdf = out + "/{ex}clude/susie.pdf",
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
@@ -229,6 +238,9 @@ rule gwas:
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
         covar = lambda wildcards, input: ("--covar 'iid-only' " + input["covar"] + " ") if check_config("covar") else ""
+        start=lambda wildcards: parse_locus(wildcards.locus)[1],
+        end=lambda wildcards: parse_locus(wildcards.locus)[2],
+        chrom=lambda wilcards: parse_locus(wildcards.locus)[0],
     output:
         log = temp(out + "/{ex}clude/hap.log"),
         linear = out + "/{ex}clude/hap.hap.glm.linear",
@@ -244,6 +256,7 @@ rule gwas:
     shell:
         "plink2 --linear --variance-standardize {params.covar}"
         "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
+        "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} "
         "--out {params.out_prefix} --threads {threads} &>{log}"
 
 

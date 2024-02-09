@@ -22,8 +22,8 @@ config["out"] = check_config("out", "out")
 config["min_maf"] = check_config("min_maf", 0)
 config["exclude_causal"] = check_config("exclude_causal", False, as_set=True)
 # handle locus
-if Path(config["locus"]).exists() and Path(config["locus"]).with_suffix(".bed"):
-    with open(Path(config["locus"]).with_suffix(".bed")) as f:
+if Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
+    with open(Path(config["locus"])) as f:
         locus_file = {
             cols[3]: f"{cols[0]}_{cols[1]}-{cols[2]}"
             for cols in (line.strip().split() for line in f)
