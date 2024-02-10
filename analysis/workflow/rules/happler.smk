@@ -48,7 +48,7 @@ rule run:
     conda:
         "happler"
     shell:
-        "happler run -o {output.hap} --verbosity DEBUG "
+        "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
         "--discard-multiallelic --region {params.region} {params.covar}"
         "-t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
 
@@ -237,10 +237,10 @@ rule gwas:
     params:
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
-        covar = lambda wildcards, input: ("--covar 'iid-only' " + input["covar"] + " ") if check_config("covar") else ""
+        covar = lambda wildcards, input: ("--covar 'iid-only' " + input["covar"] + " ") if check_config("covar") else "",
         start=lambda wildcards: parse_locus(wildcards.locus)[1],
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
-        chrom=lambda wilcards: parse_locus(wildcards.locus)[0],
+        chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
     output:
         log = temp(out + "/{ex}clude/hap.log"),
         linear = out + "/{ex}clude/hap.hap.glm.linear",

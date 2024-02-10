@@ -38,7 +38,7 @@ str_panel: "/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pas
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required!
 # locus: 19:45401409-46401409 # center: 45901409 (APOe4)
-locus: data/geuvadis/geuv.meta.summary.bed
+locus: data/geuvadis/geuvadis_eqtl_genes.bed
 modes:
  str:
   pos: 19:45903857 # STR_691361
@@ -59,7 +59,7 @@ modes:
   alpha: [0.05]
   random: false # whether to also produce random haplotypes
  run:
-  pheno: data/geuvadis/phenos/{gene}.pheno
+  pheno: data/geuvadis/temp_small_phenos/{gene}.pheno
 mode: run
 
 # Covariates to use if they're needed

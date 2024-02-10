@@ -29,7 +29,7 @@ rule plink2vcf:
         out=lambda wildcards, output: str(Path(output.bcf).with_suffix('')),
         start=lambda wildcards: parse_locus(wildcards.locus)[1],
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
-        chrom=lambda wilcards: parse_locus(wildcards.locus)[0],
+        chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
     output:
         vcf=temp(out + "/unphased.vcf.gz"),
         bcf=out + "/unphased.bcf",

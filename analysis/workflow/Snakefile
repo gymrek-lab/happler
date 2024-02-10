@@ -27,6 +27,7 @@ if Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
         locus_file = {
             cols[3]: f"{cols[0]}_{cols[1]}-{cols[2]}"
             for cols in (line.strip().split() for line in f)
+            if not cols[0].startswith("#")
         }
     locus = list(locus_file.values())
 else:
@@ -77,6 +78,7 @@ if mode in ("snp", "hap", "ld_range", "run"):
         "out": config["out"] + "/happler/"+mode+"/{beta}",
         "random": None,
         "covar": check_config("covar", default=[]),
+        "min_maf": check_config("min_maf", 0),
     }
     if mode in ("hap", "ld_range"):
         happler_config["snps"] = []
