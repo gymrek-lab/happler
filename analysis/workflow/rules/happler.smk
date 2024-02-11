@@ -271,7 +271,8 @@ rule manhattan:
         red_ids = lambda wildcards: [
             f"-i {i.split(':')[0]}" for i in check_config("snps", default=[])
         ],
-        orange_ids = lambda wildcards: "-b hap -b H1",
+        orange_ids = lambda wildcards: "-b hap --orange-Hids",
+        # TODO: allow specifying IDs from hap files, instead
     output:
         png = out + "/{ex}clude/manhattan.pdf",
     resources:

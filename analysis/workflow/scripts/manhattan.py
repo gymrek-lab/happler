@@ -99,7 +99,7 @@ def main(
     output=sys.stdout,
     ids=tuple(),
     orange_ids=tuple(),
-    orange_Hids=False,
+    orange_hids=False,
     label=True,
     small=False,
     titles=tuple(),
@@ -151,8 +151,8 @@ def main(
         )
         df = df.sort_values('chromosome')
         # retrieve any haplotype IDs (of the form 'H:digit:')
-        if orange_Hids:
-            breakpoint()
+        if orange_hids:
+            orange_ids += tuple(df.id[df.id.str.contains("^H\d+$")])
         # create the plot using pandas and add it to the figure
         if small:
             df[~df["id"].isin(red_ids + orange_ids)].plot(
