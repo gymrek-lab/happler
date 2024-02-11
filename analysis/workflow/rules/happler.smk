@@ -33,9 +33,11 @@ rule run:
     params:
         thresh=lambda wildcards: 0.05 if "alpha" not in wildcards else wildcards.alpha,
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
-        covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else ""
+        covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else "",
+        maf = check_config("min_maf", 0),
     output:
         hap=out + "/happler.hap",
+        gz=out + "/happler.hap.gz",
         dot=out + "/happler.dot",
     resources:
         runtime=30,
@@ -50,7 +52,8 @@ rule run:
     shell:
         "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
         "--discard-multiallelic --region {params.region} {params.covar}"
-        "-t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
+        "-t {params.thresh} --show-tree {input.gts} {input.pts} &>{log} && "
+        "haptools index -o {output.gz} {output.hap} &>>{log}"
 
 
 rule tree:
@@ -75,7 +78,7 @@ rule tree:
 
 rule transform:
     input:
-        hap=rules.run.output.hap,
+        hap=rules.run.output.gz,
         pgen=config["snp_panel"],
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
@@ -122,9 +125,9 @@ rule merge:
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
-        pgen=out + "/{ex}clude/merged.pgen",
-        pvar=out + "/{ex}clude/merged.pvar",
-        psam=out + "/{ex}clude/merged.psam",
+        pgen=temp(out + "/{ex}clude/merged.pgen"),
+        pvar=temp(out + "/{ex}clude/merged.pvar"),
+        psam=temp(out + "/{ex}clude/merged.psam"),
     resources:
         runtime=4,
     log:
@@ -237,7 +240,7 @@ rule gwas:
     params:
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
-        covar = lambda wildcards, input: ("--covar 'iid-only' " + input["covar"] + " ") if check_config("covar") else "",
+        covar = lambda wildcards, input: ("--covar 'iid-only' " + input["covar"]) if check_config("covar") else "allow-no-covars",
         start=lambda wildcards: parse_locus(wildcards.locus)[1],
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
@@ -254,9 +257,9 @@ rule gwas:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --linear --variance-standardize {params.covar}"
+        "plink2 --linear {params.covar} --variance-standardize "
         "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
-        "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} "
+        # "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} " # unnecessary b/c merge subsets by region already
         "--out {params.out_prefix} --threads {threads} &>{log}"
 
 
