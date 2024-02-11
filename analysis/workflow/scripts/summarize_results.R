@@ -19,16 +19,17 @@ suppressMessages(library(ggplot2))
 source("workflow/scripts/utils.R")
 
 write("Loading input data", stderr())
+region = snakemake@params[["region"]]
 # import the finemap and susie results
 # and the path to an output directory
-X = readPGEN(snakemake@input[["gt"]])
+X = readPGEN(snakemake@input[["gt"]], region=region)
 # also load the positions of each of the variants
-pos = readPVAR(snakemake@input[["gt"]])
-causal_gt = readPGEN(snakemake@input[["causal_gt"]])
+pos = readPVAR(snakemake@input[["gt"]], region=region)
+causal_gt = readPGEN(snakemake@input[["causal_gt"]], region=region)
 X = cbind(X, causal_gt)
 causal_variant = colnames(causal_gt)[1]
 # also load the positions of each of the variants
-pos = c(pos, readPVAR(snakemake@input[["causal_gt"]]))
+pos = c(pos, readPVAR(snakemake@input[["causal_gt"]], region=region))
 write(paste("Loaded", length(pos), "positions"), stderr())
 
 if ("finemap" %in% names(snakemake@input)) {

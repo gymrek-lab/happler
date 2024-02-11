@@ -1,24 +1,34 @@
 library(pgenlibr)
 library(data.table)
 
-readPVAR = function(pfile) {
+readPVAR_base = function(pfile) {
   if (endsWith(pfile, ".pgen")) {
     pfile = substr(pfile, 1, nchar(pfile)-5)
   }
   pvar = data.table::fread(paste0(pfile, '.pvar'), sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE, skip="#CHROM\tPOS")
-  pos = as.integer(as.vector(pvar$POS))
+  colnames(pvar)[1] = "CHROM"
+  pvar$POS = as.integer(pvar$POS)
+  pvar
+}
+
+readPVAR = function(pfile, region=NULL) {
+  pvar = readPVAR_base(pfile)
+  if (!is.null(region)) {
+    chrom = strsplit(region, split=":")[[1]][1]
+    start_end = strsplit(strsplit(region, split=":")[[1]][2], split="-")[[1]]
+    matching = pvar$CHROM == chrom & pvar$POS > start_end[1] & pvar$POS < start_end[2]
+    pvar = pvar[matching,]
+  }
+  pos = as.vector(pvar$POS)
   names(pos) = pvar$ID
   pos
 }
 
 readPVAR_region = function(pfile, region) {
-  chrom = strsplit(region, split=":")[1]
-  start_end = strsplit(strsplit(region, split=":")[2], split="-")
-  if (endsWith(pfile, ".pgen")) {
-    pfile = substr(pfile, 1, nchar(pfile)-5)
-  }
-  pvar = data.table::fread(paste0(pfile, '.pvar'), sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE, skip="#CHROM\tPOS")
-  which(pvar$CHROM == chrom && pvar$POS < start_end[1] && pvar$POS > start_end[2])
+  chrom = strsplit(region, split=":")[[1]][1]
+  start_end = strsplit(strsplit(region, split=":")[[1]][2], split="-")[[1]]
+  pvar = readPVAR_base(pfile)
+  which(pvar$CHROM == chrom & pvar$POS > start_end[1] & pvar$POS < start_end[2])
 }
 
 readPGEN = function(pfile, region=NULL) {
@@ -36,7 +46,7 @@ readPGEN = function(pfile, region=NULL) {
   X = pgenlibr::ReadList(pgen, var_subset, meanimpute=FALSE)
   pgenlibr::ClosePgen(pgen)
   pgenlibr::ClosePvar(pvar)
-  colnames(X) = names(readPVAR(pfile))
+  colnames(X) = names(readPVAR(pfile, region=region))
   X
 }
 
