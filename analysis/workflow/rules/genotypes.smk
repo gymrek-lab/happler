@@ -182,7 +182,6 @@ rule subset:
         prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
         out=lambda wildcards, output: Path(output.pgen).with_suffix(""),
         sampsize=lambda wildcards: wildcards.sampsize,
-        region=lambda wildcards: locus.replace("_", ":"),
     output:
         pgen=out+"/subset/{sampsize}.pgen",
         pvar=out+"/subset/{sampsize}.pvar",

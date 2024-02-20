@@ -240,7 +240,7 @@ rule gwas:
     params:
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
-        covar = lambda wildcards, input: ("--covar 'iid-only' " + input["covar"]) if check_config("covar") else "allow-no-covars",
+        covar = lambda wildcards, input: ("'no-x-sex' --covar 'iid-only' " + input["covar"]) if check_config("covar") else "allow-no-covars",
         start=lambda wildcards: parse_locus(wildcards.locus)[1],
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
@@ -257,7 +257,7 @@ rule gwas:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --linear {params.covar} --variance-standardize "
+        "plink2 --glm {params.covar} --variance-standardize "
         "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
         # "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} " # unnecessary b/c merge subsets by region already
         "--out {params.out_prefix} --threads {threads} &>{log}"
