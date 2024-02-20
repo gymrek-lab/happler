@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-#SBATCH --export=ALL
-#SBATCH --partition=hotel
-#SBATCH --qos=hotel
-#SBATCH --output=/dev/null
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --time=8:00:00
+#SBATCH --export ALL
+#SBATCH --partition hotel
+#SBATCH --qos hotel
+#SBATCH --job-name happler-smk
+#SBATCH --nodes 1
+#SBATCH --ntasks 1
+#SBATCH --cpus-per-task 1
+#SBATCH --time 8:00:00
+#SBATCH --output /dev/null
 
 # An example bash script demonstrating how to run the entire snakemake pipeline
 # This script creates two separate log files in the output dir:
@@ -16,17 +18,17 @@
 # Also, make sure that this script is executed from the directory that it lives in!
 
 out_path="out"
-mkdir -p "$out_path/logs"
+mkdir -p "$out_path"
 
 # clear leftover log files
-echo ""> "$out_path/logs/log"
+echo ""> "$out_path/log"
 
 # try to find and activate the snakemake conda env if we need it
 if ! command -v 'snakemake' &>/dev/null && \
 	command -v 'conda' &>/dev/null && \
    [ "$CONDA_DEFAULT_ENV" != "snakemake" ] && \
    conda info --envs | grep "$CONDA_ROOT/snakemake" &>/dev/null; then
-        echo "Snakemake not detected. Attempting to switch to snakemake environment." >> "out/logs/log"
+        echo "Snakemake not detected. Attempting to switch to snakemake environment." >> "out/log"
         eval "$(conda shell.bash hook)"
         conda activate snakemake
 fi
@@ -42,9 +44,9 @@ if [ "$ENVIRONMENT" = "BATCH" ]; then
     --conda-frontend conda \
     --rerun-trigger {mtime,params,input} \
     -k \
-    -j 12 \
-    -c 12 \
-    "$@" &>"$out_path/logs/log"
+    -j 16 \
+    -c 16 \
+    "$@" &>"$out_path/log"
 else
     snakemake \
     --latency-wait 60 \
@@ -54,7 +56,7 @@ else
     --rerun-trigger {mtime,params,input} \
     -k \
     -c 4 \
-    "$@" &>"$out_path/logs/log"
+    "$@" &>"$out_path/log"
 fi
 
 exit_code="$?"
@@ -63,7 +65,7 @@ if command -v 'slack' &>/dev/null; then
         slack "snakemake finished successfully" &>/dev/null
     else
         slack "snakemake simulate_gwas job failed" &>/dev/null
-        slack "$(tail -n4 "$out_path/logs/log")" &>/dev/null
+        slack "$(tail -n4 "$out_path/log")" &>/dev/null
     fi
 fi
 exit "$exit_code"
