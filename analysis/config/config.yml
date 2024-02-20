@@ -14,8 +14,7 @@
 # required!
 # ref_panel: "/projects/ps-gymreklab/resources/datasets/snpstr/1kg.snp.str.chr{chr}.vcf.gz"
 # snp_panel: "/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
-# snp_panel: "../tests/data/19_45401409-46401409_1000G.pgen"
-snp_panel: "data/geuvadis/geuvadis_ensemble_phasing.pgen"
+snp_panel: "../tests/data/19_45401409-46401409_1000G.pgen"
 str_panel: "/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
 
 # Path to a list of samples to exclude from the analysis
@@ -40,8 +39,7 @@ str_panel: "/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pas
 # genome of the reference panel VCFs
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required! and unless otherwise noted, all attributes of each mode are required
-# locus: 19:45401409-46401409 # center: 45901409 (APOe4)
-locus: data/geuvadis/geuvadis_eqtl_genes.full.bed
+locus: 19:45401409-46401409 # center: 45901409 (APOe4)
 modes:
  str:
   pos: 19:45903857 # STR_691361
@@ -64,27 +62,17 @@ modes:
  run:
   pheno: data/geuvadis/phenos/{gene}.pheno
   # pheno_matrix: data/geuvadis/EUR_converted_expr_hg38.csv # optional
-mode: run
+mode: ld_range
 
 # Covariates to use if they're needed
 # covar: data/geuvadis/5PCs_sex.covar
-
-# locus: 1:98001984-99001984
-# modes:
-#  str: 1:98506615
-#  snp: 1:98501984
-# locus: 10:104457618-105457618
-# modes:
-#  str: 10:104639652
-#  snp: 10:104612335
-# locus: 16:56927279-57084844
 
 # Discard rare variants with a MAF below this number
 # Defaults to 0 if not specified
 min_maf: 0.1
 
 # Sample sizes to use
-# sample_size: [500, 1000, 1500, 2000, 2500]
+sample_size: [500, 1000, 1500, 2000, 2500]
 # sample_size: 777
 
 # Whether to include the causal variant in the set of genotypes provided to the

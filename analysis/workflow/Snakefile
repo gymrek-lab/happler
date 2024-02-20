@@ -52,11 +52,7 @@ use rule * from genotypes as genotypes_*
 config["gts_str_panel"] = rules.genotypes_subset_str.output.vcf
 if check_config("sample_size"):
     sampsize = config["sample_size"]
-    config["gts_snp_panel"] = expand(
-        rules.genotypes_subset.output.pgen,
-        sampsize=sampsize,
-        allow_missing=True,
-    )[0]
+    config["gts_snp_panel"] = rules.genotypes_subset.output.pgen
     config["out"] += "/{sampsize}samples"
 else:
     config["gts_snp_panel"] = rules.genotypes_subset.input.pgen
