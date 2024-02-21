@@ -68,6 +68,13 @@ def agg_ld_range_metrics(wildcards):
             **wildcards,
         )
 
+fill_out_globals = lambda wildcards, val: expand(
+    val,
+    locus=wildcards.locus,
+    sampsize=wildcards.sampsize,
+    allow_missing=True,
+)
+
 rule params:
     """ check how wildcards affect the haplotypes output by happler """
     input:
@@ -77,8 +84,8 @@ rule params:
         observed_haps=agg_ld_range_obs,
         causal_hap=agg_ld_range_causal,
     params:
-        observed_haps = lambda wildcards: config["happler_hap"],
-        causal_hap = lambda wildcards: config["causal_hap"],
+        observed_haps = lambda wildcards: fill_out_globals(wildcards, config["happler_hap"]),
+        causal_hap = lambda wildcards: fill_out_globals(wildcards, config["causal_hap"]),
     output:
         png=out + "/happler_params.png",
     resources:
@@ -104,9 +111,9 @@ rule metrics:
         causal_hap=agg_ld_range_causal,
         metrics=agg_ld_range_metrics,
     params:
-        observed_haps = lambda wildcards: config["happler_hap"],
-        causal_hap = lambda wildcards: config["causal_hap"],
-        metrics = lambda wildcards: config["happler_metrics"],
+        observed_haps = lambda wildcards: fill_out_globals(wildcards, config["happler_hap"]),
+        causal_hap = lambda wildcards: fill_out_globals(wildcards, config["causal_hap"]),
+        metrics = lambda wildcards: fill_out_globals(wildcards, config["happler_metrics"]),
     output:
         png=out + "/finemapping_metrics.png",
     resources:
