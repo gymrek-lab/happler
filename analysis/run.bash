@@ -37,11 +37,7 @@ fi
 # check: are we being executed from within qsub?
 if [ "$ENVIRONMENT" = "BATCH" ]; then
     snakemake \
-    --slurm \
-    --default-resources 'slurm_account=ddp268' 'slurm_partition=condo' "runtime=30" 'nodes=1' 'slurm_extra="--qos=condo"' \
-    --latency-wait 60 \
-    --use-conda \
-    --conda-frontend conda \
+    --workflow-profile profile/slurm \
     --rerun-trigger {mtime,params,input} \
     -k \
     -j 16 \
@@ -49,9 +45,7 @@ if [ "$ENVIRONMENT" = "BATCH" ]; then
     "$@" &>"$out_path/log"
 else
     snakemake \
-    --latency-wait 60 \
-    --use-conda \
-    --conda-frontend conda \
+    --workflow-profile profile/default \
     --notemp \
     --rerun-trigger {mtime,params,input} \
     -k \

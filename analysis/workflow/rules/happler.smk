@@ -38,10 +38,13 @@ rule run:
     output:
         hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
+        idx=out + "/happler.hap.gz.tbi",
         dot=out + "/happler.dot",
     resources:
         runtime=30,
-        queue="hotel",
+        # slurm_partition="hotel",
+        # slurm_extra="--qos=hotel",
+        # mem_mb=lambda wildcards, threads: threads*4.57,
     threads: 6
     log:
         logs + "/run",
@@ -158,7 +161,7 @@ rule finemapper:
         susie=out + "/{ex}clude/susie.rds",
     resources:
         runtime=75,
-        queue="hotel",
+    threads: 6,
     log:
         logs + "/{ex}clude/finemapper",
     benchmark:
@@ -179,7 +182,7 @@ rule metrics:
         metrics=out + "/susie_metrics.tsv",
     resources:
         runtime=5,
-        queue="hotel",
+    threads: 6,
     log:
         logs + "/metrics",
     benchmark:

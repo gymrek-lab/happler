@@ -118,7 +118,7 @@ class AssocTest(ABC):
         """
         std = np.std(X, axis=0)
         standardized = (X - np.mean(X, axis=0)) / std
-        # # for variants where the stdev is 0, just set all values to 0 instead of nan
+        # for variants where the stdev is 0, just set all values to 0 instead of nan
         zero_elements = std == 0
         standardized[:, zero_elements] = np.zeros((X.shape[0], np.sum(zero_elements)))
         return standardized

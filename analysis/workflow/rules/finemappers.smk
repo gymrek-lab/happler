@@ -22,7 +22,7 @@ rule susie:
         susie=out + "/{causal}clude/susie.rds",
     resources:
         runtime=15,
-        queue="hotel",
+        slurm_partition='hotel',
     log:
         logs + "/{causal}clude/susie",
     benchmark:
@@ -47,7 +47,7 @@ rule finemap:
         finemap=out + "/{causal}clude/finemap.rds",
     resources:
         runtime=45,
-        queue="hotel",
+        slurm_partition='hotel',
     log:
         logs + "/{causal}clude/finemap",
     benchmark:
@@ -73,7 +73,8 @@ rule results:
         susie_pdf= out + "/{causal}clude/susie.pdf",
     resources:
         runtime=60,
-        queue="hotel",
+        slurm_partition='hotel',
+        slurm_extra='--qos=hotel',
         # susie_eff_pdf=temp( out + "/{causal}clude/susie_eff.pdf"),
     log:
         logs + "/{causal}clude/results",
