@@ -28,7 +28,7 @@ from haptools.data import Data, Genotypes, GenotypesPLINK
     type=str,
     show_default="the first haplotype ID",
     help=(
-        "A haplotype ID from the target file to use"
+        "A haplotype ID from the target file to use "
         "(ex: '-i H1')."
     ),
 )

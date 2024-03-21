@@ -40,7 +40,7 @@ str_panel: "/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pas
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required! and unless otherwise noted, all attributes of each mode are required
 # locus: 19:45401409-46401409 # center: 45901409 (APOe4)
-locus: data/geuvadis/geuvadis_eqtl_genes.full.bed
+locus: data/geuvadis/geuvadis_eqtl_genes.full.liftover.bed
 modes:
  str:
   pos: 19:45903857 # STR_691361

@@ -28,7 +28,7 @@ if mode == "run":
 if Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
     with open(Path(config["locus"])) as f:
         locus_file = {
-            cols[3]: f"{cols[0]}_{cols[1]}-{cols[2]}"
+            cols[3]: f"{cols[0]}_{float(cols[1]):.0f}-{float(cols[2]):.0f}"
             for cols in (line.strip().split() for line in f)
             if not cols[0].startswith("#") and (
                 mode != "run" or (cols[3] in pheno_gene_set)
@@ -173,7 +173,11 @@ if mode == "ld_range":
 elif mode == "run":
     FINAL_OUTPUT = expand(
         expand(
-            rules.happler_manhattan.output.png,
+            [
+                rules.happler_tree.output.png,
+                rules.happler_manhattan.output.png,
+                # rules.happler_results.output.susie_pdf,
+            ],
             zip,
             gene=locus_file.keys(),
             locus=locus_file.values(),
