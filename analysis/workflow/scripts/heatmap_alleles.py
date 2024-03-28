@@ -35,11 +35,12 @@ def plot_hapmatrix(hpmt, hap_id, snps, colors = None):
     ax.set_yticks([])
     ax.set_yticklabels([])
     ax.set_xticks(np.arange(0, len(snps), 1))
-    ax.set_xticklabels(snps)
+    ax.set_xticklabels(snps, fontsize=6.5)
     # map between list of indices and list of colors from CAUSAL_COLOR_KEY
-    colors = map(list(CAUSAL_COLOR_KEY.keys()).__getitem__, colors)
-    for xtick, color in zip(ax.get_xticklabels(), colors):
-        xtick.set_color(color)
+    if colors is not None:
+        colors = map(list(CAUSAL_COLOR_KEY.keys()).__getitem__, colors)
+        for xtick, color in zip(ax.get_xticklabels(), colors):
+            xtick.set_color(color)
     ax.set_title("All haplotypes" if hap_id == "ALL" else "Haplotype %s"%hap_id)
     return fig
 
@@ -194,7 +195,9 @@ def main(
     hpmt = np.append(hpmt, pts[:, np.newaxis], axis=1)
 
     fig = plot_hapmatrix(
-        hpmt, hap_id, list(gts.variants["id"])+["pheno"], snp_colors.values()
+        hpmt, hap_id, list(gts.variants["id"])+["pheno"], (
+            snp_colors.values() if snp_colors is not None else None
+        ),
     )
     fig.tight_layout()
     fig.savefig(output)

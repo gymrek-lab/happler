@@ -79,6 +79,33 @@ rule tree:
         "dot -T{params.file_ext} {input.dot} -o {output.png} &>{log}"
 
 
+rule heatmap:
+    """look at the LD pattern of the haplotype"""
+    # TODO: also include causal hap if one exists
+    input:
+        pgen=config["snp_panel"],
+        pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
+        psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        hap=rules.run.output.hap,
+        pts=config["pheno"],
+    params:
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+    output:
+        heatmap=out + "/heatmap.png",
+    resources:
+        runtime=4,
+    log:
+        logs + "/heatmap",
+    benchmark:
+        bench + "/heatmap",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/heatmap_alleles.py --verbosity DEBUG "
+        "--use-hap-alleles --region {params.region} "
+        "-o {output.heatmap} {input.pgen} {input.hap} {input.pts} &>{log}"
+
+
 rule transform:
     input:
         hap=rules.run.output.gz,
