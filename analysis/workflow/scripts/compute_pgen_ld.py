@@ -10,6 +10,38 @@ from haptools.ld import pearson_corr_ld
 from haptools.data import Data, Genotypes, GenotypesPLINK
 
 
+def corr(a, b):
+    """
+    Speedily compute the pearson correlation coefficient of a set of variables
+    against a single variable
+
+    Adapted from https://stackoverflow.com/a/61587017/16815703
+
+    Please note that I haven't checked whether this offers the same precision as
+    np.corrcoef, but it is certainly faster.
+
+    Parameters
+    ----------
+        a: 2d numpy array
+        b: 1d numpy array
+
+    Returns
+    -------
+        c: numpy array
+            correlation coefficients of all columns of a against b
+    """
+    a = np.append(a, b[:, np.newaxis], axis=1)
+    i = -1
+
+    mean_t = np.mean(a, axis=0)
+    std_t = np.std(a, axis=0)
+    mean_i = mean_t[i]
+    std_i = std_t[i]
+    mean_xy = np.mean(a*a[:,i][:,None], axis=0)
+    c = (mean_xy - mean_i * mean_t)/(std_i * std_t)
+    return c[:-1]
+
+
 @click.command()
 @click.argument("gts", type=click.Path(exists=True, path_type=Path))
 @click.argument("target", type=click.Path(exists=True, path_type=Path))
@@ -81,6 +113,9 @@ def main(
 
     log.info("Summing target genotypes")
     target_gts = target.data[:, 0, :2].sum(axis=1)
+    variant_gts = gts.data[:, :, :2].sum(axis=2)
+
+    variant_lds = corr(variant_gts, target_gts)
 
     log.info("Computing LD between genotypes and the target")
     with Data.hook_compressed(output, mode="w") as ld_file:
@@ -88,8 +123,7 @@ def main(
         ld_file.write("CHR\tBP\tSNP\tR\n")
         for idx, variant in enumerate(gts.variants):
             var_chr, var_bp, var_snp = variant[["chrom", "pos", "id"]]
-            variant_gts = gts.data[:, idx, :2].sum(axis=1)
-            variant_ld = pearson_corr_ld(target_gts, variant_gts)
+            variant_ld = variant_lds[idx]
             ld_file.write(f"{var_chr}\t{var_bp}\t{var_snp}\t{variant_ld:.3f}\n")
 
 

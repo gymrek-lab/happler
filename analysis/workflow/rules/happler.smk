@@ -104,6 +104,38 @@ rule transform:
         "{input.pgen} {input.hap} &>{log}"
 
 
+sv_file = Path("/tscc/nfs/home/amassara/storage/utkarsh/sv_ld/pangenie_hprc_hg38_all-samples_bi_SVs-missing_removed.pgen")
+rule sv_ld:
+    """compute LD between this haplotype and a bunch of SVs"""
+    input:
+        hap=rules.transform.output.pgen,
+        hap_pvar=rules.transform.output.pvar,
+        hap_psam=rules.transform.output.psam,
+        sv=sv_file,
+        sv_pvar=sv_file.with_suffix(".pvar"),
+        sv_psam=sv_file.with_suffix(".psam"),
+    params:
+        start=lambda wildcards: max(0, int(parse_locus(wildcards.locus)[1])-1000000),
+        end=lambda wildcards: int(parse_locus(wildcards.locus)[2])+1000000,
+        chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
+        hapid="H0",
+    output:
+        ld=out + "/happler_svs.ld",
+    resources:
+        runtime=4,
+    log:
+        logs + "/sv_ld",
+    benchmark:
+        bench + "/sv_ld",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/compute_pgen_ld.py --verbosity DEBUG "
+        "--region '{params.chrom}:{params.start}-{params.end}' "
+        "--hap-id {params.hapid} -o /dev/stdout {input.sv} {input.hap} 2>{log} | "
+        "grep -Ev 'nan$' > {output} 2>>{log}"
+
+
 def merge_hps_input(wildcards):
     if config["random"] is None:
         # include the hap that happler found
