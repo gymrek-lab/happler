@@ -262,6 +262,13 @@ def results_happler_hap_input(wildcards):
     return expand(config["random_hap"], **wildcards)
 
 
+def results_causal_hap_input(wildcards):
+    if config["random"] is None:
+        if exclude_obs[wildcards.ex]:
+            return []
+    return expand(config["hap_file"], **wildcards)
+
+
 rule results:
     """
         create plots to summarize the results of the simulations when tested
@@ -272,9 +279,9 @@ rule results:
         susie=rules.finemapper.output.susie,
         happler_hap=results_happler_hap_input,
         causal_gt=config["causal_gt"].pgen if "causal_gt" in config else [],
+        causal_hap=results_causal_hap_input,
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
-        causal_hap=lambda wildcards: expand(config["hap_file"], **wildcards) if config["random"] is not None or not exclude_obs[wildcards.ex] else "",
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         susie_pdf = out + "/{ex}clude/susie.pdf",
