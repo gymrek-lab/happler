@@ -2,6 +2,7 @@
 #SBATCH --export ALL
 #SBATCH --partition hotel
 #SBATCH --qos hotel
+#SBATCH --account ddp268
 #SBATCH --job-name happler-smk
 #SBATCH --nodes 1
 #SBATCH --ntasks 1

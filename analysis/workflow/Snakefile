@@ -197,11 +197,14 @@ else:
         allow_missing=True,
     )
 
-rule all:
-    input:
-       expand(
-            FINAL_OUTPUT,
-            locus=locus,
-            sampsize=config["sample_size"],
-        ) if check_config("sample_size") else expand(FINAL_OUTPUT, locus=locus)
-    default_target: True
+# If '--config debug=true' is specified, we won't try to build the entire DAG
+# This can be helpful when you want to play around with a specific target output
+if not check_config("debug", False):
+    rule all:
+        input:
+            expand(
+                FINAL_OUTPUT,
+                locus=locus,
+                sampsize=config["sample_size"],
+            ) if check_config("sample_size") else expand(FINAL_OUTPUT, locus=locus)
+        default_target: True
