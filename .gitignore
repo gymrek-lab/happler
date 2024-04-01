@@ -13,6 +13,7 @@ analysis/data
 analysis/out
 analysis/log
 analysis/Rplots.pdf
+analysis/myenv.RData
 .snakemake
 .ipynb_checkpoints
 # vscode

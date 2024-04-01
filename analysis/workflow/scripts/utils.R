@@ -15,7 +15,7 @@ readPVAR = function(pfile, region=NULL) {
   pvar = readPVAR_base(pfile)
   if (!is.null(region)) {
     chrom = strsplit(region, split=":")[[1]][1]
-    start_end = strsplit(strsplit(region, split=":")[[1]][2], split="-")[[1]]
+    start_end = as.integer(strsplit(strsplit(region, split=":")[[1]][2], split="-")[[1]])
     matching = pvar$CHROM == chrom & pvar$POS > start_end[1] & pvar$POS < start_end[2]
     pvar = pvar[matching,]
   }
@@ -26,7 +26,7 @@ readPVAR = function(pfile, region=NULL) {
 
 readPVAR_region = function(pfile, region) {
   chrom = strsplit(region, split=":")[[1]][1]
-  start_end = strsplit(strsplit(region, split=":")[[1]][2], split="-")[[1]]
+  start_end = as.integer(strsplit(strsplit(region, split=":")[[1]][2], split="-")[[1]])
   pvar = readPVAR_base(pfile)
   which(pvar$CHROM == chrom & pvar$POS > start_end[1] & pvar$POS < start_end[2])
 }
