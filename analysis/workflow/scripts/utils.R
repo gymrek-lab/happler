@@ -61,3 +61,19 @@ readPSAM = function(pfile) {
 readPheno = function(pheno) {
   data.table::fread(pheno, sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
 }
+
+save_curr_env = function(env = parent.frame(), filePath = "myenv.RData") {
+  # This function is useful for debugging failed R scripts
+  # When this function is called from within a script, it will save all current
+  # environment variables into the specified RData file.
+  # Parameters:
+  #   env: The environment to save. By default, it saves the environment from which
+  #        the function was called (parent.frame()).
+  #   filePath: The path of the file where the environment will be saved.
+  #              By default, it saves to "myenv.RData" in the current working directory.
+  #
+  # Within an R session on the command line, you can then execute load("myenv.RData")
+  # or load(filePath) to inspect the environment.
+
+  save(list = ls(all.names = TRUE, envir = env), file = filePath, envir = env)
+}
