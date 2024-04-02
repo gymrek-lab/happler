@@ -2,7 +2,7 @@ latency-wait: 60
 use-conda: true
 conda-frontend: conda
 
-slurm: true
+executor: slurm
 default-resources:
     slurm_account: ddp268
     slurm_partition: condo
