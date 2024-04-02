@@ -109,6 +109,8 @@ if mode in ("snp", "hap", "ld_range", "run"):
         happler_config["hap_file"] = []
         happler_config["pheno"] = config["modes"][mode]["pheno"]
         happler_config["out"] = config["out"] + f"/happler/{mode}/" + "{gene}"
+        if check_config("SVs", place=config["modes"][mode]):
+            happler_config["SVs"] = config["modes"][mode]["SVs"]
 elif "str" == mode:
     pass
 else:

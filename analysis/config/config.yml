@@ -27,7 +27,7 @@ str_panel: "/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pas
 # phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
 
 # A "locus" is a string with a contig name, a colon, the start position, a dash, and
-# the end position
+# the end position or a BED file with a ".bed" file ending
 # There are different simulation modes that you can use:
 # 1. "str" - a tandem repeat is a string with a contig name, a colon, and the start position
 # 2. "snp" - a SNP follows the same format as "str"
@@ -62,10 +62,13 @@ modes:
   random: false # whether to also produce random haplotypes
  run:
   pheno: data/geuvadis/phenos/{gene}.pheno
+  SVs: data/geuvadis/pangenie_hprc_hg38_all-samples_bi_SVs-missing_removed.pgen
   # pheno_matrix: data/geuvadis/EUR_converted_expr_hg38.csv # optional
 mode: run
 
 # Covariates to use if they're needed
+# Otherwise, they're assumed to be regressed out of the phenotypes
+# Note: the finemapping methods won't be able to handle these covariates
 # covar: data/geuvadis/5PCs_sex.covar
 
 # Discard rare variants with a MAF below this number

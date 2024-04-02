@@ -52,9 +52,6 @@ def main(file1: Path, file2: Path, output: Path, region: str = None, replace: bo
     gts1.read(region=region)
     gts2.read(region=region)
 
-    gts1.check_phase()
-    gts2.check_phase()
-
     assert gts1.samples == gts2.samples
 
     if replace:

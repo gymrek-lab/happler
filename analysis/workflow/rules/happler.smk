@@ -131,16 +131,15 @@ rule transform:
         "{input.pgen} {input.hap} &>{log}"
 
 
-sv_file = Path("/tscc/nfs/home/amassara/storage/utkarsh/sv_ld/pangenie_hprc_hg38_all-samples_bi_SVs-missing_removed.pgen")
 rule sv_ld:
     """compute LD between this haplotype and a bunch of SVs"""
     input:
         hap=rules.transform.output.pgen,
         hap_pvar=rules.transform.output.pvar,
         hap_psam=rules.transform.output.psam,
-        sv=sv_file,
-        sv_pvar=sv_file.with_suffix(".pvar"),
-        sv_psam=sv_file.with_suffix(".psam"),
+        sv=lambda wildcards: config["SVs"],
+        sv_pvar=lambda wildcards: Path(config["SVs"]).with_suffix(".pvar"),
+        sv_psam=lambda wildcards: Path(config["SVs"]).with_suffix(".psam"),
     params:
         start=lambda wildcards: max(0, int(parse_locus(wildcards.locus)[1])-1000000),
         end=lambda wildcards: int(parse_locus(wildcards.locus)[2])+1000000,
@@ -298,12 +297,39 @@ rule results:
         "../scripts/summarize_results.R"
 
 
+rule merge_SVs:
+    input:
+        gts=rules.merge.output.pgen,
+        gts_pvar=rules.merge.output.pvar,
+        gts_psam=rules.merge.output.psam,
+        svs=lambda wildcards: config["SVs"],
+        svs_pvar=lambda wildcards: Path(config["SVs"]).with_suffix(".pvar"),
+        svs_psam=lambda wildcards: Path(config["SVs"]).with_suffix(".psam"),
+    params:
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+    output:
+        pgen=temp(out + "/{ex}clude/merged_SVs.pgen"),
+        pvar=temp(out + "/{ex}clude/merged_SVs.pvar"),
+        psam=temp(out + "/{ex}clude/merged_SVs.psam"),
+    resources:
+        runtime=4,
+    log:
+        logs + "/{ex}clude/merge_SVs",
+    benchmark:
+        bench + "/{ex}clude/merge_SVs",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/merge_plink.py --region {params.region} "
+        "{input.gts} {input.svs} {output.pgen} &> {log}"
+
+
 rule gwas:
     """run a GWAS"""
     input:
-        pgen=rules.merge.output.pgen,
-        pvar=rules.merge.output.pvar,
-        psam=rules.merge.output.psam,
+        pgen=(rules.merge_SVs if check_config("SVs") else rules.merge).output.pgen,
+        pvar=(rules.merge_SVs if check_config("SVs") else rules.merge).output.pvar,
+        psam=(rules.merge_SVs if check_config("SVs") else rules.merge).output.psam,
         pts=config["pheno"],
         covar=config["covar"],
     params:
@@ -339,7 +365,7 @@ rule manhattan:
         linear = lambda wildcards, input: f"-l "+input.linear,
         red_ids = lambda wildcards: [
             f"-i {i.split(':')[0]}" for i in check_config("snps", default=[])
-        ],
+        ] if not check_config("SVs") else "--red-chr-ids",
         orange_ids = lambda wildcards: "-b hap --orange-Hids",
         # TODO: allow specifying IDs from hap files, instead
     output:

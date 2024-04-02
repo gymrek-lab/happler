@@ -63,6 +63,18 @@ POINT_SIZE = 0.75
     show_default=True,
     help="Add any IDs of the form 'H:digit:' to the list of orange IDs",
 )
+# TODO: remove the red-chr-ids option and convert it into a regex option
+@click.option(
+    "--red-chr-ids",
+    hidden=True,
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help=(
+        "Add any IDs of the form 'chr.*' to the list of red IDs. "
+        "This option was designed specifically for the pangenie SVs in the 1000G dataset."
+    ),
+)
 @click.option(
     "--label/--no-label",
     is_flag=True,
@@ -100,6 +112,7 @@ def main(
     ids=tuple(),
     orange_ids=tuple(),
     orange_hids=False,
+    red_chr_ids=False,
     label=True,
     small=False,
     titles=tuple(),
@@ -153,6 +166,8 @@ def main(
         # retrieve any haplotype IDs (of the form 'H:digit:')
         if orange_hids:
             orange_ids += tuple(df.id[df.id.str.contains("^H\d+$")])
+        if red_chr_ids:
+            red_ids += tuple(df.id[df.id.str.contains("^chr(\d+|X|Y)-\d+-.*$")])
         # create the plot using pandas and add it to the figure
         if small:
             df[~df["id"].isin(red_ids + orange_ids)].plot(
