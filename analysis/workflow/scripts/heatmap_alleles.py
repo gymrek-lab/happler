@@ -19,17 +19,15 @@ CAUSAL_COLOR_KEY = {
 }
 
 
-def plot_hapmatrix(hpmt, hap_id, snps, colors = None):
+def plot_hapmatrix(ax, hpmt, hap_id, snps, colors = None):
     """
     Adapted from this script by Shubham Saini
     https://github.com/shubhamsaini/pgc_analysis/blob/master/viz-snp-hap.py
     """
-    box_w =  1.0/hpmt.shape[1]
-    box_h = box_w
-    hap_height = hpmt.shape[0]*0.0025*4
-    legend_height = 0
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
+    # box_w =  1.0/hpmt.shape[1]
+    # box_h = box_w
+    # hap_height = hpmt.shape[0]*0.0025*4
+    # legend_height = 0
     # Plot SNPs
     ax.imshow(hpmt, vmin=0, vmax=1, cmap=plt.cm.Greys, aspect="auto", interpolation="none")
     ax.set_yticks([])
@@ -42,7 +40,57 @@ def plot_hapmatrix(hpmt, hap_id, snps, colors = None):
         for xtick, color in zip(ax.get_xticklabels(), colors):
             xtick.set_color(color)
     ax.set_title("All haplotypes" if hap_id == "ALL" else "Haplotype %s"%hap_id)
-    return fig
+
+
+def get_cmap_string(palette, domain):
+    """
+    Uniquely map a list of strings to distinct colors
+
+    Return a dictionary mapping each domain string to a color
+
+    Adapted from https://stackoverflow.com/a/59034585/16815703
+    """
+    domain_unique = np.unique(domain)
+    hash_table = {key: i_str for i_str, key in enumerate(domain_unique)}
+    mpl_cmap = matplotlib.cm.get_cmap(palette, lut=len(domain_unique))
+
+    def cmap_out(X, **kwargs):
+        return mpl_cmap(hash_table[X], **kwargs)
+
+    return dict(zip(domain, map(cmap_out, domain)))
+
+
+def plot_hap_label_table(ax, hps, hps_vars):
+    """
+    Append a haplotype "label table" to the bottom of the haplotype matrix
+
+    This is useful when multiple haplotypes are pictured in the table
+    """
+    hps_ids = list(hps.data.keys())
+    # create a dictionary mapping haplotypes to unique colors
+    hps_colors = get_cmap_string('viridis', hps_ids)
+    # create a matrix of colors for the table
+    snp_colors = np.array([
+        [(hps_colors[hp.id] if snp in hp.varIDs else (1, 1, 1, 1)) for snp in hps_vars]
+        for hp in hps.data.values()
+    ], dtype='float32')
+    # add a blank column for pheno
+    snp_colors = np.append(
+        snp_colors,
+        np.ones((snp_colors.shape[0], 1, snp_colors.shape[2])),
+        1
+    )
+    # now finally create the plot
+    table = ax.table(
+        cellColours=snp_colors,
+        rowLabels=hps_ids,
+        bbox=[0, -0.28, 1, 0.05*len(hps_ids)],
+        # edges="horizontal",
+        loc="bottom",
+    )
+    # remove table edges
+    for c in table.properties()['celld'].values():
+        c.set(linewidth=0)
 
 
 @click.command()
@@ -77,7 +125,7 @@ def plot_hapmatrix(hpmt, hap_id, snps, colors = None):
     help=(
         "The path to a .hap file containing haplotypes simulated to be causal. "
         "These will be added to the plot and highlited differently."
-    )
+    ),
 )
 @click.option(
     "--use-hap-alleles",
@@ -85,6 +133,13 @@ def plot_hapmatrix(hpmt, hap_id, snps, colors = None):
     default=False,
     show_default=True,
     help="Color alleles from the haplotype as black instead of just the ALT alleles"
+)
+@click.option(
+    "--label-haps/--no-label-haps",
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help="Whether to add labels for each of the haplotypes. Doesn't work with --causal",
 )
 @click.option(
     "-o",
@@ -110,6 +165,7 @@ def main(
     hap_id: str = None,
     causal: Path = None,
     use_hap_alleles: bool = False,
+    label_haps: bool = True,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "INFO"
 ):
@@ -137,6 +193,9 @@ def main(
 
     snp_colors = None
     if causal is not None:
+        # since --label-haps is not yet supported with --causal
+        label_haps = False
+
         hps_causal = Haplotypes(causal, log=log)
         hps_causal.read()
         # if there is more than one haplotype
@@ -194,12 +253,18 @@ def main(
     pts = (pts-pts.min())/(pts.max()-pts.min())
     hpmt = np.append(hpmt, pts[:, np.newaxis], axis=1)
 
-    fig = plot_hapmatrix(
-        hpmt, hap_id, list(gts.variants["id"])+["pheno"], (
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    plot_hapmatrix(
+        ax, hpmt, hap_id, list(gts.variants["id"])+["pheno"], (
             snp_colors.values() if snp_colors is not None else None
         ),
     )
+    if label_haps:
+        plot_hap_label_table(ax, hps, list(gts.variants["id"]))
     fig.tight_layout()
+    fig.subplots_adjust(wspace=0, hspace=0)
     fig.savefig(output)
 
 

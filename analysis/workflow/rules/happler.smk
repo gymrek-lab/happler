@@ -91,7 +91,7 @@ rule heatmap:
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
-        heatmap=out + "/heatmap.png",
+        png=out + "/heatmap.pdf",
     resources:
         runtime=4,
     log:
@@ -102,8 +102,8 @@ rule heatmap:
         "happler"
     shell:
         "workflow/scripts/heatmap_alleles.py --verbosity DEBUG "
-        "--use-hap-alleles --region {params.region} "
-        "-o {output.heatmap} {input.pgen} {input.hap} {input.pts} &>{log}"
+        "--region {params.region} -o {output.png} "
+        "{input.pgen} {input.hap} {input.pts} &>{log}"
 
 
 rule transform:
