@@ -60,7 +60,7 @@ def get_cmap_string(palette, domain):
     return dict(zip(domain, map(cmap_out, domain)))
 
 
-def plot_hap_label_table(ax, hps, hps_vars):
+def plot_hap_label_table(ax, hps, hps_vars, ref_alleles):
     """
     Append a haplotype "label table" to the bottom of the haplotype matrix
 
@@ -69,9 +69,26 @@ def plot_hap_label_table(ax, hps, hps_vars):
     hps_ids = list(hps.data.keys())
     # create a dictionary mapping haplotypes to unique colors
     hps_colors = get_cmap_string('viridis', hps_ids)
+    # IDs to alleles
+    alleles = {
+        hp_id: {
+            snp.id: snp.allele == ref_alleles[snp.id]
+            for snp in hps.data[hp_id].variants
+        }
+        for hp_id in hps_ids
+    }
+    change_opacity = lambda color, opaque: (0, 0, 0, 0.5 if opaque else 1)
     # create a matrix of colors for the table
     snp_colors = np.array([
-        [(hps_colors[hp.id] if snp in hp.varIDs else (1, 1, 1, 1)) for snp in hps_vars]
+        [
+            (
+                change_opacity(
+                    hps_colors[hp.id],
+                    alleles[hp.id][snp]
+                ) if snp in hp.varIDs else (1, 1, 1, 1)
+            )
+            for snp in hps_vars
+        ]
         for hp in hps.data.values()
     ], dtype='float32')
     # add a blank column for pheno
@@ -128,13 +145,6 @@ def plot_hap_label_table(ax, hps, hps_vars):
     ),
 )
 @click.option(
-    "--use-hap-alleles",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Color alleles from the haplotype as black instead of just the ALT alleles"
-)
-@click.option(
     "--label-haps/--no-label-haps",
     is_flag=True,
     default=True,
@@ -164,7 +174,6 @@ def main(
     region: str = None,
     hap_id: str = None,
     causal: Path = None,
-    use_hap_alleles: bool = False,
     label_haps: bool = True,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "INFO"
@@ -187,9 +196,6 @@ def main(
     hps_vars = {var.id: var.allele for hap in hps.data for var in hps.data[hap].variants}
     if hap_id is None:
         hap_id = "ALL"
-        if use_hap_alleles:
-            log.warning("A hap ID wasn't given. Setting --use-hap-alleles to False")
-            use_hap_alleles = False
 
     snp_colors = None
     if causal is not None:
@@ -230,16 +236,7 @@ def main(
     gts.subset(variants=list(hps_vars.keys()), inplace=True)
     pts.subset(samples=gts.samples)
     num_samps, num_snps, _ = gts.data.shape
-
-    if use_hap_alleles:
-        for var_idx, var in enumerate(gts.variants):
-            # is it the REF or ALT allele?
-            allele = var["alleles"][1] == hps_vars[var["id"]]
-            if snp_colors is not None and (snp_colors[var["id"]] == 1):
-                allele = not allele
-            # modify the genotype matrix to contain 1s only when the allele is present
-            gts.data[:, var_idx] = gts.data[:, var_idx] == allele
-            gts.variants[var_idx]["id"] += f":{int(allele)}"
+    ref_alleles = {snp["id"]:snp["alleles"][0] for snp in gts.variants}
 
     # resulting shape is num_samps * 2 by num_SNPs
     hpmt = gts.data.transpose((0, 2, 1)).reshape((num_samps*2, num_snps)).astype(np.bool_)
@@ -253,7 +250,6 @@ def main(
     pts = (pts-pts.min())/(pts.max()-pts.min())
     hpmt = np.append(hpmt, pts[:, np.newaxis], axis=1)
 
-
     fig = plt.figure()
     ax = fig.add_subplot(111)
     plot_hapmatrix(
@@ -262,7 +258,7 @@ def main(
         ),
     )
     if label_haps:
-        plot_hap_label_table(ax, hps, list(gts.variants["id"]))
+        plot_hap_label_table(ax, hps, list(gts.variants["id"]), ref_alleles)
     fig.tight_layout()
     fig.subplots_adjust(wspace=0, hspace=0)
     fig.savefig(output)
