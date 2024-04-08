@@ -28,6 +28,10 @@ def plot_hapmatrix(ax, hpmt, hap_id, snps, colors = None):
     # box_h = box_w
     # hap_height = hpmt.shape[0]*0.0025*4
     # legend_height = 0
+    # replace white with grey in the hap matrix
+    pheno_0s = hpmt[:,-1] == 0
+    hpmt[hpmt == 0] = 0.5
+    hpmt[pheno_0s, -1] = 0
     # Plot SNPs
     ax.imshow(hpmt, vmin=0, vmax=1, cmap=plt.cm.Greys, aspect="auto", interpolation="none")
     ax.set_yticks([])
@@ -39,6 +43,11 @@ def plot_hapmatrix(ax, hpmt, hap_id, snps, colors = None):
         colors = map(list(CAUSAL_COLOR_KEY.keys()).__getitem__, colors)
         for xtick, color in zip(ax.get_xticklabels(), colors):
             xtick.set_color(color)
+    # also remove the frame around it
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
     ax.set_title("All haplotypes" if hap_id == "ALL" else "Haplotype %s"%hap_id)
 
 
@@ -106,8 +115,8 @@ def plot_hap_label_table(ax, hps, hps_vars, ref_alleles):
         loc="bottom",
     )
     # remove table edges
-    for c in table.properties()['celld'].values():
-        c.set(linewidth=0)
+    for key, cell in table.get_celld().items():
+        cell.set_linewidth(0)
 
 
 @click.command()
@@ -259,6 +268,11 @@ def main(
     )
     if label_haps:
         plot_hap_label_table(ax, hps, list(gts.variants["id"]), ref_alleles)
+    # also label the colors
+    grey_patch = matplotlib.patches.Patch(color=(0, 0, 0, 0.5), label="REF")
+    black_patch = matplotlib.patches.Patch(color=(0, 0, 0, 1), label="ALT")
+    fig.legend(handles=[grey_patch, black_patch], ncol=2, loc="upper right", frameon=False)
+    # now, tidy up and save
     fig.tight_layout()
     fig.subplots_adjust(wspace=0, hspace=0)
     fig.savefig(output)
