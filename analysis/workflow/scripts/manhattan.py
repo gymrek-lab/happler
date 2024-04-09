@@ -167,7 +167,7 @@ def main(
         if orange_hids:
             orange_ids += tuple(df.id[df.id.str.contains("^H\d+$")])
         if red_chr_ids:
-            red_ids += tuple(df.id[df.id.str.contains("^chr(\d+|X|Y)-\d+-.*$")])
+            red_ids += tuple(df.id[df.id.str.contains("^chr(?:\d+|X|Y)-\d+-.*$")])
         # create the plot using pandas and add it to the figure
         if small:
             df[~df["id"].isin(red_ids + orange_ids)].plot(

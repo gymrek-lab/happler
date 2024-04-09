@@ -141,7 +141,7 @@ rule linreg:
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
-        png=out + "/linreg.png",
+        png=out + "/linreg.pdf",
     resources:
         runtime=4,
     log:

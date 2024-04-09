@@ -74,8 +74,14 @@ def main(
 
     # set up plot: each haplotype is a column in the subplots
     fig, axs = plt.subplots(1, len(gts.variants), sharey=True)
+    # handle situations where there's only one hap
+    if len(gts.variants) == 1:
+        axs = [axs,]
+
+    log.info(f"Making {len(gts.variants)} subplots")
 
     for hp_idx in range(len(gts.variants)):
+        log.info(f"Making subplot {hp_idx}")
         # gt vals (should just be 0, 1, 2)
         gt_vals = np.unique(hap_gts[:, hp_idx])
         # group phenotype data by genotype
