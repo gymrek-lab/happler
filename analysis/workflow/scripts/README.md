@@ -33,6 +33,9 @@ Plot the LD between a causal haplotype and a set of observed haplotypes across a
 ## [peer_residuals.R](peer_residuals.R)
 Create PEER factors for gene expression phenotypes
 
+## [plot_gts.py](plot_gts.py)
+Plot phenotypes against genotypes for a haplotype.
+
 ## [plot_phenotypes.py](plot_phenotypes.py)
 Performs a linear regression and outputs a plot for phenotypes from `generate_phenotypes.py`.
 

@@ -131,6 +131,31 @@ rule transform:
         "{input.pgen} {input.hap} &>{log}"
 
 
+rule linreg:
+    """plot a haplotype's genotypes against its phenotypes"""
+    input:
+        hap=rules.transform.output.pgen,
+        hap_pvar=rules.transform.output.pvar,
+        hap_psam=rules.transform.output.psam,
+        pts=config["pheno"],
+    params:
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+    output:
+        png=out + "/linreg.png",
+    resources:
+        runtime=4,
+    log:
+        logs + "/linreg",
+    benchmark:
+        bench + "/linreg",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/plot_gts.py --verbosity DEBUG "
+        "-o {output.png} --region {params.region} "
+        "{input.hap} {input.pts} 2>{log}"
+
+
 rule sv_ld:
     """compute LD between this haplotype and a bunch of SVs"""
     input:
