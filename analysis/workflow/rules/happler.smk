@@ -106,6 +106,38 @@ rule heatmap:
         "{input.pgen} {input.hap} {input.pts} &>{log}"
 
 
+rule igv:
+    """look at the haplotype in IGV"""
+    input:
+        hap=rules.run.output.hap,
+        prefs = "data/igv.prefs.properties", # todo move this into config
+        hprc_urls = "data/hprc.bam.list",
+    params:
+        chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
+        outdir=lambda wildcards, output: Path(output.png).parent,
+        width=10000,
+    output:
+        bed=temp(out + "/happler_snps.bed"),
+        png=out + "/igv.png",
+    resources:
+        runtime=10,
+    log:
+        logs + "/igv",
+    benchmark:
+        bench + "/igv",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "grep -E '^V' {input.hap} | "
+        "awk -F $'\\t' -v 'OFS=\\t' '{{print {params.chrom}, $3, $4, $2\"_\"$5;}}' > {output.bed} && "
+        "igv -o {input.prefs} -b <("
+        "sed 's+mySnapshotDirectory+{params.outdir}+' workflow/scripts/igv.bat"
+        ") -l {params.chrom}:$( "
+        "grep -Ev '^#' {input.hap} | awk -F $'\\t' "
+        "'BEGIN {{ min = \"inf\"; max = \"-inf\" }} {{ if ($3 < min) min = $3; if ($4 > max) max = $4 }} END {{ print (min-{params.width})\"-\"(max+{params.width}) }}'"
+        ") {input.hprc_urls} {output.bed} &>{log}"
+
+
 rule transform:
     input:
         hap=rules.run.output.gz,
