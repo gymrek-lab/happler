@@ -115,6 +115,7 @@ rule igv:
     params:
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
         outdir=lambda wildcards, output: Path(output.png).parent,
+        outfile=lambda wildcards, output: Path(output.png).name,
         width=10000,
     output:
         bed=temp(out + "/happler_snps.bed"),
@@ -128,14 +129,15 @@ rule igv:
     conda:
         "../envs/default.yml"
     shell:
-        "grep -E '^V' {input.hap} | "
-        "awk -F $'\\t' -v 'OFS=\\t' '{{print {params.chrom}, $3, $4, $2\"_\"$5;}}' > {output.bed} && "
-        "igv -o {input.prefs} -b <("
-        "sed 's+mySnapshotDirectory+{params.outdir}+' workflow/scripts/igv.bat"
-        ") -l {params.chrom}:$( "
+        "region={params.chrom}:$( "
         "grep -Ev '^#' {input.hap} | awk -F $'\\t' "
         "'BEGIN {{ min = \"inf\"; max = \"-inf\" }} {{ if ($3 < min) min = $3; if ($4 > max) max = $4 }} END {{ print (min-{params.width})\"-\"(max+{params.width}) }}'"
-        ") {input.hprc_urls} {output.bed} &>{log}"
+        ") && grep -E '^V' {input.hap} | "
+        "awk -F $'\\t' -v 'OFS=\\t' '{{print {params.chrom}, $3, $4, $2\"_\"$5;}}' > {output.bed} && "
+        "igv -o {input.prefs} -b <("
+        "sed 's+mySnapshotDirectory+{params.outdir}+;s/REGION/'$region'/;s+BED+{output.bed}+' workflow/scripts/igv.bat && "
+        "cut -f1,2 --output-delimiter=: {output.bed} | sort -u | sed 's/^/SORT BASE /' && echo 'snapshot {params.outfile}' && echo exit"
+        ") &>{log}"
 
 
 rule transform:

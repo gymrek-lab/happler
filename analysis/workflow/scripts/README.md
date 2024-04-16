@@ -15,6 +15,9 @@ Generate proper input files to run FINEMAP. Then run it.
 ## [heatmap_alleles.py](heatmap_alleles.py)
 Create a heatmap of the phenotypes and alleles in a haplotype from a `.hap` file.
 
+## [igv.bat](igv.bat)
+Batch scripts for automated IGV plotting
+
 ## [keep_samps.bash](keep_samps.bash)
 Determine the intersection of the set of samples between multiple input reference panels
 
