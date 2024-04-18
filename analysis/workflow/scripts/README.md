@@ -59,3 +59,6 @@ Output specific metrics about the success of a SuSiE run.
 
 ## [utils.R](utils.R)
 Define some useful methods for reading various file types into R. This script is sourced by other R scripts but never executed directly.
+
+## [variance_explained_plot.py](variance_explained_plot.py)
+Plot variance explained by haplotypes vs SNPs among all loci in a dataset.
