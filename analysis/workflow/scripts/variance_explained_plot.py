@@ -32,53 +32,64 @@ def standardize(data):
     return new_data
 
 
-def compute_explained_variance(beta: float, gt: npt.NDArray, pt: npt.NDArray, override: bool = True):
+def compute_explained_variance(gt: npt.NDArray, pt: npt.NDArray):
     """
-    compute explained variance for a SNP or haplotype
+    Compute explained variance for each SNP or haplotype in a set
 
-    If beta is a 1D array instead of a single value, gt should be a 2D array of
-    num_samples by num_variants
+    The explained variance is beta^2 in a linear model y = bx + e when x and y have
+    been standardized to mean 0 and stdev 1
 
     Parameters
     ----------
-    beta: float
-        The effect size of the SNP or haplotype
     gt: npt.NDArray
-        The genotypes of the SNP (or haplotype) as a 1D array
+        The genotypes of the SNP (or haplotype) as a 2D array of shape:
+        num_samples by num_variants
     pt: npt.NDArray
         The phenotype as a 1D array
-    override: bool, optional
-        If True, recompute beta and override it
     
     Returns
     -------
     float
-        The explained variance of the SNP or haplotype
+        The explained variance of the SNPs/haplotypes
     """
-    if override:
-        betas = np.empty(len(beta), dtype=np.float64)
-        pt = standardize(pt[:, np.newaxis]).flatten()
-        gt = standardize(gt)
-        for j in range(len(beta)):
-            model = sm.OLS(pt, gt[:, j].flatten())
-            betas[j] = (model.fit().params[0])**2
-        return betas
-    else:
-        return (beta**2) * np.var(gt, axis=0) / np.var(pt)
+    # standardize the phenotypes and genotypes
+    pt = standardize(pt[:, np.newaxis]).flatten()
+    gt = standardize(gt)
+    # compute the betas of each SNP by fitting a linear model y = beta * x + e
+    betas = np.array([
+        sm.OLS(pt, gt[:, snp_idx].flatten()).fit().params[0]
+        for snp_idx in range(gt.shape[1])
+    ])
+    return betas**2
 
 
 def get_explained_variances(
     gts: Path,
     hps: Path,
     pts: Path,
-    linear: Path,
-    region: str = None,
     log: Logger = None
 ):
-    """return explained variance for a hap file and the alleles in it"""
-    # fix the region
-    region = region.replace("_", ":")
+    """
+    Compute explained variance for the haplotypes in a .hap file and each haplotypes'
+    SNPs
 
+    Parameters
+    ----------
+    gts: Path
+        The path to a PGEN file containing genotypes for all haplotypes and their SNPs
+    hps: Path
+        The path to a .hap file containing a set of haplotypes
+    pts: Path
+        The path to a pheno file containing the phenotypes
+    log: Logger, optional
+        A logging object to write any debugging and error messages
+    
+    Returns
+    -------
+    dict[str, tuple[float, float]]
+        Explained variances of 1) each haplotype in the .hap file and 2) the
+        haplotype's SNPs. The dict is keyed by each haplotype's ID
+    """
     # load the haplotypes
     hps = Haplotypes(hps, log=log)
     hps.read()
@@ -86,6 +97,13 @@ def get_explained_variances(
     # which variants do we need?
     variants = {v.id for hap in hps.data.values() for v in hap.variants}
     variants.update(hps.data.keys())
+
+    # what region should we use?
+    # we can figure it out by looking at the haps in the .hap file
+    chrom = next(iter(hps.data.values())).chrom
+    min_pos = min(v.start for hap in hps.data.values() for v in hap.variants)
+    max_pos = max(v.end for hap in hps.data.values() for v in hap.variants)
+    region = chrom + ":" + str(min_pos) + "-" + str(max_pos)
 
     # load the SNP and hap genotypes
     gts = GenotypesPLINK(fname=gts, log=log)
@@ -99,29 +117,9 @@ def get_explained_variances(
     pts = Phenotypes(pts, log=log)
     pts.read()
 
-    # load the linear files
-    ids = [None]*len(gts.variants)
-    betas = np.empty(len(gts.variants), dtype=np.float64)
-    with open(linear, 'r') as linear_file:
-        # Read the first line to find column indices
-        header = linear_file.readline().split("\t")
-        id_index = header.index('ID')
-        beta_index = header.index('BETA')
-        # Read the rest of the lines
-        idx = 0
-        for line in linear_file:
-            parts = line.split("\t")
-            if parts[id_index] in variants:
-                ids[idx] = parts[id_index]
-                betas[idx] = parts[beta_index]
-                idx += 1
-
-    # reorder betas in case their ordering is different than in gts.variants
-    betas = betas[[gts._var_idx[v] for v in ids]]
-
     # compute explained variance for each SNP and haplotype
     raw_explained_variances = dict(zip(gts.variants["id"], compute_explained_variance(
-        betas, gts.data.sum(axis=2), pts.data[:, 0],
+        gts.data.sum(axis=2), pts.data[:, 0],
     )))
 
     # create a dictionary mapping hap IDs to two-element tuples containing
@@ -129,18 +127,15 @@ def get_explained_variances(
     explained_variances = {}
     for hp in hps.data.values():
         sum_of_SNPs = sum(raw_explained_variances[v.id] for v in hp.variants)
-        if sum_of_SNPs > 1:
-            breakpoint()
         explained_variances[hp.id] = (raw_explained_variances[hp.id], sum_of_SNPs)
 
-    return explained_variances.values()
+    return explained_variances
 
 
 @click.command()
 @click.argument("genotypes", type=click.Path(path_type=Path))
 @click.argument("phenotypes", type=click.Path(path_type=Path))
 @click.argument("haplotypes", type=click.Path(path_type=Path))
-@click.argument("linears", type=click.Path(path_type=Path))
 @click.option(
     "-s",
     "--subset",
@@ -169,7 +164,6 @@ def main(
     genotypes: Path,
     phenotypes: Path,
     haplotypes: Path,
-    linears: Path,
     subset: Path = None,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
@@ -213,16 +207,24 @@ def main(
             get_hap_fname(genotypes, params[idx]),
             get_hap_fname(haplotypes, params[idx]),
             get_hap_fname(phenotypes, params[idx]),
-            get_hap_fname(linears, params[idx]),
-            region=(params[idx]["locus"] if "locus" in dtypes else None),
             log=log
-        )
+        ).values()
     ])
 
-    percent_success = (
+    if np.any(explained_variances > 1):
+        log.error(
+            "Some of the explained variances is greater than 1! Check that nothing "
+            "went wrong."
+        )
+
+    # how good are we doing?
+    percent_success = 100*(
         explained_variances[:, 1] < explained_variances[:, 0]
     ).sum()/explained_variances.shape[0]
-    print(percent_success)
+    log.warning(
+        f"{percent_success:.3f}% of haplotypes explain more phenotypic variation than"
+        " their SNPs"
+    )
 
     max_val = explained_variances.max()
 
