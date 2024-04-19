@@ -289,6 +289,25 @@ rule finemapper:
         "workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
 
 
+rule pips:
+    """ extract PIPs to a TSV file """
+    input:
+        rds=rules.finemapper.output.susie,
+    output:
+        tsv=out + "/{ex}clude/susie_pips.tsv",
+    resources:
+        runtime=5,
+    threads: 3,
+    log:
+        logs + "/{ex}clude/pips",
+    benchmark:
+        bench + "/{ex}clude/pips",
+    conda:
+        "../envs/susie.yml"
+    shell:
+        "workflow/scripts/extract_pips.R {input} {output} &>{log}"
+
+
 rule metrics:
     """ compute summary metrics from the output of the finemapper """
     input:

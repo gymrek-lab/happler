@@ -9,6 +9,9 @@ Choose haplotype alleles such that their SNPs have a range of strengths of LD wi
 ## [create_hap_file.sh](create_hap_file.sh)
 Create a [.hap file](https://haptools.readthedocs.io/en/stable/formats/haplotypes.html) for use by haptools when simulating causal variables.
 
+## [extract_pips.R](extract_pips.R)
+Extract PIPs from the output of run_SuSiE.R
+
 ## [finemap_1p4.R](finemap_1p4.R)
 Generate proper input files to run FINEMAP. Then run it.
 
