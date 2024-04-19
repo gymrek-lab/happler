@@ -90,6 +90,10 @@ def get_explained_variances(
         Explained variances of 1) each haplotype in the .hap file and 2) the
         haplotype's SNPs. The dict is keyed by each haplotype's ID
     """
+    # load the phenotypes
+    pts = Phenotypes(pts, log=log)
+    pts.read()
+
     # load the haplotypes
     hps = Haplotypes(hps, log=log)
     hps.read()
@@ -107,15 +111,12 @@ def get_explained_variances(
 
     # load the SNP and hap genotypes
     gts = GenotypesPLINK(fname=gts, log=log)
-    gts.read(variants=variants, region=region)
+    gts.read(variants=variants, region=region, samples=pts.samples)
     gts.check_phase()
     gts.check_missing()
     gts.check_biallelic()
     gts.index()
-
-    # load the phenotypes
-    pts = Phenotypes(pts, log=log)
-    pts.read()
+    pts.subset(samples=gts.samples, inplace=True)
 
     # compute explained variance for each SNP and haplotype
     raw_explained_variances = dict(zip(gts.variants["id"], compute_explained_variance(

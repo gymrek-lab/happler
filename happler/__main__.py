@@ -263,8 +263,7 @@ def run(
         ph.names = ph.names[:1]
         ph.data = ph.data[:, :1]
     # also reorder and subset samples in Phenotypes to match those in the Genotypes
-    # TODO: use inplace once haptools is updated
-    ph = ph.subset(samples=tuple(gt.samples), names=(pheno,))
+    ph.subset(samples=tuple(gt.samples), names=(pheno,), inplace=True)
 
     log.debug("Setting up tree builder settings")
     if covars:

@@ -243,7 +243,7 @@ def main(
     gts.check_missing()
     gts.check_biallelic()
     gts.subset(variants=list(hps_vars.keys()), inplace=True)
-    pts.subset(samples=gts.samples)
+    pts.subset(samples=gts.samples, inplace=True)
     num_samps, num_snps, _ = gts.data.shape
     ref_alleles = {snp["id"]:snp["alleles"][0] for snp in gts.variants}
 

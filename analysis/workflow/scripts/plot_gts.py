@@ -69,7 +69,7 @@ def main(
 
     pts = Phenotypes(pts, log=log)
     pts.read()
-    pts.subset(samples=gts.samples)
+    pts.subset(samples=gts.samples, inplace=True)
     pt = pts.data[:, 0]
 
     # set up plot: each haplotype is a column in the subplots
