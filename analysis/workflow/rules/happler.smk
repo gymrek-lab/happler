@@ -79,6 +79,33 @@ rule tree:
         "dot -T{params.file_ext} {input.dot} -o {output.png} &>{log}"
 
 
+rule cond_linreg:
+    """plot conditional regressions for a haplotype"""
+    input:
+        pgen=config["snp_panel"],
+        pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
+        psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        hap=rules.run.output.hap,
+        pts=config["pheno"],
+    params:
+        hap_id = "H0",
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+    output:
+        png=out + "/cond_linreg.pdf",
+    resources:
+        runtime=10,
+    log:
+        logs + "/cond_linreg",
+    benchmark:
+        bench + "/cond_linreg",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/conditional_regression_plots.py --verbosity DEBUG "
+        "--region {params.region} -o {output.png} -i H0 "
+        "{input.pgen} {input.pts} {input.hap} &>{log}"
+
+
 rule heatmap:
     """look at the LD pattern of the haplotype"""
     # TODO: also include causal hap if one exists
