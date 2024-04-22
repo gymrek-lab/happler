@@ -4,7 +4,7 @@ import snakemake.io as io
 from snakemake.utils import min_version
 
 ##### set minimum snakemake version #####
-min_version("8.10.7")
+min_version("8.10.8")
 
 
 # IMPORT CONFIG VARIABLES
