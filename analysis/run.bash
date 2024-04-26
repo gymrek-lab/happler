@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --export ALL
-#SBATCH --partition hotel
-#SBATCH --qos hotel
+#SBATCH --partition condo
+#SBATCH --qos condo
 #SBATCH --account ddp268
 #SBATCH --job-name happler-smk
 #SBATCH --nodes 1
@@ -48,8 +48,8 @@ if [ "$ENVIRONMENT" = "BATCH" ]; then
 else
     snakemake \
     --workflow-profile profile/default \
-    --notemp \
     --rerun-trigger {mtime,params,input} \
+    --notemp \
     -k \
     -c 4 \
     "$@" &>"$out_path/log"
@@ -60,7 +60,7 @@ if command -v 'slack' &>/dev/null; then
     if [ "$exit_code" -eq 0 ]; then
         slack "snakemake finished successfully" &>/dev/null
     else
-        slack "snakemake simulate_gwas job failed" &>/dev/null
+        slack "snakemake happler-smk job failed" &>/dev/null
         slack "$(tail -n4 "$out_path/log")" &>/dev/null
     fi
 fi
