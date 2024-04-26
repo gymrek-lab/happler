@@ -10,9 +10,14 @@ import numpy.typing as npt
 import matplotlib.pyplot as plt
 
 from haptools.logging import getLogger
-from happler.tree.assoc_test import AssocTestSimpleCovariates
-from haptools.data import Phenotypes, Genotypes, GenotypesVCF, GenotypesPLINK, Haplotypes
-
+from happler.tree.assoc_test import AssocTestSimpleSM, AssocTestSimpleCovariates
+from haptools.data import (
+    Genotypes,
+    Phenotypes,
+    Haplotypes,
+    GenotypesVCF,
+    GenotypesPLINK,
+)
 
 FIGSIZE = 6
 
@@ -21,6 +26,7 @@ def make_manhattan(
     ax: plt.Axes,
     positions: npt.NDArray,
     pvals: npt.NDArray,
+    red_mask: npt.NDArray = None,
     exclude_mask: npt.NDArray = None,
 ):
     """
@@ -34,6 +40,8 @@ def make_manhattan(
         A 1D array of base pair positions for each SNP
     pvals: npt.NDArray
         A 1D array of p-values of the same length as positions
+    red_mask: npt.NDArray, optional
+        If provided, a bool array of pvals to highlight in red
     exclude_mask: npt.NDArray, optional
         If provided, a bool array of pvals to exclude from plotting
     """
@@ -41,9 +49,15 @@ def make_manhattan(
     if exclude_mask is not None:
         positions = positions[exclude_mask]
         pvals = pvals[exclude_mask]
-    ax.scatter(positions, pvals)
+        red_mask = red_mask[exclude_mask]
+    if red_mask is not None:
+        blue_mask = np.logical_not(red_mask)
+        ax.scatter(positions[blue_mask], pvals[blue_mask])
+        ax.scatter(positions[red_mask], pvals[red_mask], c="red")
+    else:
+        ax.scatter(positions, pvals)
 
-def condition_on_variable(gts: Genotypes, pt: Phenotypes, covars: Genotypes):
+def condition_on_variable(gts: Genotypes, pt: Phenotypes, covars: Genotypes = None):
     """
     Compute explained variance for each SNP or haplotype in a set
 
@@ -56,7 +70,7 @@ def condition_on_variable(gts: Genotypes, pt: Phenotypes, covars: Genotypes):
         A Phenotypes object with only a single phenotype
     gts: Genotypes
         The genotypes of all of the SNPs
-    covars: Genotypes
+    covars: Genotypes, optional
         The variables on which to condition the SNPs by encoding them as covariates
 
     Returns
@@ -64,7 +78,10 @@ def condition_on_variable(gts: Genotypes, pt: Phenotypes, covars: Genotypes):
     npt.NDArray[float]
         The p-values of all of the input SNPs when conditioned on the covariates
     """
-    assoc_test = AssocTestSimpleCovariates(covars=covars.data.sum(axis=2))
+    if covars is None:
+        assoc_test = AssocTestSimpleSM()
+    else:
+        assoc_test = AssocTestSimpleCovariates(covars=covars.data.sum(axis=2))
     return assoc_test.run(gts.data.sum(axis=2), pt.data[:, 0]).data["pval"]
 
 
@@ -92,6 +109,13 @@ def condition_on_variable(gts: Genotypes, pt: Phenotypes, covars: Genotypes):
     For this to work, the VCF must be indexed and the seqname must match!""",
 )
 @click.option(
+    "--show-original",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Whether to also depict the original Manhattan plot",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -113,6 +137,7 @@ def main(
     haplotype: Path,
     hap_id: str = None,
     region: str = None,
+    show_original: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -159,12 +184,17 @@ def main(
 
     # make the figure
     # set all panels in the same row
-    figsize = (FIGSIZE*(len(variants)+2)/2.5, FIGSIZE)
-    fig, axs = plt.subplots(1, 2+len(variants), sharey=True, figsize=figsize)
+    figsize = (FIGSIZE*(len(variants)+2+show_original)/2.5, FIGSIZE)
+    fig, axs = plt.subplots(1, 2+len(variants)+show_original, sharey=True, figsize=figsize)
+
+    # highlight alleles in red
+    red_mask = np.zeros(len(gts.variants), dtype=np.bool_)
+    for snp in variants:
+        red_mask[gts._var_idx[snp]] = True
 
     log.info("Creating haplotype plot")
     # first, encode the haplotype as covariate
-    make_manhattan(axs[0], positions, condition_on_variable(gts, pts, hap_gt))
+    make_manhattan(axs[0], positions, condition_on_variable(gts, pts, hap_gt), red_mask)
     axs[0].set_title("Haplotype")
     log.info("Creating haplotype alleles plot")
     # now, encode the haplotypes' alleles as separate covariates
@@ -173,7 +203,7 @@ def main(
     exclude = np.ones(len(gts.variants), dtype=np.bool_)
     for snp in variants:
         exclude[gts._var_idx[snp]] = False
-    make_manhattan(axs[1], positions, condition_on_variable(gts, pts, covars), exclude)
+    make_manhattan(axs[1], positions, condition_on_variable(gts, pts, covars), red_mask, exclude)
     axs[1].set_title("Haplotype's Alleles")
     # finally, encode each of the alleles as a covariate in a separate plot
     for idx in range(len(variants)):
@@ -181,8 +211,12 @@ def main(
         covars = gts.subset(variants=(variants[idx],))
         exclude = np.ones(len(gts.variants), dtype=np.bool_)
         exclude[gts._var_idx[variants[idx]]] = False
-        make_manhattan(axs[idx+2], positions, condition_on_variable(gts, pts, covars), exclude)
+        make_manhattan(axs[idx+2], positions, condition_on_variable(gts, pts, covars), red_mask, exclude)
         axs[idx+2].set_title(variants[idx])
+    if show_original:
+        log.info("Creating original manhattan plot")
+        make_manhattan(axs[-1], positions, condition_on_variable(gts, pts), red_mask)
+        axs[-1].set_title("")
 
     # now, tidy up and save the plot
     log.info("Writing out plot")

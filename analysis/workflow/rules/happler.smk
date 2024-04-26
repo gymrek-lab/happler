@@ -93,7 +93,7 @@ rule cond_linreg:
     output:
         png=out + "/cond_linreg.pdf",
     resources:
-        runtime=10,
+        runtime=15,
     log:
         logs + "/cond_linreg",
     benchmark:
@@ -102,7 +102,7 @@ rule cond_linreg:
         "happler"
     shell:
         "workflow/scripts/conditional_regression_plots.py --verbosity DEBUG "
-        "--region {params.region} -o {output.png} -i H0 "
+        "--show-original --region {params.region} -o {output.png} -i H0 "
         "{input.pgen} {input.pts} {input.hap} &>{log}"
 
 
