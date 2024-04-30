@@ -67,9 +67,10 @@ class TreeBuilder:
         self._split_method = self._find_split_rigid
         split_method = "rigid"
         self.ld_prune_thresh = ld_prune_thresh
-        if self.ld_prune_thresh is not None:
-            self._split_method = self._find_split_flexible
-            split_method = "flexible"
+        # for now, let's comment this out because we want to try the rigid strat
+        # if self.ld_prune_thresh is not None:
+            # self._split_method = self._find_split_flexible
+            # split_method = "flexible"
         self.log = log or getLogger(self.__class__.__name__)
         self.log.info(f"Using {split_method} branching strategy")
 
