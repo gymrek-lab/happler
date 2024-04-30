@@ -111,7 +111,7 @@ def get_explained_variances(
 
     # load the SNP and hap genotypes
     gts = GenotypesPLINK(fname=gts, log=log)
-    gts.read(variants=variants, region=region, samples=pts.samples)
+    gts.read(variants=variants, region=region, samples=set(pts.samples))
     gts.check_phase()
     gts.check_missing()
     gts.check_biallelic()
@@ -224,6 +224,13 @@ def main(
     ).sum()/explained_variances.shape[0]
     log.warning(
         f"{percent_success:.3f}% of haplotypes explain more phenotypic variation than"
+        " their SNPs"
+    )
+    percent_success = 100*(
+        explained_variances[:, 1] == explained_variances[:, 0]
+    ).sum()/explained_variances.shape[0]
+    log.warning(
+        f"{percent_success:.3f}% of haplotypes explain as much phenotypic variation as"
         " their SNPs"
     )
 
