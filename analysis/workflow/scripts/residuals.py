@@ -28,7 +28,7 @@ def compute_residuals(pt: npt.NDArray, cv: npt.NDArray):
         A 2D array (shape: samples x residuals) containing the residuals of a model
         y ~ X where y refers to the phenotypes and X refers to the covariates
     """
-    # compute the betas of each SNP by fitting a linear model y = beta * x + e
+    # compute the residuals of each phenotype by fitting a linear model y = X + e
     resids = np.array([
         sm.OLS(pt[:, idx], cv).fit().resid
         for idx in range(pt.shape[1])
