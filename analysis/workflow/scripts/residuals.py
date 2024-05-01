@@ -45,7 +45,7 @@ def compute_residuals(pt: npt.NDArray, cv: npt.NDArray):
     type=click.Path(path_type=Path),
     default=Path("/dev/stdout"),
     show_default="stdout",
-    help="The path to a .pheno file to which to output the residuals",
+    help="The path to a .pheno file into which to write the residuals",
 )
 @click.option(
     "-v",

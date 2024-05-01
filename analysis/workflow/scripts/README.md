@@ -1,7 +1,7 @@
 # scripts
 This directory contains various scripts used by the pipeline. However, you can use most of these scripts on their own, too. Some may even be helpful in day-to-day use.
 
-All python scripts implement the --help argument. For bash and R scripts, you can run `head <script>` to read about their usage.
+All python scripts implement the --help argument. For bash, awk, and R scripts, you can run `head <script>` to read about their usage.
 
 ## [choose_different_ld.py](choose_different_ld.py)
 Choose haplotype alleles such that their SNPs have a range of strengths of LD with the causal haplotype.
@@ -45,6 +45,9 @@ Plot phenotypes against genotypes for a haplotype.
 ## [plot_phenotypes.py](plot_phenotypes.py)
 Performs a linear regression and outputs a plot for phenotypes from `generate_phenotypes.py`.
 
+## [residuals.py](residuals.py)
+Regresses out covariates from a set of phenotypes.
+
 ## [run_FINEMAP.R](run_FINEMAP.R)
 Run FINEMAP with a set of genotypes and phenotypes. Compute summary statistics, then call the `finemap_1p4.R` script.
 
@@ -53,6 +56,9 @@ Run SuSiE with a set of genotypes and phenotypes. Follow the same interface as `
 
 ## [snakemake_io.py](snakemake_io.py)
 Methods from the `snakemake.io` module which are imported by some of the other scripts in this directory.
+
+## [split_pheno.awk](split_pheno.awk)
+Splits phenotypes from a .pheno file into multiple .pheno files.
 
 ## [summarize_results.R](summarize_results.R)
 This R script summarizes the output of several executions of FINEMAP and SuSiE by producing several useful visualizations.
