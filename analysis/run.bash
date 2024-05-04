@@ -55,6 +55,7 @@ else
     "$@" &>"$out_path/log"
 fi
 
+# send a slack message to notify that the job has finished
 exit_code="$?"
 if command -v 'slack' &>/dev/null; then
     if [ "$exit_code" -eq 0 ]; then
