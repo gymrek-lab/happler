@@ -114,10 +114,14 @@ rule vcf2plink:
             else config["snp_panel"],
         vcf_idx=lambda wildcards: rules.phase_gt.output.phased_idx if check_config('phase_map')
             else config["snp_panel"] + ".tbi",
-        samples=rules.keep_samps.output.samples if check_config('exclude_samples') else [],
+        samples=(
+            (rules.keep_samps.output.samples if check_config("str_panel") else config["exclude_samples"])
+            if check_config('exclude_samples') else []
+        ),
     params:
         maf=config["min_maf"],
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+        samps="keep" if check_config("str_panel") else "remove",
     output:
         pgen=out+"/snps.pgen",
         pvar=out+"/snps.pvar",
@@ -133,7 +137,7 @@ rule vcf2plink:
         "../envs/default.yml"
     shell:
         "plink2 --bcf {input.vcf} --maf {params.maf} --make-pgen "
-        "--keep {input.samples} " if check_config('exclude_samples') else ""
+        "--{params.samps} {input.samples} " if check_config('exclude_samples') else ""
         " --out {params.prefix} &>{log}"
 
 
