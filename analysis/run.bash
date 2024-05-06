@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 #SBATCH --export ALL
 #SBATCH --partition condo
-#SBATCH --qos condo
 #SBATCH --account ddp268
+#SBATCH --qos condo
 #SBATCH --job-name happler-smk
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
 #SBATCH --cpus-per-task 1
-#SBATCH --time 8:00:00
+#SBATCH --time 0:30:00
+#SBATCH --mem 2G
 #SBATCH --output /dev/null
 
 # An example bash script demonstrating how to run the entire snakemake pipeline

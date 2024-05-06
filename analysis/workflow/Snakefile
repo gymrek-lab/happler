@@ -24,14 +24,15 @@ config["exclude_causal"] = check_config("exclude_causal", False, as_set=True)
 mode = config["mode"]
 # handle locus
 if mode == "run":
-    pheno_gene_set = set(glob_wildcards(Path(config["modes"][mode]["pheno"])).gene)
+    pheno_set = set(glob_wildcards(Path(config["modes"][mode]["pheno"])).trait)
 if Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
     with open(Path(config["locus"])) as f:
+        # the fourth column of the bed file must contain the name of the trait
         locus_file = {
             cols[3]: f"{cols[0]}_{float(cols[1]):.0f}-{float(cols[2]):.0f}"
             for cols in (line.strip().split() for line in f)
             if not cols[0].startswith("#") and (
-                mode != "run" or (cols[3] in pheno_gene_set)
+                mode != "run" or (cols[3] in pheno_set)
             )
         }
     locus = list(locus_file.values())
@@ -108,7 +109,7 @@ if mode in ("snp", "hap", "ld_range", "run"):
     if mode == "run":
         happler_config["hap_file"] = []
         happler_config["pheno"] = config["modes"][mode]["pheno"]
-        happler_config["out"] = config["out"] + f"/happler/{mode}/" + "{gene}"
+        happler_config["out"] = config["out"] + f"/happler/{mode}/" + "{trait}"
         if check_config("SVs", place=config["modes"][mode]):
             happler_config["SVs"] = config["modes"][mode]["SVs"]
 elif "str" == mode:
@@ -179,7 +180,7 @@ elif mode == "run":
                 rules.happler_results.output.susie_pdf,
             ],
             zip,
-            gene=locus_file.keys(),
+            trait=locus_file.keys(),
             locus=locus_file.values(),
             allow_missing=True,
         ),
