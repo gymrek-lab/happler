@@ -13,18 +13,16 @@
 # The VCF(s) must be sorted and indexed (with a .tbi file in the same directory)
 # required!
 # ref_panel: "/projects/ps-gymreklab/resources/datasets/snpstr/1kg.snp.str.chr{chr}.vcf.gz"
-# snp_panel: "/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
-snp_panel: "data/geuvadis/geuvadis_ensemble_phasing.pgen"
-# str_panel: "/tscc/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
+snp_panel: "/tscc/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
 
 # Path to a list of samples to exclude from the analysis
 # There should be one sample ID per line
-# exclude_samples: data/ukb_random_samples_exclude.tsv
+exclude_samples: data/ukb/samples/remove.txt
 
 # If SNPs are unphased, provide the path to a SHAPEIT4 map file like these:
 # https://github.com/odelaneau/shapeit4/tree/master/maps
 # The map file should use the same reference genome as the reference panel VCFs
-# phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
+phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
 
 # A "locus" is a string with a contig name, a colon, the start position, a dash, and
 # the end position or a BED file with a ".bed" file ending
@@ -39,45 +37,15 @@ snp_panel: "data/geuvadis/geuvadis_ensemble_phasing.pgen"
 # genome of the reference panel VCFs
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required! and unless otherwise noted, all attributes of each mode are required
-# locus: 19:45401409-46401409 # center: 45901409 (APOe4)
-locus: data/geuvadis/geuvadis_eqtl_genes.full.liftover.bed
+locus: data/ukb/phenos/platelet_count.bed
 modes:
- str:
-  pos: 19:45903857 # STR_691361
- snp:
-  pos: 19:45910672 # rs1046282
- hap:
-  alleles: [rs36046716:G, rs1046282:G] # 45892145, 45910672
-  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
- ld_range:
-  reps: 1
-  min_ld: 0
-  max_ld: 1
-  step: 0.1
-  min_af: 0.25
-  max_af: 0.75
-  # beta: [0.35]
-  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
-  alpha: [0.05]
-  random: false # whether to also produce random haplotypes
  run:
-  pheno: data/geuvadis/phenos/{trait}.pheno
-  SVs: data/geuvadis/pangenie_hprc_hg38_all-samples_bi_SVs-missing_removed.pgen
-  # pheno_matrix: data/geuvadis/EUR_converted_expr_hg38.csv # optional
+  pheno: data/ukb/phenos/{trait}.resid.pheno
 mode: run
-
-# Covariates to use if they're needed
-# Otherwise, they're assumed to be regressed out of the phenotypes
-# Note: the finemapping methods won't be able to handle these covariates
-# covar: data/geuvadis/5PCs_sex.covar
 
 # Discard rare variants with a MAF below this number
 # Defaults to 0 if not specified
-min_maf: 0.1
-
-# Sample sizes to use
-# sample_size: [500, 1000, 1500, 2000, 2500]
-# sample_size: 777
+min_maf: 0.01
 
 # Whether to include the causal variant in the set of genotypes provided to the
 # finemapping methods. Set this to true if you're interested in seeing how the
