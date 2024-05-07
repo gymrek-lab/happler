@@ -31,7 +31,6 @@ rule plink2vcf:
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
     output:
-        vcf=temp(out + "/unphased.vcf.gz"),
         bcf=out + "/unphased.bcf",
         bcf_idx=out + "/unphased.bcf.csi",
         log=temp(out + "/unphased.log"),
@@ -46,8 +45,7 @@ rule plink2vcf:
     shell:
         "plink2 --pfile {params.pfile} --out {params.out} --from-bp {params.start} "
         "--to-bp {params.end} --chr {params.chrom} --snps-only 'just-acgt' "
-        "--export vcf bgz id-paste=iid &>{log} && "
-        "bcftools view -Ob -o {output.bcf} {output.vcf} &>>{log} && "
+        "--export bcf id-paste=iid &>{log} && "
         "tabix -p bcf {output.bcf} &>>{log}"
 
 
