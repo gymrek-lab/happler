@@ -28,14 +28,14 @@ if mode == "run":
 if Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
     with open(Path(config["locus"])) as f:
         # the fourth column of the bed file must contain the name of the trait
-        locus_file = {
-            cols[3]: f"{cols[0]}_{float(cols[1]):.0f}-{float(cols[2]):.0f}"
+        locus_file = [
+            (cols[3], f"{cols[0]}_{float(cols[1]):.0f}-{float(cols[2]):.0f}")
             for cols in (line.strip().split() for line in f)
             if not cols[0].startswith("#") and (
                 mode != "run" or (cols[3] in pheno_set)
             )
-        }
-    locus = list(locus_file.values())
+        ]
+    locus_traits, locus = list(zip(*locus_file))
 else:
     locus = config["locus"].replace(":", "_")
 # convert the exclude_causal var into a dict for later
@@ -187,8 +187,8 @@ elif mode == "run":
                 rules.happler_results.output.susie_pdf,
             ],
             zip,
-            trait=locus_file.keys(),
-            locus=locus_file.values(),
+            trait=locus_traits,
+            locus=locus,
             allow_missing=True,
         ),
         ex=("in",),
