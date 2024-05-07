@@ -120,7 +120,7 @@ rule vcf2plink:
         maf=config["min_maf"],
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
         samps=lambda wildcards, input: (" --" + (
-            "keep" if check_config("str_panel") else "remove"
+            "keep " if check_config("str_panel") else "remove "
         ) + input.samples) if check_config("exclude_samples") else "",
     output:
         pgen=out+"/snps.pgen",
