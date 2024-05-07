@@ -59,10 +59,11 @@ else:
     config["gts_snp_panel"] = rules.genotypes_subset.input.pgen
 config["random"] = False
 
-module simulate:
-    snakefile: "rules/simulate.smk"
-    config: config
-use rule * from simulate as simulate_*
+if mode != "run":
+    module simulate:
+        snakefile: "rules/simulate.smk"
+        config: config
+    use rule * from simulate as simulate_*
 
 if mode == "ld_range" and config["modes"][mode]["random"]:
     config["random"] = True
@@ -89,7 +90,7 @@ if check_config("covar"):
     if "pheno_matrix" in covar_config:
         covar_file = rules.covariates_merge.output.covar
 
-if mode in ("snp", "hap", "ld_range", "run"):
+if mode in ("snp", "hap", "ld_range"):
     happler_config = {
         "pheno": rules.simulate_simphenotype.output.pheno,
         "hap_file": rules.simulate_transform.input.hap,
@@ -106,12 +107,18 @@ if mode in ("snp", "hap", "ld_range", "run"):
         happler_config["causal_gt"] = rules.simulate_transform.output
     if mode == "ld_range":
         happler_config["out"] = config["out"] + "/happler/"+mode+"/ld_{ld}/beta_{beta}/alpha_{alpha}"
-    if mode == "run":
-        happler_config["hap_file"] = []
-        happler_config["pheno"] = config["modes"][mode]["pheno"]
-        happler_config["out"] = config["out"] + f"/happler/{mode}/" + "{trait}"
-        if check_config("SVs", place=config["modes"][mode]):
-            happler_config["SVs"] = config["modes"][mode]["SVs"]
+elif mode == "run":
+    happler_config = {
+        "pheno": config["modes"][mode]["pheno"],
+        "hap_file": [],
+        "snp_panel": config["gts_snp_panel"],
+        "out": config["out"] + f"/happler/{mode}/" + "{trait}",
+        "random": None,
+        "covar": covar_file,
+        "min_maf": check_config("min_maf", 0),
+    }
+    if check_config("SVs", place=config["modes"][mode]):
+        happler_config["SVs"] = config["modes"][mode]["SVs"]
 elif "str" == mode:
     pass
 else:
@@ -156,7 +163,7 @@ plots_config = {
     "mode": mode,
     "mode_attrs": config["modes"][mode],
     "happler_hap": rules.happler_run.output.hap,
-    "causal_hap": rules.simulate_transform.input.hap,
+    "causal_hap": rules.simulate_transform.input.hap if mode != "run" else [],
     "snp_panel": config["gts_snp_panel"],
     "happler_metrics": rules.happler_metrics.output.metrics,
 }
