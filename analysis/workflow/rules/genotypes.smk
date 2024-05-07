@@ -63,7 +63,7 @@ rule phase_gt:
     """ phase an unphased set of genotypes """
     input: unpack(phase_gt_input)
     params:
-        locus=config["locus"],
+        locus=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         phased=out + "/phased.bcf",
         phased_idx=out + "/phased.bcf.csi",
@@ -119,7 +119,9 @@ rule vcf2plink:
     params:
         maf=config["min_maf"],
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
-        samps="keep" if check_config("str_panel") else "remove",
+        samps=lambda wildcards, input: (" --" + (
+            "keep" if check_config("str_panel") else "remove"
+        ) + input.samples) if check_config("exclude_samples") else "",
     output:
         pgen=out+"/snps.pgen",
         pvar=out+"/snps.pvar",
@@ -134,9 +136,8 @@ rule vcf2plink:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --bcf {input.vcf} --maf {params.maf} --make-pgen "
-        "--{params.samps} {input.samples} " if check_config('exclude_samples') else ""
-        " --out {params.prefix} &>{log}"
+        "plink2 --bcf {input.vcf} --maf {params.maf} --make-pgen"
+        "{params.samps} --out {params.prefix} &>{log}"
 
 
 rule subset_str:
