@@ -93,8 +93,7 @@ class TreeBuilder:
         # step three: create the rest of the tree
         self._create_tree(parent_hap, parent_idx=0)
         # step four: prune nodes from the tree that are in strong LD
-        if self._split_method == self._find_split_flexible:
-            self.prune_tree()
+        self.prune_tree()
         return self.tree
 
     def _create_tree(
