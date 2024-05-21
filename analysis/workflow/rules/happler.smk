@@ -102,7 +102,7 @@ rule cond_linreg:
         "happler"
     shell:
         "workflow/scripts/conditional_regression_plots.py --verbosity DEBUG "
-        "--show-original --region {params.region} -o {output.png} -i H0 "
+        "--show-original --region {params.region} -o {output.png} -i {params.hap_id} "
         "{input.pgen} {input.pts} {input.hap} &>{log}"
 
 
@@ -281,7 +281,7 @@ rule merge:
         pvar=temp(out + "/{ex}clude/merged.pvar"),
         psam=temp(out + "/{ex}clude/merged.psam"),
     resources:
-        runtime=4,
+        runtime=10,
     log:
         logs + "/{ex}clude/merge",
     benchmark:
@@ -293,14 +293,15 @@ rule merge:
         "{input.gts} {input.hps} {output.pgen} &> {log}"
 
 
+finemapper_input = lambda wildcards: rules.transform.input if (exclude_obs[wildcards.ex] and config["random"] is None) else rules.merge.output
+
+
 rule finemapper:
     """ execute SuSiE using the haplotypes from happler """
     input:
-        gt=lambda wildcards: (
-            rules.transform.input
-            if (exclude_obs[wildcards.ex] and config["random"] is None) else
-            rules.merge.output
-        ).pgen,
+        gt=lambda wildcards: finemapper_input(wildcards).pgen,
+        gt_pvar=lambda wildcards: finemapper_input(wildcards).pvar,
+        gt_psam=lambda wildcards: finemapper_input(wildcards).psam,
         phen=config["pheno"],
     params:
         outdir=lambda wildcards, output: Path(output.susie).parent,
@@ -318,7 +319,7 @@ rule finemapper:
     conda:
         "../envs/susie.yml"
     shell:
-        "workflow/scripts/run_SuSiE.R {input} {params} &>{log}"
+        "workflow/scripts/run_SuSiE.R {input.gt} {input.phen} {params} &>{log}"
 
 
 rule pips:
@@ -481,7 +482,7 @@ rule manhattan:
     output:
         png = out + "/{ex}clude/manhattan.pdf",
     resources:
-        runtime=5,
+        runtime=10,
     log:
         logs + "/{ex}clude/manhattan",
     benchmark:

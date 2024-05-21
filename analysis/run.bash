@@ -41,6 +41,7 @@ if [ "$ENVIRONMENT" = "BATCH" ]; then
     snakemake \
     --workflow-profile profile/slurm \
     --rerun-trigger {mtime,params,input} \
+    --notemp \
     -k \
     -j 32 \
     -c 32 \
