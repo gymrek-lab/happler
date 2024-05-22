@@ -490,5 +490,5 @@ rule manhattan:
     conda:
         "happler"
     shell:
-        "workflow/scripts/manhattan.py -o {output.png} {params.linear} "
+        "workflow/scripts/manhattan.py -o {output.png} --no-label {params.linear} "
         "{params.red_ids} {params.orange_ids} &>{log}"
