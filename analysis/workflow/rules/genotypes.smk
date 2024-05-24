@@ -26,13 +26,13 @@ rule plink2vcf:
         pgen=lambda wildcards: expand(config["snp_panel"], chr=parse_locus(wildcards.locus)[0])[0],
     params:
         pfile=lambda wildcards, input: str(Path(input.pgen).with_suffix('')),
-        out=lambda wildcards, output: str(Path(output.bcf).with_suffix('')),
+        out=lambda wildcards, output: str(Path(output.log).with_suffix('')),
         start=lambda wildcards: parse_locus(wildcards.locus)[1],
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
     output:
-        bcf=out + "/unphased.bcf",
-        bcf_idx=out + "/unphased.bcf.csi",
+        vcf=temp(out + "/unphased.vcf.gz"),
+        vcf_idx=temp(out + "/unphased.vcf.gz.tbi"),
         log=temp(out + "/unphased.log"),
     resources:
         runtime=20,
@@ -45,17 +45,19 @@ rule plink2vcf:
     shell:
         "plink2 --pfile {params.pfile} --out {params.out} --from-bp {params.start} "
         "--to-bp {params.end} --chr {params.chrom} --snps-only 'just-acgt' "
-        "--export bcf id-paste=iid &>{log} && "
-        "tabix -p bcf {output.bcf} &>>{log}"
+        "--export vcf bgz id-paste=iid &>{log} && "
+        "tabix -p vcf {output.vcf} &>>{log}"
 
 
 def phase_gt_input(wildcards):
-    input_files = { 'map': config['phase_map'].format(chr=parse_locus(wildcards.locus)[0]) }
+    chrom = parse_locus(wildcards.locus)[0]
+    input_files = { 'map': config['phase_map'].format(chr=chrom) }
     if config["snp_panel"].endswith('.pgen'):
-        input_files['unphased'] = rules.plink2vcf.output.bcf
+        input_files['unphased'] = rules.plink2vcf.output.vcf
     else:
-        input_files['unphased'] = config["snp_panel"]
-    input_files['unphased_idx'] = input_files['unphased'] + ".csi"
+        input_files['unphased'] = config["snp_panel"].format(chr=chrom)
+    input_files['unphased_idx'] = input_files['unphased'] + ".tbi"
+    input_files["ref"] = config["ref_panel"].format(chr=chrom)
     return input_files
 
 
@@ -64,22 +66,27 @@ rule phase_gt:
     input: unpack(phase_gt_input)
     params:
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
+        prefix=lambda wildcards, output: str(Path(output.log).with_suffix("")),
     output:
-        phased=out + "/phased.bcf",
-        phased_idx=out + "/phased.bcf.csi",
+        phased=out + "/phased.vcf.gz",
+        phased_idx=out + "/phased.vcf.gz.tbi",
+        log=temp(out + "/phased.log"),
     resources:
-        runtime=60*4,
-    threads: 8
+        runtime=60*2,
+        # each CPU comes with 1 GB (or 1000 MB) on TSCC
+        mem_mb=lambda wildcards, threads: int(threads*999),
+    threads: 16
     log:
         logs + "/phase_gt"
     benchmark:
         bench + "/phase_gt"
     conda:
-        "../envs/shapeit.yml"
+        "../envs/beagle.yml"
     shell:
-        "shapeit4 --input {input.unphased} --map {input.map} --region {params.locus} "
-        "--output {output.phased} --thread {threads} --log {log} &>>{log} && "
-        "tabix -p bcf {output.phased} &>>{log}"
+        "beagle -Xmx{resources.mem_mb}m gt={input.unphased} ref={input.ref} "
+        "out={params.prefix} map={input.map} chrom={params.locus} nthreads={threads} "
+        "impute=false &>{log} && "
+        "tabix -p vcf {output.phased} &>>{log}"
 
 
 rule keep_samps:
@@ -136,7 +143,7 @@ rule vcf2plink:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --bcf {input.vcf} --maf {params.maf} --make-pgen"
+        "plink2 --vcf {input.vcf} --maf {params.maf} --make-pgen"
         "{params.samps} --out {params.prefix} &>{log}"
 
 

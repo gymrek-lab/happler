@@ -7,22 +7,21 @@
 # Note: this file is written in the YAML syntax (https://learnxinyminutes.com/docs/yaml/)
 
 
-# Paths to a SNP-STR haplotype reference panel
-# You can download this from http://gymreklab.com/2018/03/05/snpstr_imputation.html
+# Paths to a SNP haplotype reference panel (like the 1000 Genomes)
 # If the VCFs are per-chromosome, replace the contig name in the file name with "{chr}"
 # The VCF(s) must be sorted and indexed (with a .tbi file in the same directory)
 # required!
-# ref_panel: "/projects/ps-gymreklab/resources/datasets/snpstr/1kg.snp.str.chr{chr}.vcf.gz"
+ref_panel: "/tscc/projects/ps-gymreklab/resources/datasets/1000Genomes/phase3VCFs/ALL.chr{chr}.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz"
 snp_panel: "/tscc/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
 
 # Path to a list of samples to exclude from the analysis
 # There should be one sample ID per line
 exclude_samples: data/ukb/samples/remove.txt
 
-# If SNPs are unphased, provide the path to a SHAPEIT4 map file like these:
-# https://github.com/odelaneau/shapeit4/tree/master/maps
+# If SNPs are unphased, provide the path to a beagle map file like these:
+# https://bochet.gcc.biostat.washington.edu/beagle/genetic_maps/
 # The map file should use the same reference genome as the reference panel VCFs
-phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
+phase_map: data/genetic_maps/plink.chr{chr}.GRCh37.map
 
 # A "locus" is a string with a contig name, a colon, the start position, a dash, and
 # the end position or a BED file with a ".bed" file ending
