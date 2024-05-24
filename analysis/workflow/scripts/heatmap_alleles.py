@@ -106,11 +106,15 @@ def plot_hap_label_table(ax, hps, hps_vars, ref_alleles):
         np.ones((snp_colors.shape[0], 1, snp_colors.shape[2])),
         1
     )
+    if len(hps_ids) <= 2:
+        extra_buffer = -0.006*len(hps_ids)
+    else:
+        extra_buffer = 0
     # now finally create the plot
     table = ax.table(
         cellColours=snp_colors,
         rowLabels=hps_ids,
-        bbox=[0, -0.28, 1, 0.05*len(hps_ids)],
+        bbox=[0, -0.07*len(hps_ids)+extra_buffer, 1, 0.05*len(hps_ids)],
         # edges="horizontal",
         loc="bottom",
     )
@@ -238,7 +242,7 @@ def main(
     pts = Phenotypes(phenotypes, log=log)
     pts.read()
 
-    gts.read(variants=set(hps_vars.keys()), region=region, samples=pts.samples)
+    gts.read(variants=set(hps_vars.keys()), region=region, samples=set(pts.samples))
     gts.check_phase()
     gts.check_missing()
     gts.check_biallelic()
