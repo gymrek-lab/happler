@@ -268,7 +268,7 @@ def test_haplotypes_write():
         assert lines == [
             "#\torderH\tbeta\tpval",
             "#\torderV\tscore",
-            "#\tversion\t0.1.0",
+            "#\tversion\t0.2.0",
             "#H\tbeta\t.2f\tEffect size in linear model",
             "#H\tpval\t.2f\t-log(pval) in linear model",
             "#V\tscore\t.2f\t-log(pval) assigned to this variant",

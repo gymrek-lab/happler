@@ -53,6 +53,7 @@ class TreeBuilder:
         self,
         genotypes: Genotypes,
         phenotypes: Phenotypes,
+        maf: float = None,
         method: AssocTest = AssocTestSimple(),
         terminator: Terminator = TTestTerminator(),
         ld_prune_thresh: float = None,
@@ -60,6 +61,7 @@ class TreeBuilder:
     ):
         self.gens = genotypes
         self.phens = phenotypes
+        self.maf = maf or 0
         self.method = method
         self.terminator = terminator
         self.results_type = method.results_type
@@ -149,6 +151,8 @@ class TreeBuilder:
         from_root: bool, optional
             Whether to only prune leaves attached to the root of the tree
         """
+        if self.ld_prune_thresh is None:
+            return
         count = 0
         leaves = self.tree.leaves(from_root=from_root)
         self.log.debug(f"Considering {len(leaves)} leaves for pruning")
@@ -196,6 +200,30 @@ class TreeBuilder:
             " siblings"
         )
 
+    def maf_mask(
+        self,
+        hap_matrix: npt.NDArray[np.bool_],
+    ) -> npt.NDArray:
+        """
+        Check the minor allele frequency of each haplotype in the provided hap matrix
+
+        Parameters
+        ----------
+        hap_matrix: npt.NDArray[np.bool_]
+            An array of haplotype "genotypes" of shape: num_samples x num_haplotypes
+
+        Returns
+        -------
+            An integer mask denoting the indices of the haplotypes that passed the
+            MAF threshold
+        """
+        num_strands = 2 * hap_matrix.shape[0]
+        # TODO: make this work for multi-allelic variants, too?
+        ref_af = hap_matrix.sum(axis=(0, 2)) / num_strands
+        maf = np.array([ref_af, 1 - ref_af]).min(axis=0)
+        common_variants = maf > self.maf
+        return np.nonzero(common_variants)[0]
+
     def _find_split_flexible(
         self, parent: Haplotype, parent_res: NodeResults = None
     ) -> tuple[Variant, np.void]:
@@ -220,9 +248,10 @@ class TreeBuilder:
         # iterate through the two possible alleles and try all SNPs with that allele
         alleles = (0, 1)
         for allele in alleles:
-            # step 1: transform the GT matrix into a haplotype matrix
+            # step 1: transform the GT matrix into a matrix of common haplotypes
             hap_matrix = parent.transform(self.gens, allele)
-            if hap_matrix.shape[1] == 0:
+            maf_mask = self.maf_mask(hap_matrix)
+            if hap_matrix[:, maf_mask].shape[1] == 0:
                 # if there weren't any genotypes left, just return None
                 yield None, allele, None
                 continue
@@ -231,7 +260,7 @@ class TreeBuilder:
                 parent_res is None
             ):
                 results = self.method.run(
-                    hap_matrix.sum(axis=2),
+                    hap_matrix[:, maf_mask].sum(axis=2),
                     self.phens.data[:, 0],
                     parent_res=parent_res,
                 )
@@ -239,7 +268,7 @@ class TreeBuilder:
                 best_var_idx = results.data["tscore"].argmax()
             else:
                 results = self.method.run(
-                    hap_matrix.sum(axis=2),
+                    hap_matrix[:, maf_mask].sum(axis=2),
                     self.phens.data[:, 0],
                 )
                 # step 3: record the best p-value among all the SNPs with this allele
@@ -256,6 +285,8 @@ class TreeBuilder:
                 if gt_idx > best_var_idx:
                     break
                 best_var_idx += 1
+            # also account for the rare variants that were masked out
+            best_var_idx += (best_res_idx - len(maf_mask[:best_res_idx]))
             # step 5: retrieve the Variant with the best p-value
             best_variant = Variant.from_np(
                 self.gens.variants[best_var_idx], best_var_idx
@@ -298,12 +329,14 @@ class TreeBuilder:
         num_samps = len(self.gens.samples)
         results = {}
         best_p_idx = {}
+        maf_mask = {}
         # iterate through the two possible alleles and try all SNPs with that allele
         alleles = (0, 1)
         for allele in alleles:
-            # step 1: transform the GT matrix into a haplotype matrix
+            # step 1: transform the GT matrix into a matrix of common haplotypes
             hap_matrix = parent.transform(self.gens, allele)
-            if hap_matrix.shape[1] == 0:
+            maf_mask[allele] = self.maf_mask(hap_matrix)
+            if hap_matrix[:, maf_mask[allele]].shape[1] == 0:
                 # if there weren't any genotypes left, just return None
                 yield None, allele, None
                 continue
@@ -312,7 +345,7 @@ class TreeBuilder:
                 parent_res is None
             ):
                 results[allele] = self.method.run(
-                    hap_matrix.sum(axis=2),
+                    hap_matrix[:, maf_mask[allele]].sum(axis=2),
                     self.phens.data[:, 0],
                     parent_res=parent_res,
                 )
@@ -320,7 +353,7 @@ class TreeBuilder:
                 best_p_idx[allele] = results[allele].data["tscore"].argmax()
             else:
                 results[allele] = self.method.run(
-                    hap_matrix.sum(axis=2),
+                    hap_matrix[:, maf_mask[allele]].sum(axis=2),
                     self.phens.data[:, 0],
                 )
                 # also, record the best p-value among all the SNPs with this allele
@@ -349,13 +382,23 @@ class TreeBuilder:
             if gt_idx > best_var_idx:
                 break
             best_var_idx += 1
+        # also account for the rare variants that were masked out
+        best_var_idx += (best_res_idx - len(maf_mask[best_allele][:best_res_idx]))
         # step 5: retrieve the Variant with the best p-value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
         self.log.debug("Chose variant {}".format(best_variant.id))
         # iterate through all of the alleles of the best variant and check if they're
         # significant
-        for allele in alleles:
-            best_results = results[allele].data[best_p_idx[best_allele]]
+        for allele in results:
+            if allele == best_allele:
+                best_allele_idx = best_p_idx[best_allele]
+            else:
+                best_allele_idx = np.searchsorted(maf_mask[allele], maf_mask[best_allele][best_p_idx[best_allele]])
+                # if the best variant was filtered out for this allele due to low MAF
+                if best_allele_idx >= len(results[allele].data):
+                    yield None, allele, None
+                    continue
+            best_results = results[allele].data[best_allele_idx]
             node_res = self.results_type.from_np(best_results)
             # step 6: check whether we should terminate the branch
             self.log.debug(

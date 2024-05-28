@@ -92,8 +92,8 @@ def main():
     "--maf",
     type=float,
     default=None,
-    show_default="no filtering",
-    help="Ignore variants with a MAF below this threshold",
+    show_default="all haplotypes",
+    help="Only build haplotypes with a MAF above this threshold",
 )
 @click.option(
     "--phased",
@@ -300,6 +300,7 @@ def run(
     hap_tree = tree.TreeBuilder(
         gt,
         ph,
+        maf=maf,
         method=test_method,
         terminator=terminator,
         ld_prune_thresh=ld_prune_thresh,
