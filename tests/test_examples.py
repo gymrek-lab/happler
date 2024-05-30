@@ -1,10 +1,14 @@
+import filecmp
+from pathlib import Path
 from itertools import product
 
 import pytest
 import numpy as np
 from logging import getLogger
-from haptools.data import Genotypes, Phenotypes
+from click.testing import CliRunner
+from haptools.data import Genotypes, Phenotypes, Haplotypes
 
+from happler.__main__ import main
 from happler.tree import (
     TreeBuilder,
     AssocTestSimple,
@@ -12,6 +16,9 @@ from happler.tree import (
     BICTerminator,
     NodeResultsExtra,
 )
+
+
+DATADIR = Path(__file__).parent.joinpath("data")
 
 
 def _create_fake_gens(data) -> Genotypes:
@@ -668,3 +675,21 @@ def test_ppt_case():
         assert haps[0][i]["variant"].id == "snp" + str(i)
     for i in range(2):
         assert haps[1][i]["variant"].id == "snp" + str(i)
+
+
+def test_1000G_simulated(capfd):
+    """
+    Test using simulated data from the 1000G dataset
+    """
+    gt_file = DATADIR / "19_45401409-46401409_1000G.pgen"
+    pt_file = DATADIR / "19_45401409-46401409_1000G.pheno"
+    hp_file = DATADIR / "19_45401409-46401409_1000G.hap"
+    out_hp_file = "test.hap"
+
+    cmd = f"run -o {out_hp_file} {gt_file} {pt_file}"
+    runner = CliRunner()
+    result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
+    captured = capfd.readouterr()
+    assert captured.out == ""
+    assert result.exit_code == 0
+    assert filecmp.cmp(hp_file, out_hp_file)
