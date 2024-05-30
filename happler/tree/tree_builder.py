@@ -61,7 +61,7 @@ class TreeBuilder:
     ):
         self.gens = genotypes
         self.phens = phenotypes
-        self.maf = maf or 0
+        self.maf = maf
         self.method = method
         self.terminator = terminator
         self.results_type = method.results_type
@@ -217,11 +217,13 @@ class TreeBuilder:
             An integer mask denoting the indices of the haplotypes that passed the
             MAF threshold
         """
+        if self.maf is None:
+            return np.arange(hap_matrix.shape[1])
         num_strands = 2 * hap_matrix.shape[0]
         # TODO: make this work for multi-allelic variants, too?
         ref_af = hap_matrix.sum(axis=(0, 2)) / num_strands
         maf = np.array([ref_af, 1 - ref_af]).min(axis=0)
-        common_variants = maf > self.maf
+        common_variants = maf >= self.maf
         return np.nonzero(common_variants)[0]
 
     def _find_split_flexible(

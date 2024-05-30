@@ -233,7 +233,7 @@ def run(
     else:
         gt = data.GenotypesVCF(fname=genotypes, log=log)
     gt._prephased = phased
-    gt.read(region=region, samples=list(ph.samples))
+    gt.read(region=region, samples=set(ph.samples))
     num_variants, num_samples = len(gt.variants), len(gt.samples)
     if samples is not None and len(gt.samples) < len(samples):
         diff = set(samples) - set(gt.samples)
