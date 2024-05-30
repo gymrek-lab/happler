@@ -693,3 +693,43 @@ def test_1000G_simulated(capfd):
     assert captured.out == ""
     assert result.exit_code == 0
     assert filecmp.cmp(hp_file, out_hp_file)
+
+
+def test_1000G_simulated_maf(capfd):
+    """
+    Test using simulated data from the 1000G dataset
+    """
+    gt_file = DATADIR / "19_45401409-46401409_1000G.pgen"
+    pt_file = DATADIR / "19_45401409-46401409_1000G.pheno"
+    hp_file = DATADIR / "19_45401409-46401409_1000G.hap"
+    out_hp_file = Path("test.hap")
+
+    out_vars = ("rs1046282", "rs36046716")
+
+    for maf in (0.05, 0.30, 0.31, 0.38):
+        cmd = f"run --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        runner = CliRunner()
+        result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
+        captured = capfd.readouterr()
+        assert captured.out == ""
+        assert result.exit_code == 0
+
+        out_hp = Haplotypes.load(out_hp_file)
+        assert len(out_hp.data) == 1
+        var_ids = tuple(vr.id for vr in list(out_hp.data.values())[0].variants)
+
+        # rs36046716 has MAF 0.37435567
+        # rs1046282 has MAF 0.30476804
+        # the combined haplotype has MAF of 0.06314433
+        if maf > 0.37435567:
+            assert len(var_ids) == 1
+            assert out_vars[0] not in var_ids and out_vars[1] not in var_ids
+        elif maf > 0.30476804:
+            assert var_ids == (out_vars[1],)
+        elif maf > 0.06314433:
+            # rs1046282 has a better p-value than rs36046716
+            assert var_ids == (out_vars[0],)
+        else:
+            assert var_ids == out_vars
+
+    out_hp_file.unlink()

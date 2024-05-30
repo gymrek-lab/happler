@@ -253,6 +253,10 @@ class TreeBuilder:
             # step 1: transform the GT matrix into a matrix of common haplotypes
             hap_matrix = parent.transform(self.gens, allele)
             maf_mask = self.maf_mask(hap_matrix)
+            if len(maf_mask) != hap_matrix.shape[1]:
+                self.log.debug(
+                    f"Considering {len(maf_mask)} variants for allele {allele}"
+                )
             if hap_matrix[:, maf_mask].shape[1] == 0:
                 # if there weren't any genotypes left, just return None
                 yield None, allele, None
@@ -279,7 +283,9 @@ class TreeBuilder:
             best_res_idx = best_var_idx
             num_tests = len(parent.nodes) + 1
             # step 4: find the index of the best variant within the genotype matrix
-            # We need to account for indices that we removed when running transform()
+            # We need to account for the rare variants that were masked out and indices
+            # that we removed when running transform()
+            best_var_idx += (maf_mask[best_res_idx] - len(maf_mask[:best_res_idx]))
             # There might be a faster way of doing this but for now we're just going to
             # live with it
             for gt_idx in sorted(parent.node_indices):
@@ -287,8 +293,6 @@ class TreeBuilder:
                 if gt_idx > best_var_idx:
                     break
                 best_var_idx += 1
-            # also account for the rare variants that were masked out
-            best_var_idx += (best_res_idx - len(maf_mask[:best_res_idx]))
             # step 5: retrieve the Variant with the best p-value
             best_variant = Variant.from_np(
                 self.gens.variants[best_var_idx], best_var_idx
@@ -338,6 +342,10 @@ class TreeBuilder:
             # step 1: transform the GT matrix into a matrix of common haplotypes
             hap_matrix = parent.transform(self.gens, allele)
             maf_mask[allele] = self.maf_mask(hap_matrix)
+            if len(maf_mask[allele]) != hap_matrix.shape[1]:
+                self.log.debug(
+                    f"Considering {len(maf_mask[allele])} variants for allele {allele}"
+                )
             if hap_matrix[:, maf_mask[allele]].shape[1] == 0:
                 # if there weren't any genotypes left, just return None
                 yield None, allele, None
@@ -376,7 +384,9 @@ class TreeBuilder:
         best_res_idx = best_var_idx
         num_tests = len(parent.nodes) + 1
         # step 4: find the index of the best variant within the genotype matrix
-        # we need to account for indices that we removed when running transform()
+        # We need to account for the rare variants that were masked out and indices
+        # that we removed when running transform()
+        best_var_idx += maf_mask[best_allele][best_res_idx] - len(maf_mask[best_allele][:best_res_idx])
         # There might be a faster way of doing this but for now we're just going to
         # live with it
         for gt_idx in sorted(parent.node_indices):
@@ -384,8 +394,6 @@ class TreeBuilder:
             if gt_idx > best_var_idx:
                 break
             best_var_idx += 1
-        # also account for the rare variants that were masked out
-        best_var_idx += (best_res_idx - len(maf_mask[best_allele][:best_res_idx]))
         # step 5: retrieve the Variant with the best p-value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
         self.log.debug("Chose variant {}".format(best_variant.id))
