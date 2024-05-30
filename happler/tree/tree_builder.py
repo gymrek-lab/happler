@@ -257,7 +257,8 @@ class TreeBuilder:
                 self.log.debug(
                     f"Considering {len(maf_mask)} variants for allele {allele}"
                 )
-            if hap_matrix[:, maf_mask].shape[1] == 0:
+            hap_matrix = hap_matrix[:, maf_mask]
+            if hap_matrix.shape[1] == 0:
                 # if there weren't any genotypes left, just return None
                 yield None, allele, None
                 continue
@@ -266,7 +267,7 @@ class TreeBuilder:
                 parent_res is None
             ):
                 results = self.method.run(
-                    hap_matrix[:, maf_mask].sum(axis=2),
+                    hap_matrix.sum(axis=2),
                     self.phens.data[:, 0],
                     parent_res=parent_res,
                 )
@@ -274,7 +275,7 @@ class TreeBuilder:
                 best_var_idx = results.data["tscore"].argmax()
             else:
                 results = self.method.run(
-                    hap_matrix[:, maf_mask].sum(axis=2),
+                    hap_matrix.sum(axis=2),
                     self.phens.data[:, 0],
                 )
                 # step 3: record the best p-value among all the SNPs with this allele
@@ -346,7 +347,8 @@ class TreeBuilder:
                 self.log.debug(
                     f"Considering {len(maf_mask[allele])} variants for allele {allele}"
                 )
-            if hap_matrix[:, maf_mask[allele]].shape[1] == 0:
+            hap_matrix = hap_matrix[:, maf_mask[allele]]
+            if hap_matrix.shape[1] == 0:
                 # if there weren't any genotypes left, just return None
                 yield None, allele, None
                 continue
@@ -355,7 +357,7 @@ class TreeBuilder:
                 parent_res is None
             ):
                 results[allele] = self.method.run(
-                    hap_matrix[:, maf_mask[allele]].sum(axis=2),
+                    hap_matrix.sum(axis=2),
                     self.phens.data[:, 0],
                     parent_res=parent_res,
                 )
@@ -363,7 +365,7 @@ class TreeBuilder:
                 best_p_idx[allele] = results[allele].data["tscore"].argmax()
             else:
                 results[allele] = self.method.run(
-                    hap_matrix[:, maf_mask[allele]].sum(axis=2),
+                    hap_matrix.sum(axis=2),
                     self.phens.data[:, 0],
                 )
                 # also, record the best p-value among all the SNPs with this allele
