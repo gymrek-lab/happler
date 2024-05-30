@@ -1,4 +1,4 @@
-![Snakemake](https://img.shields.io/badge/snakemake-�~I�8.10.8-brightgreen.svg?style=flat-square)](https://snakemake.bitbucket.io)
+![Snakemake](https://img.shields.io/badge/snakemake-�~I�8.12.0-brightgreen.svg?style=flat-square)](https://snakemake.bitbucket.io)
 
 # download
 Execute the following command.
@@ -8,9 +8,9 @@ git clone https://github.com/aryarm/happler
 You can also download example data for the pipeline. See [the config file](config/config.yml) for links and instructions.
 
 # setup
-The pipeline is written as a Snakefile which can be executed via [Snakemake](https://snakemake.readthedocs.io). For reproduciblity, we recommend installing the version that we used (8.10.8):
+The pipeline is written as a Snakefile which can be executed via [Snakemake](https://snakemake.readthedocs.io). For reproduciblity, we recommend installing the version that we used (8.12.0):
 ```
-conda create -n snakemake -c conda-forge --no-channel-priority 'bioconda::snakemake==8.10.8'
+conda create -n snakemake -c conda-forge --no-channel-priority 'bioconda::snakemake==8.12.0'
 ```
 `snakemake` will [automatically install all dependencies](https://snakemake.readthedocs.io/en/stable/snakefiles/deployment.html#integrated-package-management) of the pipeline upon its first execution using `conda`.
 
