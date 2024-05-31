@@ -178,22 +178,52 @@ use rule * from plots as plots_*
 if mode == "ld_range":
     FINAL_OUTPUT = [rules.plots_params.output.png, rules.plots_metrics.output.png]
 elif mode == "run":
-    FINAL_OUTPUT = expand(
-        expand(
-            [
-                rules.happler_tree.output.png,
-                rules.happler_heatmap.output.png,
-                rules.happler_manhattan.output.png,
-                rules.happler_results.output.susie_pdf,
-            ],
-            zip,
-            trait=locus_traits,
-            locus=locus,
-            allow_missing=True,
-        ),
-        ex=("in",),
-        allow_missing=True
-    )
+    checkpoint multiline:
+        input:
+            expand(
+                rules.happler_run.output.hap,
+                zip, trait=locus_traits, locus=locus, allow_missing=True,
+            )
+        params: orig_out
+        output: orig_out + "/multiline.tsv"
+        resources:
+            runtime=3,
+        log:
+            orig_out + "/logs/multiline",
+        benchmark:
+            orig_out + "/bench/multiline",
+        conda:
+            "envs/default.yml"
+        shell:
+            "cd {params} && for i in {input}; do if [ $("
+            "grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | awk -F ' ' '$1 > 1' | wc -l"
+            ") -ne 0 ]; then echo $i; fi; done | sed 's+/happler/run/+\\t+;s+/happler.hap$++' "
+            "> multiline.tsv 2> {log}"
+
+    def FINAL_OUTPUT(wildcards):
+        with open(checkpoints.multiline.get().output, 'r') as file:
+            multiline_locus, multiline_traits = zip(*(file.readlines()))
+        return expand(
+            expand(
+                [
+                    rules.happler_tree.output.png,
+                    rules.happler_heatmap.output.png,
+                    rules.happler_manhattan.output.png,
+                    rules.happler_results.output.susie_pdf,
+                ],
+                zip,
+                trait=multiline_traits,
+                locus=multiline_locus,
+                allow_missing=True,
+            ),
+            ex=("in",),
+            allow_missing=True
+        )
+
+    rule all:
+        input:
+            FINAL_OUTPUT
+        default_target: True
 else:
     FINAL_OUTPUT = expand(
         [
@@ -210,7 +240,7 @@ else:
 
 # If '--config debug=true' is specified, we won't try to build the entire DAG
 # This can be helpful when you want to play around with a specific target output
-if not check_config("debug", False):
+if not check_config("debug", False) and mode != "run":
     rule all:
         input:
             expand(
