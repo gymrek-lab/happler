@@ -184,7 +184,9 @@ elif mode == "run":
                 rules.happler_run.output.hap,
                 zip, trait=locus_traits, locus=locus, allow_missing=True,
             )
-        params: orig_out
+        params:
+            out = orig_out,
+            hp_path = rules.happler_run.output.hap.format(locus="*", trait="*"),
         output: orig_out + "/multiline.tsv"
         resources:
             runtime=3,
@@ -195,10 +197,10 @@ elif mode == "run":
         conda:
             "envs/default.yml"
         shell:
-            "cd {params} && for i in {input}; do if [ $("
+            "for i in {params.hp_path}; do if [ $("
             "grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | awk -F ' ' '$1 > 1' | wc -l"
-            ") -ne 0 ]; then echo $i; fi; done | sed 's+/happler/run/+\\t+;s+/happler.hap$++' "
-            "> multiline.tsv 2> {log}"
+            ") -ne 0 ]; then echo $i; fi; done | "
+            "sed 's+^out/++;s+/happler/run/+\\t+;s+/happler.hap$++' > {output} 2> {log}"
 
     def FINAL_OUTPUT(wildcards):
         with open(checkpoints.multiline.get().output, 'r') as file:
