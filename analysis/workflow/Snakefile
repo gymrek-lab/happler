@@ -180,14 +180,15 @@ if mode == "ld_range":
 elif mode == "run":
     checkpoint multiline:
         input:
-            expand(
+            hps = expand(
                 rules.happler_run.output.hap,
                 zip, trait=locus_traits, locus=locus, allow_missing=True,
-            )
+            ),
         params:
             out = orig_out,
-            hp_path = rules.happler_run.output.hap.format(locus="*", trait="*"),
-        output: orig_out + "/multiline.tsv"
+            hp_path = Path(str(rules.happler_run.output.hap).format(locus="*", trait="*")),
+        output:
+            hps = orig_out + "/multiline.tsv",
         resources:
             runtime=3,
         log:
@@ -200,17 +201,19 @@ elif mode == "run":
             "for i in {params.hp_path}; do if [ $("
             "grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | awk -F ' ' '$1 > 1' | wc -l"
             ") -ne 0 ]; then echo $i; fi; done | "
-            "sed 's+^out/++;s+/happler/run/+\\t+;s+/happler.hap$++' > {output} 2> {log}"
+            "sed 's+^{params.out}/++;s+/happler/run/+\\t+;s+/happler.hap$++' >{output} 2>{log}"
 
     def FINAL_OUTPUT(wildcards):
-        with open(checkpoints.multiline.get().output, 'r') as file:
-            multiline_locus, multiline_traits = zip(*(file.readlines()))
+        with open(checkpoints.multiline.get().output["hps"], 'r') as file:
+            multiline_locus, multiline_traits = zip(*(f[:-1].split("\t") for f in file.readlines()))
         return expand(
             expand(
                 [
                     rules.happler_tree.output.png,
+                    rules.happler_linreg.output.png,
                     rules.happler_heatmap.output.png,
                     rules.happler_manhattan.output.png,
+                    rules.happler_cond_linreg.output.png,
                     rules.happler_results.output.susie_pdf,
                 ],
                 zip,
@@ -219,7 +222,7 @@ elif mode == "run":
                 allow_missing=True,
             ),
             ex=("in",),
-            allow_missing=True
+            allow_missing=True,
         )
 
     rule all:
