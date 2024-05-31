@@ -89,6 +89,7 @@ rule cond_linreg:
         pts=config["pheno"],
     params:
         hap_id = "H0",
+        maf = check_config("min_maf", 0),
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         png=out + "/cond_linreg.pdf",
@@ -103,7 +104,7 @@ rule cond_linreg:
     shell:
         "workflow/scripts/conditional_regression_plots.py --verbosity DEBUG "
         "--show-original --region {params.region} -o {output.png} -i {params.hap_id} "
-        "{input.pgen} {input.pts} {input.hap} &>{log}"
+        "--maf {params.maf} {input.pgen} {input.pts} {input.hap} &>{log}"
 
 
 rule heatmap:
@@ -235,6 +236,7 @@ rule sv_ld:
         start=lambda wildcards: max(0, int(parse_locus(wildcards.locus)[1])-1000000),
         end=lambda wildcards: int(parse_locus(wildcards.locus)[2])+1000000,
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
+        maf = check_config("min_maf", 0),
         hapid="H0",
     output:
         ld=out + "/happler_svs.ld",
@@ -248,7 +250,7 @@ rule sv_ld:
         "happler"
     shell:
         "workflow/scripts/compute_pgen_ld.py --verbosity DEBUG "
-        "--region '{params.chrom}:{params.start}-{params.end}' "
+        "--region '{params.chrom}:{params.start}-{params.end}' --maf {params.maf} "
         "--hap-id {params.hapid} -o /dev/stdout {input.sv} {input.hap} 2>{log} | "
         "grep -Ev 'nan$' > {output} 2>>{log}"
 
@@ -276,6 +278,7 @@ rule merge:
         hps_psam=lambda wildcards: merge_hps_input(wildcards).psam,
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        maf = check_config("min_maf", 0),
     output:
         pgen=temp(out + "/{ex}clude/merged.pgen"),
         pvar=temp(out + "/{ex}clude/merged.pvar"),
@@ -289,7 +292,7 @@ rule merge:
     conda:
         "happler"
     shell:
-        "workflow/scripts/merge_plink.py --region {params.region} "
+        "workflow/scripts/merge_plink.py --region {params.region} --maf {params.maf} "
         "{input.gts} {input.hps} {output.pgen} &> {log}"
 
 
@@ -417,6 +420,7 @@ rule merge_SVs:
         svs_pvar=lambda wildcards: Path(config["SVs"]).with_suffix(".pvar"),
         svs_psam=lambda wildcards: Path(config["SVs"]).with_suffix(".psam"),
     params:
+        maf = check_config("min_maf", 0),
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         pgen=temp(out + "/{ex}clude/merged_SVs.pgen"),
@@ -431,7 +435,7 @@ rule merge_SVs:
     conda:
         "happler"
     shell:
-        "workflow/scripts/merge_plink.py --region {params.region} "
+        "workflow/scripts/merge_plink.py --region {params.region} --maf {params.maf} "
         "{input.gts} {input.svs} {output.pgen} &> {log}"
 
 
@@ -444,6 +448,7 @@ rule gwas:
         pts=config["pheno"],
         covar=config["covar"],
     params:
+        maf = check_config("min_maf", 0),
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
         covar = lambda wildcards, input: ("'no-x-sex' --covar 'iid-only' " + input["covar"]) if check_config("covar") else "allow-no-covars",
@@ -463,7 +468,7 @@ rule gwas:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --glm {params.covar} --variance-standardize "
+        "plink2 --glm {params.covar} --variance-standardize --maf {params.maf} "
         "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
         # "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} " # unnecessary b/c merge subsets by region already
         "--out {params.out_prefix} --threads {threads} &>{log}"

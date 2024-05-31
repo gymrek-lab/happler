@@ -109,6 +109,13 @@ def condition_on_variable(gts: Genotypes, pt: Phenotypes, covars: Genotypes = No
     For this to work, the VCF must be indexed and the seqname must match!""",
 )
 @click.option(
+    "--maf",
+    type=float,
+    default=None,
+    show_default="all SNPs",
+    help="Only select SNPs with a MAF above this threshold",
+)
+@click.option(
     "--show-original",
     is_flag=True,
     default=False,
@@ -137,6 +144,7 @@ def main(
     haplotype: Path,
     hap_id: str = None,
     region: str = None,
+    maf: float = None,
     show_original: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
@@ -174,6 +182,7 @@ def main(
     gts.check_phase()
     gts.check_missing()
     gts.check_biallelic()
+    gts.check_maf(threshold=maf, discard_also=True)
     positions = gts.variants["pos"]
     # reorder the phenotypes and ensure there is only one phenotype
     pts.subset(names=(pts.names[0],), samples=gts.samples, inplace=True)

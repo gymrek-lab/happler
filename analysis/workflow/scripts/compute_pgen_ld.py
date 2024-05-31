@@ -55,6 +55,13 @@ def corr(a, b):
     For this to work, the VCF must be indexed and the seqname must match!""",
 )
 @click.option(
+    "--maf",
+    type=float,
+    default=None,
+    show_default="all SVs",
+    help="Only select SVs with a MAF above this threshold",
+)
+@click.option(
     "-i",
     "--hap-id",
     type=str,
@@ -84,6 +91,7 @@ def main(
     gts: Path,
     target: Path,
     region: str = None,
+    maf: float = None,
     hap_id: str = None,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
@@ -108,6 +116,7 @@ def main(
     gts.read(samples=set(target.samples), region=region)
     gts.check_missing()
     gts.check_biallelic()
+    gts.check_maf(threshold=maf, discard_also=True)
     # important: check that samples are ordered the same in each file!
     assert gts.samples == target.samples
 

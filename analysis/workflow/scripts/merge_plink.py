@@ -17,13 +17,27 @@ from haptools.data import GenotypesPLINK
     help="The region to extract genotypes from",
 )
 @click.option(
+    "--maf",
+    type=float,
+    default=None,
+    show_default="all variants",
+    help="Only use variants with MAFs above this threshold",
+)
+@click.option(
     "--replace/--no-replace",
     is_flag=True,
     default=True,
     show_default=True,
     help="Whether to use the variants in file2 to replace those in file1",
 )
-def main(file1: Path, file2: Path, output: Path, region: str = None, replace: bool = True):
+def main(
+    file1: Path,
+    file2: Path,
+    output: Path,
+    region: str = None,
+    maf: float = None,
+    replace: bool = True
+):
     """
     Merge variants from two PGEN files that have the same set of samples
 
@@ -51,6 +65,12 @@ def main(file1: Path, file2: Path, output: Path, region: str = None, replace: bo
 
     gts1.read(region=region)
     gts2.read(region=region)
+
+    if maf is not None:
+        for gts in (gts1, gts2):
+            gts.check_missing()
+            gts.check_biallelic()
+            gts.check_maf(threshold=maf, discard_also=True)
 
     assert gts1.samples == gts2.samples
 
