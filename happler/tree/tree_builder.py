@@ -403,9 +403,9 @@ class TreeBuilder:
         # significant
         for allele in results:
             if allele == best_allele:
-                best_allele_idx = best_p_idx[best_allele]
+                best_allele_idx = best_res_idx
             else:
-                best_allele_idx = np.searchsorted(maf_mask[allele], maf_mask[best_allele][best_p_idx[best_allele]])
+                best_allele_idx = np.searchsorted(maf_mask[allele], maf_mask[best_allele][best_res_idx])
                 # if the best variant was filtered out for this allele due to low MAF
                 if best_allele_idx >= len(results[allele].data):
                     yield None, allele, None
@@ -417,7 +417,7 @@ class TreeBuilder:
                 "Testing variant {} / allele {} with parent_res {} and node_res {}"
                 .format(best_variant.id, allele, parent_res, node_res)
             )
-            if self.terminator.check(parent_res, node_res, results[allele], best_res_idx, num_samps, num_tests):
+            if self.terminator.check(parent_res, node_res, results[allele], best_allele_idx, num_samps, num_tests):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res
