@@ -407,7 +407,15 @@ class TreeBuilder:
             else:
                 best_allele_idx = np.searchsorted(maf_mask[allele], maf_mask[best_allele][best_res_idx])
                 # if the best variant was filtered out for this allele due to low MAF
-                if best_allele_idx >= len(results[allele].data):
+                # searchsorted() will return an index at the end of the array or the
+                # wrong index
+                if best_allele_idx >= len(maf_mask[allele]) or (
+                    maf_mask[allele][best_allele_idx] != maf_mask[best_allele][best_res_idx]
+                ):
+                    self.log.debug(
+                        f"Ignoring variant {best_variant.id} / allele {allele} because"
+                        " it results in a haplotype with low MAF"
+                    )
                     yield None, allele, None
                     continue
             best_results = results[allele].data[best_allele_idx]
