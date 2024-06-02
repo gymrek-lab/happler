@@ -697,7 +697,7 @@ def test_1000G_simulated(capfd):
 
 def test_1000G_simulated_maf(capfd):
     """
-    Test using simulated data from the 1000G dataset
+    Test MAF filtering using simulated data from the 1000G dataset
     """
     gt_file = DATADIR / "19_45401409-46401409_1000G.pgen"
     pt_file = DATADIR / "19_45401409-46401409_1000G.pheno"
@@ -730,6 +730,50 @@ def test_1000G_simulated_maf(capfd):
             # rs1046282 has a better p-value than rs36046716
             assert var_ids == (out_vars[0],)
         else:
+            assert var_ids == out_vars
+
+    out_hp_file.unlink()
+
+def test_1000G_real(capfd):
+    """
+    Test MAF filtering using real Geuvadis data from the 1000G dataset
+    """
+    gt_file = DATADIR / "15_38177344-39177344_1000G.pgen"
+    pt_file = DATADIR / "15_38177344-39177344_1000G.pheno"
+    hp_file = DATADIR / "15_38177344-39177344_1000G.hap"
+    out_hp_file = Path("test.hap")
+
+    out_vars = ("15:38694167:G:T", "15:38842030:C:A")
+
+    for maf in (0.05, 0.14, 0.22, 0.23, 0.35):
+        cmd = f"run --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        runner = CliRunner()
+        result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
+        captured = capfd.readouterr()
+        assert captured.out == ""
+        assert result.exit_code == 0
+
+        out_hp = Haplotypes.load(out_hp_file)
+        assert len(out_hp.data) >= 1
+        var_ids = tuple(vr.id for vr in list(out_hp.data.values())[0].variants)
+
+        # 15:38842030:C:A has MAF 0.34261838
+        # 15:38694167:G:T has MAF 0.22980501
+        # the combined haplotype has MAF of 0.14763231
+        if maf > 0.34261838:
+            assert len(out_hp.data) == 1
+            assert len(var_ids) == 1
+            assert out_vars[0] not in var_ids and out_vars[1] not in var_ids
+        elif maf > 0.22980501:
+            assert len(out_hp.data) == 1
+            # neither of the causal variants has a strong enough pval at this MAF
+            assert var_ids == ("15:38694612:C:T",)
+        elif maf > 0.14763231:
+            assert len(out_hp.data) == 1
+            # 15:38694167:G:T has a better pval than 15:38842030:C:A
+            assert var_ids == (out_vars[0],)
+        else:
+            assert len(out_hp.data) == 1
             assert var_ids == out_vars
 
     out_hp_file.unlink()
