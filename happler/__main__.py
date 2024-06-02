@@ -251,9 +251,6 @@ def run(
         log.info(f"Ignoring {removed} multiallelic variants")
         num_variants = len(gt.variants)
     gt.check_maf(threshold=maf, discard_also=True)
-    removed = num_variants - len(gt.variants)
-    if maf is not None:
-        log.info(f"Ignoring {removed} variants with MAF < {maf}")
     gt.check_phase()
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
 
@@ -309,10 +306,11 @@ def run(
     log.info("Outputting haplotypes")
     tree.Haplotypes.from_tree(fname=output, tree=hap_tree, gts=gt, log=log).write()
     if show_tree:
-        if output.suffix == ".gz":
-            dot_output = output.with_suffix("").with_suffix(".dot")
-        else:
-            dot_output = output.with_suffix(".dot")
+        dot_output = output
+        if Path(output) != Path("/dev/stdout"):
+            if output.suffix == ".gz":
+                dot_output = dot_output.with_suffix("")
+            dot_output = dot_output.with_suffix(".dot")
         log.info("Writing tree to dot file")
         with open(dot_output, "w") as dot_file:
             dot_file.write(hap_tree.dot())
