@@ -58,7 +58,13 @@ def phase_gt_input(wildcards):
         input_files['unphased'] = config["snp_panel"].format(chr=chrom)
     input_files['unphased_idx'] = input_files['unphased'] + ".tbi"
     input_files["ref"] = config["ref_panel"].format(chr=chrom)
+    input_files["log"] = rules.plink2vcf.output.log
     return input_files
+
+
+def get_num_variants(wildcards):
+    with open(expand(rules.plink2vcf.output.log, **wildcards)[0], "r") as file:
+        return int(next(line for line in file if 'variants rem' in line).split(" ")[0])
 
 
 rule phase_gt:
@@ -73,9 +79,13 @@ rule phase_gt:
         log=temp(out + "/phased.log"),
     resources:
         runtime=60*2,
-        # each CPU comes with 1 GB (or 1000 MB) on TSCC
-        mem_mb=lambda wildcards, threads: int(threads*999),
-    threads: 16
+        # We use a custom formula to determine the memory requirements:
+        # This computes the number of GB from the number of variants and then it
+        # multiplies by 999 MB per GB
+        mem_mb=lambda wildcards, threads: int(
+            (0.000400954156048668 * get_num_variants(wildcards) + 12.10814748327) * 999
+        ),
+    threads: 32
     log:
         logs + "/phase_gt"
     benchmark:
@@ -135,7 +145,8 @@ rule vcf2plink:
         psam=out+"/snps.psam",
         log=temp(out+"/snps.log"),
     resources:
-        runtime=3,
+        runtime=10,
+    threads: 2
     log:
         logs + "/vcf2plink",
     benchmark:
@@ -143,8 +154,8 @@ rule vcf2plink:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --vcf {input.vcf} --maf {params.maf} --make-pgen"
-        "{params.samps} --out {params.prefix} &>{log}"
+        "plink2 --vcf {input.vcf} --maf {params.maf} --geno 0 --make-pgen "
+        "--threads {threads} {params.samps} --out {params.prefix} &>{log}"
 
 
 rule subset_str:
