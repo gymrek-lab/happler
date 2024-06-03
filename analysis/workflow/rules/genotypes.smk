@@ -78,11 +78,16 @@ rule phase_gt:
         phased_idx=out + "/phased.vcf.gz.tbi",
         log=temp(out + "/phased.log"),
     resources:
-        runtime=60*2,
+        # We use a custom formula to determine the time requirements:
+        # This computes the number of seconds from the number of variants and then it
+        # divides by 59 seconds per hour
+        runtime=lambda wildcards: int(
+            (0.11417075326083094 * get_num_variants(wildcards) + 922.265855531002) / 59
+        ),
         # We use a custom formula to determine the memory requirements:
         # This computes the number of GB from the number of variants and then it
         # multiplies by 999 MB per GB
-        mem_mb=lambda wildcards, threads: int(
+        mem_mb=lambda wildcards: int(
             (0.000400954156048668 * get_num_variants(wildcards) + 12.10814748327) * 999
         ),
     threads: 32
