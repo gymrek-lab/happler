@@ -26,6 +26,7 @@ scipy = ">=1.7.3"
 pydot = ">=1.4.2"
 pysam = ">=0.19.0"
 haptools = ">=0.4.0"
+statsmodels = ">=0.13.4"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = ">=4.3.2"
