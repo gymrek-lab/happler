@@ -204,25 +204,23 @@ elif mode == "run":
             "sed 's+^{params.out}/++;s+/happler/run/+\\t+;s+/happler.hap$++' >{output} 2>{log}"
 
     def FINAL_OUTPUT(wildcards):
+        files = [
+            rules.happler_tree.output.png,
+            rules.happler_linreg.output.png,
+            rules.happler_heatmap.output.png,
+            rules.happler_manhattan.output.png,
+            rules.happler_cond_linreg.output.png,
+            rules.happler_results.output.susie_pdf,
+        ]
+        if check_config("SVs", place=config["modes"][mode]):
+            files.append(rules.happler_sv_ld.output.ld)
         with open(checkpoints.multiline.get().output["hps"], 'r') as file:
             multiline_locus, multiline_traits = zip(*(f[:-1].split("\t") for f in file.readlines()))
         return expand(
             expand(
-                [
-                    rules.happler_tree.output.png,
-                    rules.happler_linreg.output.png,
-                    rules.happler_heatmap.output.png,
-                    rules.happler_manhattan.output.png,
-                    rules.happler_cond_linreg.output.png,
-                    rules.happler_results.output.susie_pdf,
-                ],
-                zip,
-                trait=multiline_traits,
-                locus=multiline_locus,
+                files, zip, trait=multiline_traits, locus=multiline_locus,
                 allow_missing=True,
-            ),
-            ex=("in",),
-            allow_missing=True,
+            ), ex=("in",), allow_missing=True,
         )
 
     rule all:
