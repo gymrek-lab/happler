@@ -204,7 +204,14 @@ class AssocTestSimple(AssocTest):
             The slope, p-value, and stderr obtained from the test. The delta BIC is
             appended to the end if ``self.with_bic`` is True.
         """
-        res = stats.linregress(x, y)
+        try:
+            res = stats.linregress(x, y)
+        except ValueError:
+            # This can happen, for example, when all x values are identical
+            # In this case, we just output the worst possible values
+            if self.with_bic:
+                return 0, 1, np.inf, 0
+            return 0, 1, np.inf
         if self.with_bic:
             y_hat = res.intercept + res.slope * x
             residuals = y - y_hat
