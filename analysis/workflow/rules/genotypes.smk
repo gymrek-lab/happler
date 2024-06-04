@@ -86,9 +86,9 @@ rule phase_gt:
         ),
         # We use a custom formula to determine the memory requirements:
         # This computes the number of GB from the number of variants and then it
-        # multiplies by 999 MB per GB
+        # multiplies by 1050 MB per GB
         mem_mb=lambda wildcards: int(
-            (0.000400954156048668 * get_num_variants(wildcards) + 12.10814748327) * 999
+            (0.0004624708472873269 * get_num_variants(wildcards) + 13.369088722181218) * 1050
         ),
     threads: 32
     log:
