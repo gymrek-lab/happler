@@ -192,9 +192,7 @@ def test_two_snps_independent_perfect():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-        )
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
     )
     gts = gens.data.sum(axis=2)
     phens = _create_fake_phens(gts[:, 0] * 0.5 + gts[:, 1] * 0.5)
@@ -320,9 +318,7 @@ def test_two_snps_one_branch_perfect_opposite_direction():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-        )
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
     )
     gts = gens.data
     phens = _create_fake_phens(-0.5 * (gts[:, 0] & ~gts[:, 1]).sum(axis=1))
@@ -355,9 +351,7 @@ def test_three_snps_one_branch_one_snp_not_causal():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:], [1, 1]]
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-        )
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
     )
     gts = gens.data
     phens = _create_fake_phens(0.5 * (gts[:, 0] & gts[:, 1]).sum(axis=1))
@@ -415,9 +409,7 @@ def test_four_snps_two_independent_trees_perfect_one_snp_not_causal():
     and X4 occurs in the second
     """
     # a function for splitting a list into a list of pairs
-    split_list = lambda pair: [pair[i : i + 2] for i in range(0, len(pair), 2)] + [
-        [1, 1]
-    ]
+    split_list = lambda pair: [pair[i : i + 2] for i in range(0, len(pair), 2)] + [[1, 1]]
     gens = _create_fake_gens(
         np.array(list(map(split_list, product([0, 1], repeat=8))), dtype=np.bool_)
     )
@@ -537,9 +529,7 @@ def test_two_snps_two_branches_perfect():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-        )
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
     )
     gts = gens.data
     phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
@@ -610,9 +600,7 @@ def test_two_snps_two_branches_perfect_one_snp_not_causal():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]] + [[1, 1]]
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-        )
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
     )
     gts = gens.data
     phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
@@ -733,6 +721,7 @@ def test_1000G_simulated_maf(capfd):
             assert var_ids == out_vars
 
     out_hp_file.unlink()
+
 
 def test_1000G_real(capfd):
     """

@@ -95,6 +95,7 @@ class AssocTest(ABC):
     pval_thresh : float, optional
         The threshold of significance
     """
+
     def __init__(self, with_bic: bool = False):
         self.with_bic = with_bic
         self.results_type = NodeResults
@@ -124,9 +125,7 @@ class AssocTest(ABC):
         return standardized
 
     @abstractmethod
-    def run(
-        self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
-    ) -> AssocResults:
+    def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
         Run a series of phenotype-haplotype association tests for each haplotype
         (column) in X and return their p-values
@@ -214,9 +213,7 @@ class AssocTestSimple(AssocTest):
         else:
             return res.slope, res.pvalue, res.stderr
 
-    def run(
-        self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
-    ) -> AssocResults:
+    def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
         Implement AssocTest for a simple linear regression.
 

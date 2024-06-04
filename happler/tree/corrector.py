@@ -79,6 +79,7 @@ class Bonferroni(Corrector):
 class BH(Corrector):
 
     if false_discovery_control is None:
+
         def correct(
             self,
             pvals: npt.NDArray,
@@ -89,7 +90,9 @@ class BH(Corrector):
             Refer to the documentation of :py:meth:`~.Corrector.correct`
             """
             raise NotImplementedError
+
     else:
+
         def correct(
             self,
             pvals: npt.NDArray,
