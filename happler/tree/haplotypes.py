@@ -28,7 +28,7 @@ class Haplotype:
     ----------
     nodes : tuple[tuple[Variant, int]]
         An ordered collection of pairs, where each pair is a node and its allele
-    data : npt.NDArray[np.bool_]
+    data : npt.NDArray[bool]
         A np array (with shape n x 2, num_samples x num_chromosomes) denoting the
         presence of this haplotype in each chromosome of each sample
     """
