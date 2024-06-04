@@ -2,6 +2,7 @@ from __future__ import annotations
 from logging import Logger
 
 import numpy as np
+import numpy.typing as npt
 from haptools.logging import getLogger
 from haptools.data import Genotypes, Phenotypes
 from haptools.ld import pearson_corr_ld

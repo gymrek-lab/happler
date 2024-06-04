@@ -35,12 +35,12 @@ class Haplotype:
 
     # TODO: consider using a named tuple?
     nodes: tuple[tuple[Variant, int]]
-    data: npt.NDArray[np.bool_]
+    data: npt.NDArray[bool]
 
     def __init__(
         self,
         nodes: tuple[tuple[Variant, int]] = tuple(),
-        data: npt.NDArray[np.bool_] = None,
+        data: npt.NDArray[bool] = None,
         num_samples: int = None,
     ):
         """
@@ -50,7 +50,7 @@ class Haplotype:
         ----------
         nodes : tuple[tuple[Variant, int]]
             An ordered collection of pairs, where each pair is a node and its allele
-        data : npt.NDArray[np.bool_]
+        data : npt.NDArray[bool]
             A np array (with length n x 2, num_samples x num_chromosomes) denoting the
             presence of this haplotype in each chromosome of each sample
         num_samples : int
@@ -72,7 +72,7 @@ class Haplotype:
 
     @classmethod
     def from_node(
-        cls, node: Variant, allele: int, variant_genotypes: npt.NDArray[np.bool_]
+        cls, node: Variant, allele: int, variant_genotypes: npt.NDArray[bool]
     ) -> Haplotype:
         """
         Create a new haplotype with a single node entry
@@ -83,7 +83,7 @@ class Haplotype:
             The initializing node for this haplotype
         allele : int
             The allele associated with node
-        variant_genotypes : npt.NDArray[np.bool_]
+        variant_genotypes : npt.NDArray[bool]
             A np array (with length n x 2, num_samples x num_chromosomes) denoting the
             presence of this haplotype in each chromosome of each sample
 
@@ -95,7 +95,7 @@ class Haplotype:
         return cls(((node, allele),), variant_genotypes)
 
     def append(
-        self, node: Variant, allele: int, variant_genotypes: npt.NDArray[np.bool_]
+        self, node: Variant, allele: int, variant_genotypes: npt.NDArray[bool]
     ) -> Haplotype:
         """
         Append a new node (variant) to this haplotype
@@ -106,7 +106,7 @@ class Haplotype:
             The node to add to this haplotype
         allele : int
             The allele associated with this node
-        variant_genotypes : npt.NDArray[np.bool_]
+        variant_genotypes : npt.NDArray[bool]
             A np array (with length n x 2, num_samples x num_chromosomes) denoting the
             presence of this haplotype in each chromosome of each sample
 
@@ -132,7 +132,7 @@ class Haplotype:
         """
         return tuple(node[0].idx for node in self.nodes)
 
-    def transform(self, genotypes: Genotypes, allele: int) -> npt.NDArray[np.bool_]:
+    def transform(self, genotypes: Genotypes, allele: int) -> npt.NDArray[bool]:
         """
         Transform a genotypes matrix via the current haplotype:
 
@@ -148,7 +148,7 @@ class Haplotype:
 
         Returns
         -------
-        npt.NDArray[np.bool_]
+        npt.NDArray[bool]
             A 3D haplotype matrix similar to the genotype matrix but with haplotypes
             instead of variants in the columns. It will have the same shape except that
             the number of columns (second dimension) will have decreased by the number
