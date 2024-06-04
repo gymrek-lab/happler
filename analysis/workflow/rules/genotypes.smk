@@ -150,7 +150,7 @@ rule vcf2plink:
         psam=out+"/snps.psam",
         log=temp(out+"/snps.log"),
     resources:
-        runtime=10,
+        runtime=12,
     threads: 2
     log:
         logs + "/vcf2plink",
@@ -160,7 +160,7 @@ rule vcf2plink:
         "../envs/default.yml"
     shell:
         "plink2 --vcf {input.vcf} --maf {params.maf} --geno 0 --make-pgen "
-        "--threads {threads} {params.samps} --out {params.prefix} &>{log}"
+        "--threads {threads}{params.samps} --out {params.prefix} &>{log}"
 
 
 rule subset_str:
@@ -214,7 +214,8 @@ rule subset:
         psam=out+"/subset/{sampsize}.psam",
         log=temp(out+"/subset/{sampsize}.log"),
     resources:
-        runtime=3,
+        runtime=12,
+    threads: 2
     log:
         logs + "/subset/{sampsize}",
     benchmark:

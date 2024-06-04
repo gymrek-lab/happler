@@ -44,7 +44,7 @@ mode: run
 
 # Discard rare variants with a MAF below this number
 # Defaults to 0 if not specified
-min_maf: 0.01
+min_maf: 0.00005
 
 # Whether to include the causal variant in the set of genotypes provided to the
 # finemapping methods. Set this to true if you're interested in seeing how the

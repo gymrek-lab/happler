@@ -41,11 +41,12 @@ rule run:
         idx=out + "/happler.hap.gz.tbi",
         dot=out + "/happler.dot",
     resources:
-        runtime=10,
+        runtime=120,
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
         # mem_mb=lambda wildcards, threads: threads*4.57,
-    threads: 6
+        mem_mb=lambda wildcards: 5000,
+    threads: 1
     log:
         logs + "/run",
     benchmark:
