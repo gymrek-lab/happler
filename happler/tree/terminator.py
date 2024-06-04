@@ -22,11 +22,8 @@ class Terminator(ABC):
     """
 
     def __init__(
-            self,
-            thresh: float = 0.05,
-            corrector: Corrector = Bonferroni,
-            log: Logger = None
-        ):
+        self, thresh: float = 0.05, corrector: Corrector = Bonferroni, log: Logger = None
+    ):
         self.thresh = thresh
         self.corrector = corrector
         self.log = log or getLogger(self.__class__.__name__)
@@ -90,7 +87,9 @@ class TTestTerminator(Terminator):
                 return True
             # perform a two tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
-            std_err = np.sqrt(((results.data["stderr"]**2) + (parent_res.stderr**2)) / 2)
+            std_err = np.sqrt(
+                ((results.data["stderr"] ** 2) + (parent_res.stderr**2)) / 2
+            )
             if std_err[best_idx] == 0:
                 # if we have a standard error of 0, then we already know the result is
                 # significant! It doesn't matter what the effect sizes are b/c t_stat
@@ -164,7 +163,7 @@ class BICTerminator(Terminator):
             # correct for multiple hypothesis testing
             if self.corrector is not None:
                 # I dunno why, but this needs None as the first arg for some reason
-                pval = self.corrector.correct(None, pval, num_samps, len(results.data))[best_idx]
+                pval = self.corrector.correct(None, pval, num_samps, len(pval))[best_idx]
             else:
                 pval = pval[best_idx]
             if pval >= self.thresh:

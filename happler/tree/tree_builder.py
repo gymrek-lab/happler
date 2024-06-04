@@ -69,10 +69,10 @@ class TreeBuilder:
         self._split_method = self._find_split_rigid
         split_method = "rigid"
         self.ld_prune_thresh = ld_prune_thresh
-        # for now, let's comment this out because we want to try the rigid strat
+        # for now, let's comment this out because we want to try the rigid strategy
         # if self.ld_prune_thresh is not None:
-            # self._split_method = self._find_split_flexible
-            # split_method = "flexible"
+        #     self._split_method = self._find_split_flexible
+        #     split_method = "flexible"
         self.log = log or getLogger(self.__class__.__name__)
         self.log.info(f"Using {split_method} branching strategy")
 
@@ -286,7 +286,7 @@ class TreeBuilder:
             # step 4: find the index of the best variant within the genotype matrix
             # We need to account for the rare variants that were masked out and indices
             # that we removed when running transform()
-            best_var_idx += (maf_mask[best_res_idx] - len(maf_mask[:best_res_idx]))
+            best_var_idx += maf_mask[best_res_idx] - len(maf_mask[:best_res_idx])
             # There might be a faster way of doing this but for now we're just going to
             # live with it
             for gt_idx in sorted(parent.node_indices):
@@ -295,16 +295,17 @@ class TreeBuilder:
                     break
                 best_var_idx += 1
             # step 5: retrieve the Variant with the best p-value
-            best_variant = Variant.from_np(
-                self.gens.variants[best_var_idx], best_var_idx
-            )
+            best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
             self.log.debug("Chose variant {}".format(best_variant.id))
             # step 6: check if this allele is significant and whether we should terminate the branch
             self.log.debug(
-                "Testing variant {} / allele {} with parent_res {} and node_res {}"
-                .format(best_variant.id, allele, parent_res, node_res)
+                "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
+                    best_variant.id, allele, parent_res, node_res
+                )
             )
-            if self.terminator.check(parent_res, node_res, results, best_res_idx, num_samps, num_tests):
+            if self.terminator.check(
+                parent_res, node_res, results, best_res_idx, num_samps, num_tests
+            ):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res
@@ -388,7 +389,9 @@ class TreeBuilder:
         # step 4: find the index of the best variant within the genotype matrix
         # We need to account for the rare variants that were masked out and indices
         # that we removed when running transform()
-        best_var_idx += maf_mask[best_allele][best_res_idx] - len(maf_mask[best_allele][:best_res_idx])
+        best_var_idx += maf_mask[best_allele][best_res_idx] - len(
+            maf_mask[best_allele][:best_res_idx]
+        )
         # There might be a faster way of doing this but for now we're just going to
         # live with it
         for gt_idx in sorted(parent.node_indices):
@@ -405,12 +408,15 @@ class TreeBuilder:
             if allele == best_allele:
                 best_allele_idx = best_res_idx
             else:
-                best_allele_idx = np.searchsorted(maf_mask[allele], maf_mask[best_allele][best_res_idx])
+                best_allele_idx = np.searchsorted(
+                    maf_mask[allele], maf_mask[best_allele][best_res_idx]
+                )
                 # if the best variant was filtered out for this allele due to low MAF
                 # searchsorted() will return an index at the end of the array or the
                 # wrong index
                 if best_allele_idx >= len(maf_mask[allele]) or (
-                    maf_mask[allele][best_allele_idx] != maf_mask[best_allele][best_res_idx]
+                    maf_mask[allele][best_allele_idx]
+                    != maf_mask[best_allele][best_res_idx]
                 ):
                     self.log.debug(
                         f"Ignoring variant {best_variant.id} / allele {allele} because"
@@ -422,10 +428,18 @@ class TreeBuilder:
             node_res = self.results_type.from_np(best_results)
             # step 6: check whether we should terminate the branch
             self.log.debug(
-                "Testing variant {} / allele {} with parent_res {} and node_res {}"
-                .format(best_variant.id, allele, parent_res, node_res)
+                "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
+                    best_variant.id, allele, parent_res, node_res
+                )
             )
-            if self.terminator.check(parent_res, node_res, results[allele], best_allele_idx, num_samps, num_tests):
+            if self.terminator.check(
+                parent_res,
+                node_res,
+                results[allele],
+                best_allele_idx,
+                num_samps,
+                num_tests,
+            ):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res

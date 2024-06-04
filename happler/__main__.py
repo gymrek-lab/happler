@@ -292,7 +292,9 @@ def run(
             log.warning("Couldn't interpret correction method. Disabling corrections")
         corrector = None
     log.debug(f"Using alpha threshold of {threshold}")
-    terminator = tree.terminator.TTestTerminator(thresh=threshold, corrector=corrector, log=log)
+    terminator = tree.terminator.TTestTerminator(
+        thresh=threshold, corrector=corrector, log=log
+    )
     log.info("Running tree builder")
     hap_tree = tree.TreeBuilder(
         gt,

@@ -222,9 +222,9 @@ def test_haplotype_transform():
     variant_gts = gens.data[:, variant_idx, :] == allele
     variant = Variant.from_np(gens.variants[variant_idx], variant_idx)
     hap = Haplotype.from_node(variant, allele, variant_gts)
-    gens_without_variant = (
-        gens.data[:, (variant_idx + 1) :, :] == allele
-    ) & variant_gts[:, np.newaxis]
+    gens_without_variant = (gens.data[:, (variant_idx + 1) :, :] == allele) & variant_gts[
+        :, np.newaxis
+    ]
     np.testing.assert_allclose(hap.transform(gens, allele), gens_without_variant)
 
 

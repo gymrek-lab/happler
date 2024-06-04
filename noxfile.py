@@ -1,4 +1,5 @@
 """Nox sessions."""
+
 import os
 import shutil
 from pathlib import Path
@@ -69,9 +70,7 @@ if os.getenv("CONDA_EXE"):
         )
         install_handle_python_numpy(session)
         try:
-            session.run(
-                "coverage", "run", "--parallel", "-m", "pytest", *session.posargs
-            )
+            session.run("coverage", "run", "--parallel", "-m", "pytest", *session.posargs)
         finally:
             if session.interactive:
                 session.notify("coverage", posargs=[])
@@ -84,9 +83,7 @@ else:
         session.install("coverage[toml]", "pytest")
         install_handle_python_numpy(session)
         try:
-            session.run(
-                "coverage", "run", "--parallel", "-m", "pytest", *session.posargs
-            )
+            session.run("coverage", "run", "--parallel", "-m", "pytest", *session.posargs)
         finally:
             if session.interactive:
                 session.notify("coverage", posargs=[])

@@ -46,7 +46,7 @@ filprofiler = ">=2023.3.1"
 happler = 'happler.__main__:main'
 
 [tool.black]
-line-length = 88
+line-length = 90
 preview = true
 extend-exclude = "analysis/"
 
