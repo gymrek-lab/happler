@@ -208,12 +208,12 @@ class Tree:
             # check: does this node have a valid variant attached to it?
             if attrs["variant"] == "None" and idx == 0:
                 # treat the root node specially, since it isn't a real variant
-                node.obj_dict["attributes"] = {"label": "\"root\""}
+                node.obj_dict["attributes"] = {"label": '"root"'}
             elif self.log.getEffectiveLevel() == DEBUG:
                 node.obj_dict["attributes"] = {
                     "label": attrs["label"] + "\n" + attrs["results"]
                 }
             else:
-                node.obj_dict["attributes"] = {"label": "\"" + attrs["label"] + "\""}
+                node.obj_dict["attributes"] = {"label": '"' + attrs["label"] + '"'}
 
         return dot.to_string()
