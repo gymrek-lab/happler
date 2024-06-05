@@ -3,6 +3,7 @@ from pathlib import Path
 from itertools import product
 
 import pytest
+import logging
 import numpy as np
 from logging import getLogger
 from click.testing import CliRunner
@@ -723,7 +724,7 @@ def test_1000G_simulated_maf(capfd):
     out_hp_file.unlink()
 
 
-def test_1000G_real(capfd):
+def test_1000G_real(capfd, caplog):
     """
     Test MAF filtering using real Geuvadis data from the 1000G dataset
     """
@@ -733,6 +734,8 @@ def test_1000G_real(capfd):
     out_hp_file = Path("test.hap")
 
     out_vars = ("15:38694167:G:T", "15:38842030:C:A")
+
+    caplog.set_level(logging.INFO)
 
     for maf in (0.05, 0.14, 0.22, 0.23, 0.35):
         cmd = f"run --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
