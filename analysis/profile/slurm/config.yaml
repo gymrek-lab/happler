@@ -1,0 +1,11 @@
+latency-wait: 60
+use-conda: true
+conda-frontend: conda
+
+executor: slurm
+default-resources:
+    slurm_account: ddp268
+    slurm_partition: condo
+    runtime: 30
+    nodes: 1
+    slurm_extra: "'--qos=condo'"

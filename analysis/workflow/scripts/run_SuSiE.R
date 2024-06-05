@@ -8,6 +8,7 @@
 #         This will be created if it doesn't exist.
 # param4: 1 if the causal variant should be removed from the genotype matrix and
 #         0 otherwise
+# param5: The finemapping region (ex: 19:45401409-46401409)
 
 
 thisFile <- function() {
@@ -35,6 +36,7 @@ gt = args[1]
 phen = args[2]
 out = args[3]
 exclude_causal = args[4]
+region = args[5]
 
 dir.create(out, showWarnings = FALSE)
 
@@ -43,11 +45,13 @@ source(paste0(thisDir, "/utils.R"))
 
 write("reading genotype matrix", stderr())
 # import genotype matrices as proper matrices
-X = readPGEN(gt)
+X = readPGEN(gt, region=region)
 phen = readPheno(phen)
 # the number of samples and the number of variants:
 n = nrow(X)
 p = ncol(X)
+stopifnot(n > 0)
+stopifnot(p > 0)
 storage.mode(X) = 'double'
 # load psam and ensure sample names are the same
 stopifnot(readPSAM(gt) == phen[,1])

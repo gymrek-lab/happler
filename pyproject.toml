@@ -1,79 +1,52 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.poetry]
 name = "happler"
 version = "0.0.1"
 description = "A haplotype-based fine-mapping method"
 authors = ["Arya Massarat"]
 license = "MIT"
+repository = "https://github.com/gymrek-lab/happler"
+homepage = "https://github.com/gymrek-lab/happler"
+documentation = "https://happler.readthedocs.io"
 readme = "README.md"
-packages = [
-    { include = "happler" }
-]
-include = [
-    { path = "tests", format = "sdist" }
-]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent"
 ]
-repository = "https://github.com/gymrek-lab/happler"
-homepage = "https://github.com/gymrek-lab/happler"
-documentation = "https://happler.readthedocs.io"
 
 [tool.poetry.dependencies]
-python = ">=3.7,<3.11"
+python = ">=3.8,<4.0"
 click = ">=8.0.4"
 networkx = ">=2.6.3"
 scipy = ">=1.7.3"
 pydot = ">=1.4.2"
-pysam = ">=0.19.0" # temporary workaround until pysam >0.21.0 is released
-haptools = {git = "https://github.com/cast-genomics/haptools.git", extras = ["files"], rev = "ce2337bfb5f295942dfee2e6d1bd482a440c1d5e"}
+pysam = ">=0.19.0"
+haptools = ">=0.4.0"
+statsmodels = ">=0.13.4"
 
-# docs
-# these belong in the docs group only, but RTD doesn't support that yet -- see
-# https://github.com/readthedocs/readthedocs.org/issues/4912
-sphinx = { version = ">=4.2.0", optional = true }
-sphinx-autodoc-typehints = { version = ">=1.12.0", optional = true }
-sphinx-rtd-theme = { version = ">=1.0.0", optional = true }
-numpydoc = { version = ">=1.1.0", optional = true }
-sphinx-click = { version = ">=3.0.2", optional = true }
-
-[tool.poetry.dev-dependencies]
-black = ">=22.3.0"
-ipython = ">=7.29.0"
-pytest = ">=6.2.5"
-nox = ">=2022.8.7"
-nox-poetry = ">=1.0.1"
-coverage = {extras = ["toml"], version = ">=6.5.0"}
-
-# docs
-sphinx = ">=4.2.0"
-sphinx-autodoc-typehints = ">=1.12.0"
+[tool.poetry.group.docs.dependencies]
+sphinx = ">=4.3.2"
+sphinx-autodoc-typehints = ">=1.13.0"
 sphinx-rtd-theme = ">=1.0.0"
 numpydoc = ">=1.1.0"
 sphinx-click = ">=3.0.2"
 
-[tool.poetry.extras]
-docs = [
-    "sphinx",
-    "sphinx-autodoc-typehints",
-    "sphinx-rtd-theme",
-    "numpydoc",
-    "sphinx-click"
-]
-
-tests = [
-    "pytest",
-    "coverage",
-    "nox",
-    "nox-poetry"
-]
+[tool.poetry.group.tests.dependencies]
+pytest = ">=7.4.3"
+black = ">=23.3.0"
+ipython = ">=7.34.0"
+coverage = {extras = ["toml"], version = ">=7.2.7"}
+filprofiler = ">=2023.3.1"
 
 [tool.poetry.scripts]
 happler = 'happler.__main__:main'
 
 [tool.black]
-line-length = 88
+line-length = 90
 preview = true
 extend-exclude = "analysis/"
 
@@ -81,7 +54,3 @@ extend-exclude = "analysis/"
 log_cli_level = "DEBUG"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"

@@ -2,5 +2,5 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - bioconda::shapeit4=4.2.2
+  - bioconda::beagle=5.4_27May24.118
   - bioconda::tabix==1.11

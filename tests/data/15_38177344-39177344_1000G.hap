@@ -1,0 +1,9 @@
+#	orderH	beta	pval
+#	orderV	score
+#	version	0.2.0
+#H	beta	.2f	Effect size in linear model
+#H	pval	.2f	-log(pval) in linear model
+#V	score	.2f	-log(pval) assigned to this variant
+H	15	38694167	38842031	H0	0.39	13.66
+V	H0	38694167	38694168	15:38694167:G:T	T	7.35
+V	H0	38842030	38842031	15:38842030:C:A	C	13.66

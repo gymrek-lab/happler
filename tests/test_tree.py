@@ -77,8 +77,8 @@ def test_tree_dot():
     log.setLevel("INFO")
     assert (
         tree.dot()
-        == "strict digraph  {\nforcelabels=true;\n0 [label=root];\n1 [label=SNP0];\n2"
-        " [label=SNP1];\n3 [label=SNP2];\n4 [label=SNP3];\n5 [label=SNP3];\n0 -> 1 "
+        == 'strict digraph  {\nforcelabels=true;\n0 [label="root"];\n1 [label="SNP0"];\n2'
+        ' [label="SNP1"];\n3 [label="SNP2"];\n4 [label="SNP3"];\n5 [label="SNP3"];\n0 -> 1 '
         " [label=0];\n1 -> 2  [label=0];\n2 -> 3  [label=1];\n3 -> 4  [label=0];\n3"
         " -> 5  [label=1];\n}\n"
     )
@@ -222,9 +222,9 @@ def test_haplotype_transform():
     variant_gts = gens.data[:, variant_idx, :] == allele
     variant = Variant.from_np(gens.variants[variant_idx], variant_idx)
     hap = Haplotype.from_node(variant, allele, variant_gts)
-    gens_without_variant = (
-        gens.data[:, (variant_idx + 1) :, :] == allele
-    ) & variant_gts[:, np.newaxis]
+    gens_without_variant = (gens.data[:, (variant_idx + 1) :, :] == allele) & variant_gts[
+        :, np.newaxis
+    ]
     np.testing.assert_allclose(hap.transform(gens, allele), gens_without_variant)
 
 
@@ -268,7 +268,7 @@ def test_haplotypes_write():
         assert lines == [
             "#\torderH\tbeta\tpval",
             "#\torderV\tscore",
-            "#\tversion\t0.1.0",
+            "#\tversion\t0.2.0",
             "#H\tbeta\t.2f\tEffect size in linear model",
             "#H\tpval\t.2f\t-log(pval) in linear model",
             "#V\tscore\t.2f\t-log(pval) assigned to this variant",

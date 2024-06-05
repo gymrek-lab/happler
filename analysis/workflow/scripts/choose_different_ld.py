@@ -1,8 +1,7 @@
 #!/usr/bin/env python
-import random
 from pathlib import Path
 from logging import Logger
-from itertools import combinations, product
+from itertools import product
 
 import click
 import numpy as np
@@ -13,24 +12,14 @@ from haptools.sim_phenotype import Haplotype
 from haptools.data import Genotypes, GenotypesPLINK, Haplotypes, Variant
 
 
-def random_combinations(iterable, r):
-    """
-        Random selection from itertools.combinations(iterable, r)
-        Copied from the ex recipe at https://docs.python.org/library/itertools.html
-    """
-    pool = tuple(iterable)
-    n = len(pool)
-    indices = sorted(random.sample(range(n), r))
-    return tuple(pool[i] for i in indices)
-
-
 def find_haps(
     gts: Genotypes,
     log: Logger,
     min_ld: float,
     max_ld: float,
-    reps: float = 1,
+    reps: int = 1,
     step: float = 0.1,
+    seed: np.random.Generator = np.random.default_rng(None),
 ):
     log.info(f"Using min_ld {min_ld}, max_ld {max_ld}, reps {reps}, and step {step}")
     sum_gts = gts.data.sum(axis=2)
@@ -44,11 +33,11 @@ def find_haps(
     count = len(intervals) * reps
 
     combos = np.array(list(range(len(gts.variants))))
-    np.random.shuffle(combos)
+    seed.shuffle(combos)
     for combo_id1 in combos:
         combo_id = [combo_id1, combo_id1]
         while combo_id[0] == combo_id[1]:
-            combo_id[1] = np.random.choice(combos)
+            combo_id[1] = seed.choice(combos)
         snp_vars = gts.variants[combo_id]
         hp_id = "-".join(snp_vars['id'])
         log.debug(f"Trying {hp_id}")
@@ -74,7 +63,7 @@ def find_haps(
 
 @click.command()
 @click.argument("gts", type=click.Path(exists=True, path_type=Path))
-@click.argument("output_dir", type=click.Path(path_type=Path))
+@click.argument("output", type=click.Path(path_type=Path))
 @click.option(
     "-r",
     "--reps",
@@ -119,6 +108,13 @@ def find_haps(
     help="The maximum LD value to allow",
 )
 @click.option(
+    "--seed",
+    type=int,
+    default=None,
+    show_default="random",
+    help="A seed to ensure replicable randomness",
+)
+@click.option(
     "-v",
     "--verbosity",
     type=click.Choice(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
@@ -128,17 +124,22 @@ def find_haps(
 )
 def main(
     gts: Path,
-    output_dir: Path,
+    output: Path,
     reps: int = 1,
     min_ld: float = 0,
     max_ld: float = 1,
     step: float = 0.1,
     min_af: float = 0.25,
     max_af: float = 0.75,
+    seed: int = None,
     verbosity: str = "DEBUG",
 ):
     """
     Create haplotypes with a range of LD values between their alleles
+
+    LD values are injected into the output from brace expressions
+    For example, if we are given a a path like "ld_{ld}/happler.hap", then
+    we will replace {ld} with the provided ld value
     """
     log = getLogger("choose", verbosity)
 
@@ -152,8 +153,7 @@ def main(
     af_thresh = (af > min_af) & (af < max_af)
     gts.subset(variants=gts.variants['id'][af_thresh], inplace=True)
 
-    # create output directory
-    output_dir.mkdir()
+    seed = np.random.default_rng(seed)
 
     for combo_ld, hp in find_haps(
         gts,
@@ -162,12 +162,13 @@ def main(
         max_ld=max_ld,
         reps=reps,
         step=step,
+        seed=seed,
     ):
-        out_dir = output_dir / f"ld_{round(combo_ld, 2)}"
-        out_dir.mkdir()
-        hps = Haplotypes(out_dir / "haplotype.hap",
-        log=log,
-        haplotype=Haplotype)
+        out_path = Path(str(output).format(ld=round(combo_ld, 2)))
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        hps = Haplotypes(
+            out_path, log=log, haplotype=Haplotype,
+        )
         hps.data = {hp.id: hp}
         hps.write()
 

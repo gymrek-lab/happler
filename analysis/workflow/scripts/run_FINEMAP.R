@@ -48,6 +48,8 @@ phen = readPheno(phen)
 # the number of samples and the number of variants:
 n = nrow(X)
 p = ncol(X)
+stopifnot(n > 0)
+stopifnot(p > 0)
 storage.mode(X) = 'double'
 # load psam and ensure sample names are the same
 stopifnot(readPSAM(gt) == phen[,1])

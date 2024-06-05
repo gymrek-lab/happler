@@ -1,7 +1,9 @@
 from __future__ import annotations
 from logging import Logger
 
+import logging
 import numpy as np
+import numpy.typing as npt
 from haptools.logging import getLogger
 from haptools.data import Genotypes, Phenotypes
 from haptools.ld import pearson_corr_ld
@@ -53,6 +55,7 @@ class TreeBuilder:
         self,
         genotypes: Genotypes,
         phenotypes: Phenotypes,
+        maf: float = None,
         method: AssocTest = AssocTestSimple(),
         terminator: Terminator = TTestTerminator(),
         ld_prune_thresh: float = None,
@@ -60,24 +63,18 @@ class TreeBuilder:
     ):
         self.gens = genotypes
         self.phens = phenotypes
+        self.maf = maf
         self.method = method
         self.terminator = terminator
-        if method.with_bic:
-            if isinstance(method, AssocTestSimpleSMTScore):
-                self.results_type = NodeResultsExtraTScore
-            else:
-                self.results_type = NodeResultsExtra
-        elif isinstance(method, AssocTestSimpleSMTScore):
-            self.results_type = NodeResultsTScore
-        else:
-            self.results_type = NodeResults
+        self.results_type = method.results_type
         self.tree = None
         self._split_method = self._find_split_rigid
         split_method = "rigid"
         self.ld_prune_thresh = ld_prune_thresh
-        if self.ld_prune_thresh is not None:
-            self._split_method = self._find_split_flexible
-            split_method = "flexible"
+        # for now, let's comment this out because we want to try the rigid strategy
+        # if self.ld_prune_thresh is not None:
+        #     self._split_method = self._find_split_flexible
+        #     split_method = "flexible"
         self.log = log or getLogger(self.__class__.__name__)
         self.log.info(f"Using {split_method} branching strategy")
 
@@ -100,8 +97,7 @@ class TreeBuilder:
         # step three: create the rest of the tree
         self._create_tree(parent_hap, parent_idx=0)
         # step four: prune nodes from the tree that are in strong LD
-        if self._split_method == self._find_split_flexible:
-            self.prune_tree()
+        self.prune_tree()
         return self.tree
 
     def _create_tree(
@@ -142,7 +138,8 @@ class TreeBuilder:
                 # there were no significant variants!
                 continue
             new_node_idx = self.tree.add_node(variant, parent_idx, allele, results)
-            self.log.debug(self.tree.dot())
+            if self.log.getEffectiveLevel() == logging.DEBUG:
+                self.log.debug(self.tree.dot())
             # create a new Haplotype with the variant-allele pair added
             variant_gts = self.gens.data[:, variant.idx, :2] == allele
             new_parent_hap = parent_hap.append(variant, allele, variant_gts)
@@ -157,6 +154,8 @@ class TreeBuilder:
         from_root: bool, optional
             Whether to only prune leaves attached to the root of the tree
         """
+        if self.ld_prune_thresh is None:
+            return
         count = 0
         leaves = self.tree.leaves(from_root=from_root)
         self.log.debug(f"Considering {len(leaves)} leaves for pruning")
@@ -167,11 +166,24 @@ class TreeBuilder:
             sibs = list(self.tree.siblings(leaf_idx).items())
             if not len(sibs):
                 continue
+            # just use the first sibling for now
+            # TODO: use a for-loop if we allow more than two branches per node
             sib_idx, sibling = sibs[0]
-            if sib_idx in leaves and sibling["results"].pval > leaf["results"].pval:
-                self.log.debug(f"Left leaf {leaf_var.id} unpruned since it is better")
-                # keep it if our p-value is better
-                continue
+            if sib_idx in leaves:
+                sib_p = sibling["results"].pval
+                leaf_p = leaf["results"].pval
+                if sib_p > leaf_p and not np.isclose(sib_p, leaf_p):
+                    self.log.debug(
+                        f"Left leaf {leaf_var.id} unpruned since it has a better pval"
+                    )
+                    # keep it if our p-value is better
+                    continue
+                elif np.isclose(sib_p, leaf_p) and leaf["results"].beta > 0:
+                    self.log.debug(
+                        f"Left leaf {leaf_var.id} unpruned since it's beta is positive"
+                    )
+                    # also if the p-values are the same but our effect size is positive
+                    continue
             # step 3: get the genotypes for the leaf node and its sibling
             leaf_gts = self.gens.data[:, leaf_var.idx, :] == leaf["allele"]
             sibling_gts = (
@@ -190,6 +202,32 @@ class TreeBuilder:
             f"Pruned {count} leaves with LD > {self.ld_prune_thresh} with their"
             " siblings"
         )
+
+    def maf_mask(
+        self,
+        hap_matrix: npt.NDArray[np.bool_],
+    ) -> npt.NDArray:
+        """
+        Check the minor allele frequency of each haplotype in the provided hap matrix
+
+        Parameters
+        ----------
+        hap_matrix: npt.NDArray[np.bool_]
+            An array of haplotype "genotypes" of shape: num_samples x num_haplotypes
+
+        Returns
+        -------
+            An integer mask denoting the indices of the haplotypes that passed the
+            MAF threshold
+        """
+        if self.maf is None:
+            return np.arange(hap_matrix.shape[1])
+        num_strands = 2 * hap_matrix.shape[0]
+        # TODO: make this work for multi-allelic variants, too?
+        ref_af = hap_matrix.sum(axis=(0, 2)) / num_strands
+        maf = np.array([ref_af, 1 - ref_af]).min(axis=0)
+        common_variants = maf >= self.maf
+        return np.nonzero(common_variants)[0]
 
     def _find_split_flexible(
         self, parent: Haplotype, parent_res: NodeResults = None
@@ -215,8 +253,14 @@ class TreeBuilder:
         # iterate through the two possible alleles and try all SNPs with that allele
         alleles = (0, 1)
         for allele in alleles:
-            # step 1: transform the GT matrix into a haplotype matrix
+            # step 1: transform the GT matrix into a matrix of common haplotypes
             hap_matrix = parent.transform(self.gens, allele)
+            maf_mask = self.maf_mask(hap_matrix)
+            if len(maf_mask) != hap_matrix.shape[1]:
+                self.log.debug(
+                    f"Considering {len(maf_mask)} variants for allele {allele}"
+                )
+            hap_matrix = hap_matrix[:, maf_mask]
             if hap_matrix.shape[1] == 0:
                 # if there weren't any genotypes left, just return None
                 yield None, allele, None
@@ -240,9 +284,12 @@ class TreeBuilder:
                 # step 3: record the best p-value among all the SNPs with this allele
                 best_var_idx = results.data["pval"].argmin()
             node_res = self.results_type.from_np(results.data[best_var_idx])
+            best_res_idx = best_var_idx
             num_tests = len(parent.nodes) + 1
             # step 4: find the index of the best variant within the genotype matrix
-            # We need to account for indices that we removed when running transform()
+            # We need to account for the rare variants that were masked out and indices
+            # that we removed when running transform()
+            best_var_idx += maf_mask[best_res_idx] - len(maf_mask[:best_res_idx])
             # There might be a faster way of doing this but for now we're just going to
             # live with it
             for gt_idx in sorted(parent.node_indices):
@@ -251,16 +298,17 @@ class TreeBuilder:
                     break
                 best_var_idx += 1
             # step 5: retrieve the Variant with the best p-value
-            best_variant = Variant.from_np(
-                self.gens.variants[best_var_idx], best_var_idx
-            )
+            best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
             self.log.debug("Chose variant {}".format(best_variant.id))
             # step 6: check if this allele is significant and whether we should terminate the branch
             self.log.debug(
-                "Testing variant {} / allele {} with parent_res {} and node_res {}"
-                .format(best_variant.id, allele, parent_res, node_res)
+                "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
+                    best_variant.id, allele, parent_res, node_res
+                )
             )
-            if self.terminator.check(parent_res, node_res, num_samps, num_tests):
+            if self.terminator.check(
+                parent_res, node_res, results, best_res_idx, num_samps, num_tests
+            ):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res
@@ -292,11 +340,18 @@ class TreeBuilder:
         num_samps = len(self.gens.samples)
         results = {}
         best_p_idx = {}
+        maf_mask = {}
         # iterate through the two possible alleles and try all SNPs with that allele
         alleles = (0, 1)
         for allele in alleles:
-            # step 1: transform the GT matrix into a haplotype matrix
+            # step 1: transform the GT matrix into a matrix of common haplotypes
             hap_matrix = parent.transform(self.gens, allele)
+            maf_mask[allele] = self.maf_mask(hap_matrix)
+            if len(maf_mask[allele]) != hap_matrix.shape[1]:
+                self.log.debug(
+                    f"Considering {len(maf_mask[allele])} variants for allele {allele}"
+                )
+            hap_matrix = hap_matrix[:, maf_mask[allele]]
             if hap_matrix.shape[1] == 0:
                 # if there weren't any genotypes left, just return None
                 yield None, allele, None
@@ -332,9 +387,14 @@ class TreeBuilder:
                 best_p_idx, key=lambda a: results[a].data["pval"][best_p_idx[a]]
             )
         best_var_idx = best_p_idx[best_allele]
+        best_res_idx = best_var_idx
         num_tests = len(parent.nodes) + 1
         # step 4: find the index of the best variant within the genotype matrix
-        # we need to account for indices that we removed when running transform()
+        # We need to account for the rare variants that were masked out and indices
+        # that we removed when running transform()
+        best_var_idx += maf_mask[best_allele][best_res_idx] - len(
+            maf_mask[best_allele][:best_res_idx]
+        )
         # There might be a faster way of doing this but for now we're just going to
         # live with it
         for gt_idx in sorted(parent.node_indices):
@@ -347,15 +407,42 @@ class TreeBuilder:
         self.log.debug("Chose variant {}".format(best_variant.id))
         # iterate through all of the alleles of the best variant and check if they're
         # significant
-        for allele in alleles:
-            best_results = results[allele].data[best_p_idx[best_allele]]
+        for allele in results:
+            if allele == best_allele:
+                best_allele_idx = best_res_idx
+            else:
+                best_allele_idx = np.searchsorted(
+                    maf_mask[allele], maf_mask[best_allele][best_res_idx]
+                )
+                # if the best variant was filtered out for this allele due to low MAF
+                # searchsorted() will return an index at the end of the array or the
+                # wrong index
+                if best_allele_idx >= len(maf_mask[allele]) or (
+                    maf_mask[allele][best_allele_idx]
+                    != maf_mask[best_allele][best_res_idx]
+                ):
+                    self.log.debug(
+                        f"Ignoring variant {best_variant.id} / allele {allele} because"
+                        " it results in a haplotype with low MAF"
+                    )
+                    yield None, allele, None
+                    continue
+            best_results = results[allele].data[best_allele_idx]
             node_res = self.results_type.from_np(best_results)
             # step 6: check whether we should terminate the branch
             self.log.debug(
-                "Testing variant {} / allele {} with parent_res {} and node_res {}"
-                .format(best_variant.id, allele, parent_res, node_res)
+                "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
+                    best_variant.id, allele, parent_res, node_res
+                )
             )
-            if self.terminator.check(parent_res, node_res, num_samps, num_tests):
+            if self.terminator.check(
+                parent_res,
+                node_res,
+                results[allele],
+                best_allele_idx,
+                num_samps,
+                num_tests,
+            ):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res

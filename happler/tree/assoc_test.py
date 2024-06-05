@@ -83,7 +83,7 @@ class AssocResults:
         It has shape num_variants x num_fields
     """
 
-    data: npt.NDArray[np.float64, np.float64, np.float64]
+    data: npt.NDArray
 
 
 class AssocTest(ABC):
@@ -95,6 +95,12 @@ class AssocTest(ABC):
     pval_thresh : float, optional
         The threshold of significance
     """
+
+    def __init__(self, with_bic: bool = False):
+        self.with_bic = with_bic
+        self.results_type = NodeResults
+        if self.with_bic:
+            self.results_type = NodeResultsExtra
 
     def standardize(self, X: npt.NDArray[np.uint8]) -> npt.NDArray[np.float64]:
         """
@@ -113,15 +119,13 @@ class AssocTest(ABC):
         """
         std = np.std(X, axis=0)
         standardized = (X - np.mean(X, axis=0)) / std
-        # # for variants where the stdev is 0, just set all values to 0 instead of nan
+        # for variants where the stdev is 0, just set all values to 0 instead of nan
         zero_elements = std == 0
         standardized[:, zero_elements] = np.zeros((X.shape[0], np.sum(zero_elements)))
         return standardized
 
     @abstractmethod
-    def run(
-        self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
-    ) -> AssocResults:
+    def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
         Run a series of phenotype-haplotype association tests for each haplotype
         (column) in X and return their p-values
@@ -143,16 +147,15 @@ class AssocTest(ABC):
 
 
 class AssocTestSimple(AssocTest):
-    def __init__(self, with_bic=False):
-        self.with_bic = with_bic
+    def __init__(self, with_bic: bool = False):
+        super().__init__(with_bic=with_bic)
         self.return_dtype = [
             ("beta", np.float64),
             ("pval", np.float64),
             ("stderr", np.float64),
         ]
-        if with_bic:
+        if self.with_bic:
             self.return_dtype.append(("bic", np.float64))
-        super().__init__()
 
     def bic(self, n, residuals) -> float:
         """
@@ -201,7 +204,14 @@ class AssocTestSimple(AssocTest):
             The slope, p-value, and stderr obtained from the test. The delta BIC is
             appended to the end if ``self.with_bic`` is True.
         """
-        res = stats.linregress(x, y)
+        try:
+            res = stats.linregress(x, y)
+        except ValueError:
+            # This can happen, for example, when all x values are identical
+            # In this case, we just output the worst possible values
+            if self.with_bic:
+                return 0, 1, np.inf, 0
+            return 0, 1, np.inf
         if self.with_bic:
             y_hat = res.intercept + res.slope * x
             residuals = y - y_hat
@@ -210,9 +220,7 @@ class AssocTestSimple(AssocTest):
         else:
             return res.slope, res.pvalue, res.stderr
 
-    def run(
-        self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]
-    ) -> AssocResults:
+    def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
         Implement AssocTest for a simple linear regression.
 
@@ -284,7 +292,7 @@ class AssocTestSimpleSM(AssocTestSimple):
 
 
 class AssocTestSimpleCovariates(AssocTestSimpleSM):
-    def __init__(self, covars: npt.NDArray[np.float64], with_bic=False):
+    def __init__(self, covars: npt.NDArray[np.float64], with_bic: bool = False):
         """
         Implement a subclass of AssocTestSimple with covariates.
 
@@ -307,7 +315,7 @@ class AssocTestSimpleCovariates(AssocTestSimpleSM):
 
 
 class AssocTestSimpleSMTScore(AssocTestSimpleSM):
-    def __init__(self, with_bic=False):
+    def __init__(self, with_bic: bool = False):
         """
         Implement a subclass of AssocTestSimple with covariates.
 
@@ -319,6 +327,9 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
         """
         super().__init__(with_bic=with_bic)
         self.return_dtype.append(("tscore", np.float64))
+        self.results_type = NodeResultsTScore
+        if self.with_bic:
+            self.results_type = NodeResultsExtraTScore
 
     def perform_test(
         self,

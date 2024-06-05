@@ -16,13 +16,13 @@ rule susie:
         phen=config["pheno"],
     params:
         outdir=lambda wildcards, output: Path(output.susie).parent,
-        exclude_causal=lambda wildcards: config["causal_gt"] if \
+        exclude_causal=lambda wildcards: expand(config["causal_gt"], **wildcards)[0] if \
             int(exclude_causal[wildcards.causal]) else "NULL",
     output:
         susie=out + "/{causal}clude/susie.rds",
     resources:
-        runtime="0:15:00",
-        queue="hotel",
+        runtime=15,
+        slurm_partition='hotel',
     log:
         logs + "/{causal}clude/susie",
     benchmark:
@@ -40,14 +40,14 @@ rule finemap:
         phen=config["pheno"],
     params:
         outdir=lambda wildcards, output: Path(output.finemap).parent,
-        exclude_causal=lambda wildcards: config["causal_gt"] if \
+        exclude_causal=lambda wildcards: expand(config["causal_gt"], **wildcards)[0] if \
             not int(exclude_causal[wildcards.causal]) else "NULL",
     output:
         sumstats=temp(out + "/{causal}clude/sumstats.rds"),
         finemap=out + "/{causal}clude/finemap.rds",
     resources:
-        runtime="0:45:00",
-        queue="hotel",
+        runtime=45,
+        slurm_partition='hotel',
     log:
         logs + "/{causal}clude/finemap",
     benchmark:
@@ -64,17 +64,17 @@ rule results:
         gt=config["snp_panel"],
         finemap=rules.finemap.output.finemap,
         susie=rules.susie.output.susie,
+        causal_gt=config["causal_gt"],
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
-        exclude_causal=lambda wildcards: not int(exclude_causal[wildcards.causal]),
         causal_hap="",
-        causal_gt=config["causal_gt"],
     output:
         finemap_pdf= out + "/{causal}clude/finemap.pdf",
         susie_pdf= out + "/{causal}clude/susie.pdf",
     resources:
-        runtime="1:00:00",
-        queue="hotel",
+        runtime=60,
+        slurm_partition='hotel',
+        slurm_extra='--qos=hotel',
         # susie_eff_pdf=temp( out + "/{causal}clude/susie_eff.pdf"),
     log:
         logs + "/{causal}clude/results",

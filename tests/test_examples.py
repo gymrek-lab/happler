@@ -1,10 +1,15 @@
+import filecmp
+from pathlib import Path
 from itertools import product
 
 import pytest
+import logging
 import numpy as np
 from logging import getLogger
-from haptools.data import Genotypes, Phenotypes
+from click.testing import CliRunner
+from haptools.data import Genotypes, Phenotypes, Haplotypes
 
+from happler.__main__ import main
 from happler.tree import (
     TreeBuilder,
     AssocTestSimple,
@@ -12,6 +17,9 @@ from happler.tree import (
     BICTerminator,
     NodeResultsExtra,
 )
+
+
+DATADIR = Path(__file__).parent.joinpath("data")
 
 
 def _create_fake_gens(data) -> Genotypes:
@@ -185,9 +193,7 @@ def test_two_snps_independent_perfect():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-        )
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
     )
     gts = gens.data.sum(axis=2)
     phens = _create_fake_phens(gts[:, 0] * 0.5 + gts[:, 1] * 0.5)
@@ -313,9 +319,7 @@ def test_two_snps_one_branch_perfect_opposite_direction():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-        )
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
     )
     gts = gens.data
     phens = _create_fake_phens(-0.5 * (gts[:, 0] & ~gts[:, 1]).sum(axis=1))
@@ -348,9 +352,7 @@ def test_three_snps_one_branch_one_snp_not_causal():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:], [1, 1]]
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-        )
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
     )
     gts = gens.data
     phens = _create_fake_phens(0.5 * (gts[:, 0] & gts[:, 1]).sum(axis=1))
@@ -408,9 +410,7 @@ def test_four_snps_two_independent_trees_perfect_one_snp_not_causal():
     and X4 occurs in the second
     """
     # a function for splitting a list into a list of pairs
-    split_list = lambda pair: [pair[i : i + 2] for i in range(0, len(pair), 2)] + [
-        [1, 1]
-    ]
+    split_list = lambda pair: [pair[i : i + 2] for i in range(0, len(pair), 2)] + [[1, 1]]
     gens = _create_fake_gens(
         np.array(list(map(split_list, product([0, 1], repeat=8))), dtype=np.bool_)
     )
@@ -530,9 +530,7 @@ def test_two_snps_two_branches_perfect():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-        )
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
     )
     gts = gens.data
     phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
@@ -603,9 +601,7 @@ def test_two_snps_two_branches_perfect_one_snp_not_causal():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]] + [[1, 1]]
     gens = _create_fake_gens(
-        np.array(
-            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-        )
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
     )
     gts = gens.data
     phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
@@ -668,3 +664,108 @@ def test_ppt_case():
         assert haps[0][i]["variant"].id == "snp" + str(i)
     for i in range(2):
         assert haps[1][i]["variant"].id == "snp" + str(i)
+
+
+def test_1000G_simulated(capfd):
+    """
+    Test using simulated data from the 1000G dataset
+    """
+    gt_file = DATADIR / "19_45401409-46401409_1000G.pgen"
+    pt_file = DATADIR / "19_45401409-46401409_1000G.pheno"
+    hp_file = DATADIR / "19_45401409-46401409_1000G.hap"
+    out_hp_file = "test.hap"
+
+    cmd = f"run -o {out_hp_file} {gt_file} {pt_file}"
+    runner = CliRunner()
+    result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
+    captured = capfd.readouterr()
+    assert captured.out == ""
+    assert result.exit_code == 0
+    assert filecmp.cmp(hp_file, out_hp_file)
+
+
+def test_1000G_simulated_maf(capfd):
+    """
+    Test MAF filtering using simulated data from the 1000G dataset
+    """
+    gt_file = DATADIR / "19_45401409-46401409_1000G.pgen"
+    pt_file = DATADIR / "19_45401409-46401409_1000G.pheno"
+    hp_file = DATADIR / "19_45401409-46401409_1000G.hap"
+    out_hp_file = Path("test.hap")
+
+    out_vars = ("rs1046282", "rs36046716")
+
+    for maf in (0.05, 0.30, 0.31, 0.38):
+        cmd = f"run --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        runner = CliRunner()
+        result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
+        captured = capfd.readouterr()
+        assert captured.out == ""
+        assert result.exit_code == 0
+
+        out_hp = Haplotypes.load(out_hp_file)
+        assert len(out_hp.data) == 1
+        var_ids = tuple(vr.id for vr in list(out_hp.data.values())[0].variants)
+
+        # rs36046716 has MAF 0.37435567
+        # rs1046282 has MAF 0.30476804
+        # the combined haplotype has MAF of 0.06314433
+        if maf > 0.37435567:
+            assert len(var_ids) == 1
+            assert out_vars[0] not in var_ids and out_vars[1] not in var_ids
+        elif maf > 0.30476804:
+            assert var_ids == (out_vars[1],)
+        elif maf > 0.06314433:
+            # rs1046282 has a better p-value than rs36046716
+            assert var_ids == (out_vars[0],)
+        else:
+            assert var_ids == out_vars
+
+    out_hp_file.unlink()
+
+
+def test_1000G_real(capfd, caplog):
+    """
+    Test MAF filtering using real Geuvadis data from the 1000G dataset
+    """
+    gt_file = DATADIR / "15_38177344-39177344_1000G.pgen"
+    pt_file = DATADIR / "15_38177344-39177344_1000G.pheno"
+    hp_file = DATADIR / "15_38177344-39177344_1000G.hap"
+    out_hp_file = Path("test.hap")
+
+    out_vars = ("15:38694167:G:T", "15:38842030:C:A")
+
+    caplog.set_level(logging.INFO)
+
+    for maf in (0.05, 0.14, 0.22, 0.23, 0.35):
+        cmd = f"run --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        runner = CliRunner()
+        result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
+        captured = capfd.readouterr()
+        assert captured.out == ""
+        assert result.exit_code == 0
+
+        out_hp = Haplotypes.load(out_hp_file)
+        assert len(out_hp.data) >= 1
+        var_ids = tuple(vr.id for vr in list(out_hp.data.values())[0].variants)
+
+        # 15:38842030:C:A has MAF 0.34261838
+        # 15:38694167:G:T has MAF 0.22980501
+        # the combined haplotype has MAF of 0.14763231
+        if maf > 0.34261838:
+            assert len(out_hp.data) == 1
+            assert len(var_ids) == 1
+            assert out_vars[0] not in var_ids and out_vars[1] not in var_ids
+        elif maf > 0.22980501:
+            assert len(out_hp.data) == 1
+            # neither of the causal variants has a strong enough pval at this MAF
+            assert var_ids == ("15:38694612:C:T",)
+        elif maf > 0.14763231:
+            assert len(out_hp.data) == 1
+            # 15:38694167:G:T has a better pval than 15:38842030:C:A
+            assert var_ids == (out_vars[0],)
+        else:
+            assert len(out_hp.data) == 1
+            assert var_ids == out_vars
+
+    out_hp_file.unlink()

@@ -19,17 +19,22 @@ suppressMessages(library(ggplot2))
 source("workflow/scripts/utils.R")
 
 write("Loading input data", stderr())
+region = snakemake@params[["region"]]
 # import the finemap and susie results
 # and the path to an output directory
-X = readPGEN(snakemake@input[["gt"]])
+X = readPGEN(snakemake@input[["gt"]], region=region)
 # also load the positions of each of the variants
-pos = readPVAR(snakemake@input[["gt"]])
-if (nchar(snakemake@params[["causal_gt"]]) > 0) {
-    causal_gt = readPGEN(snakemake@params[["causal_gt"]])
+pos = readPVAR(snakemake@input[["gt"]], region=region)
+if (length(snakemake@input[["causal_gt"]])) {
+    causal_gt = readPGEN(snakemake@input[["causal_gt"]], region=region)
     X = cbind(X, causal_gt)
     causal_variant = colnames(causal_gt)[1]
     # also load the positions of each of the variants
-    pos = c(pos, readPVAR(snakemake@params[["causal_gt"]]))
+    pos = c(pos, readPVAR(snakemake@input[["causal_gt"]], region=region))
+    write(paste("Loaded", length(pos), "positions"), stderr())
+} else {
+    causal_variant = NULL
+    write("Causal haplotype is unknown", stderr())
 }
 
 if ("finemap" %in% names(snakemake@input)) {
@@ -40,29 +45,46 @@ if ("finemap" %in% names(snakemake@input)) {
 susie_results = readRDS(snakemake@input[["susie"]])
 out = snakemake@params[["outdir"]]
 hap = FALSE
-if (nchar(snakemake@params[["causal_hap"]]) > 0) {
+causal_hap_is_provided = FALSE
+if (length(snakemake@input[["happler_hap"]]) > 0) {
     hap = TRUE
     happler_haplotype = file(snakemake@input[["happler_hap"]], "rt")
+}
+if (length(snakemake@params[["causal_hap"]]) > 0) {
+    causal_hap_is_provided = TRUE
     causal_haplotype = file(snakemake@params[["causal_hap"]], "rt")
 }
 
 if (hap) {
-    write("Parsing hap files", stderr())
+    write("Parsing happler hap file", stderr())
     while(TRUE) {
         line = readLines(happler_haplotype, 1)
-        if (grepl("^H", line)) break
+        # we assume the first line in the hap file that begins with H denotes the haplotype
+        if (grepl("^H\\t", line)) break
     }
-    # extract the start and end of the haplotype
+    # extract the start, end, and ID of the haplotype
     happler_hap = as.integer(strsplit(line, "\t")[[1]][c(3,4)])
-    names(happler_hap) = c("start", "end")
+    happler_hap_id = strsplit(line, "\t")[[1]][c(5)]
+}
+if (causal_hap_is_provided) {
+    write("Parsing causal hap file", stderr())
     while(TRUE) {
         line = readLines(causal_haplotype, 1)
-        if (grepl("^H", line)) break
+        # we assume the first line in the hap file that begins with H denotes the haplotype
+        if (grepl("^H\\t", line)) break
     }
     # extract the start, end, and ID of the haplotype
     causal_hap = as.integer(strsplit(line, "\t")[[1]][c(3,4)])
-    names(causal_hap) = c("start", "end")
-    haplotypes = t(data.frame(causal_hap, happler_hap))
+    causal_hap_id = strsplit(line, "\t")[[1]][c(5)]
+    stopifnot(causal_hap_id == causal_variant)
+    haplotypes = t(data.frame(
+        causal_hap = c("start"=causal_hap[1], "end"=causal_hap[2], "id"=causal_hap_id),
+        happler_hap = c("start"=happler_hap[1], "end"=happler_hap[2], "id"=happler_hap_id)
+    ))
+} else {
+    haplotypes = t(data.frame(
+        happler_hap = c("start"=happler_hap[1], "end"=happler_hap[2], "id"=happler_hap_id)
+    ))
 }
 
 write("Formatting genotypes and creating output dir", stderr())
@@ -82,14 +104,21 @@ write("Handling causal variable", stderr())
 # this vector indicates which variant is truly causal
 b = rep(0, ncol(X))
 names(b) = colnames(X)
-if (exclude_causal) {
-    b = b[!(names(b) %in% c(causal_variant))]
-    pos = pos[!(names(pos) %in% c(causal_variant))]
-    if (hap) {
-        haplotypes = t(data.frame(haplotypes[c(2),]))
+if (!is.null(causal_variant)) {
+    if (exclude_causal) {
+        write("Excluding causal variable", stderr())
+        causal_var_idx = which.max(names(b) %in% c(causal_variant))
+        b = b[-causal_var_idx]
+        pos = pos[-causal_var_idx]
+        if (hap && !causal_hap_is_provided) {
+            haplotypes = t(data.frame(haplotypes[c(2),]))
+        }
+        stopifnot(nrow(haplotypes) == 1)
+    } else {
+        b[causal_variant] = 1
     }
 } else {
-    b[causal_variant] = 1
+    write("Causal variable already excluded", stderr())
 }
 
 if (!is.null(finemap_results)) {
@@ -107,19 +136,31 @@ pip_plot_data = function(pips, X, b, pos, susie_cs=NULL) {
     # first, initialize the values we need
     b_colors = c(`0`='black', `1`='red')
     causal_var = names(b[b == 1])
-    if (length(causal_var) == 0) {
-        causal_var = X[,causal_variant]
-        X = X[,!(colnames(X) %in% c(causal_variant))]
-    } else {
-        causal_var = X[,causal_var[1]]
-    }
-    stopifnot(names(b) == names(pos))
-    data = data.frame(
-        pip = pips,
-        b = as.character(b),
-        pos = pos,
+    if (!is.null(causal_variant)) {
+        if (length(causal_var) == 0) {
+            causal_var = X[,causal_variant]
+            X = X[,-which.max(colnames(X) %in% c(causal_variant))]
+        } else {
+            # TODO: make sure this only outputs a single row?
+            causal_var = X[,causal_var[1]]
+        }
         ld_causal = as.vector(cor(causal_var, X))^2
-    )
+        stopifnot(length(b) == length(pos))
+        stopifnot(names(b) == names(pos))
+        stopifnot(names(b) == names(pips))
+        data = data.frame(
+            pip = pips,
+            b = as.character(b),
+            pos = pos,
+            ld_causal = ld_causal
+        )
+    } else {
+        data = data.frame(
+            pip = pips,
+            b = as.character(b),
+            pos = pos
+        )
+    }
     if (!is.null(susie_cs)) {
         data$cs = as.integer((names(b) %in% susie_cs))*2
     } else {
@@ -137,10 +178,16 @@ pip_plot = function(pips, X, b, pos, susie_cs=NULL) {
     # extract the causal variants to another data frame
     data_causal = data[data$b == '1',]
     # make the plot
-    ggplot(data, aes(x=pos, y=pip)) +
-    geom_point(aes(fill=ld_causal, stroke=cs, color=factor(cs)), size=7, shape=21) +
-    scale_fill_gradient(name='LD with Causal Variant', low='#FBBA72', high='#691E06') +
-    scale_color_manual(name='Credible Sets', values=c('transparent', '#7C9299'), guide="none") +
+    plt = ggplot(data, aes(x=pos, y=pip))
+    if ("ld_causal" %in% colnames(data)) {
+        write("Plotting with causal LD", stderr())
+        plt = plt + geom_point(aes(fill=ld_causal, stroke=cs, color=factor(cs)), size=7, shape=21) +
+        scale_fill_gradient(name='LD with Causal Variant', low='#FBBA72', high='#691E06')
+    } else {
+        write("Not including causal variable", stderr())
+        plt = plt + geom_point(aes(fill=1, stroke=cs, color=factor(cs)), size=7, shape=21, show.legend=F)
+    }
+    plt + scale_color_manual(name='Credible Sets', values=c('transparent', '#7C9299'), guide="none") +
     geom_point(data=data_causal, aes(stroke=cs, color=factor(cs)), fill='red', size=7, shape=21) +
     xlab('Chromosomal Position') +
     ylab('Posterior Inclusion Probability (PIP)') + 
@@ -153,16 +200,26 @@ pip_plot_haps = function(pips, X, b, pos, haplotypes, susie_cs=NULL) {
     # create a ggplot of the PIPs
     # but first, get the data we need for the plot
     data = pip_plot_data(pips, X, b, pos, susie_cs)
+    # extract start and end coords
+    # note that we must convert to integer b/c they're characters
+    start_end = t(data.frame(as.integer(haplotypes[1, c("start", "end")])))
+    colnames(start_end) = c("start", "end")
     # extract the haplotypes to another data frame
-    data_hap = cbind(data[grepl(".2", rownames(data), fixed=T),], haplotypes)
+    data_hap = cbind(data[haplotypes[1, "id"],], start_end)
     data_hap$color = c("black", "red")[as.integer(data_hap$b)+1]
     # remove the haps from the data
     data = data[!(row.names(data) %in% rownames(data_hap)),]
     # make the plot
-    ggplot(data, aes(x=pos, y=pip)) +
-    geom_point(aes(fill=ld_causal, stroke=cs, color=factor(cs)), size=7, shape=21) +
-    scale_fill_gradient(name='LD with Causal Variant', low='#FBBA72', high='#691E06') +
-    scale_color_manual(name='Credible Sets', values=c('transparent', '#7C9299'), guide="none") +
+    plt = ggplot(data, aes(x=pos, y=pip))
+    if ("ld_causal" %in% colnames(data)) {
+        write("Plotting with causal LD", stderr())
+        plt = plt + geom_point(aes(fill=ld_causal, stroke=cs, color=factor(cs)), size=7, shape=21) +
+        scale_fill_gradient(name='LD with Causal Variant', low='#FBBA72', high='#691E06')
+    } else {
+        write("Not including causal variable", stderr())
+        plt = plt + geom_point(aes(fill=1, stroke=cs, color=factor(cs)), size=7, shape=21, show.legend=F)
+    }
+    plt + scale_color_manual(name='Credible Sets', values=c('transparent', '#7C9299'), guide="none") +
     geom_segment(data=data_hap, aes(x = start, xend = end, y = pip, yend = pip, color=factor(b)), color=data_hap$color, size=3) +
     xlab('Chromosomal Position') +
     ylab('Posterior Inclusion Probability (PIP)') +

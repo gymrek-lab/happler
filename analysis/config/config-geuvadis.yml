@@ -1,0 +1,87 @@
+# This is the Snakemake configuration file that specifies paths and 
+# and options for the pipeline. Anybody wishing to use
+# the provided snakemake pipeline should first fill out this file with paths to
+# their own data, as the Snakefile requires it.
+# Every config option has reasonable defaults unless it is labeled as "required."
+# All paths are relative to the directory that Snakemake is executed in.
+# Note: this file is written in the YAML syntax (https://learnxinyminutes.com/docs/yaml/)
+
+
+# Paths to a SNP-STR haplotype reference panel
+# You can download this from http://gymreklab.com/2018/03/05/snpstr_imputation.html
+# If the VCFs are per-chromosome, replace the contig name in the file name with "{chr}"
+# The VCF(s) must be sorted and indexed (with a .tbi file in the same directory)
+# required!
+# ref_panel: "/projects/ps-gymreklab/resources/datasets/snpstr/1kg.snp.str.chr{chr}.vcf.gz"
+# snp_panel: "/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
+snp_panel: "data/geuvadis/geuvadis_ensemble_phasing.pgen"
+# str_panel: "/tscc/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
+
+# Path to a list of samples to exclude from the analysis
+# There should be one sample ID per line
+# exclude_samples: data/ukb_random_samples_exclude.tsv
+
+# If SNPs are unphased, provide the path to a SHAPEIT4 map file like these:
+# https://github.com/odelaneau/shapeit4/tree/master/maps
+# The map file should use the same reference genome as the reference panel VCFs
+# phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
+
+# A "locus" is a string with a contig name, a colon, the start position, a dash, and
+# the end position or a BED file with a ".bed" file ending
+# There are different simulation modes that you can use:
+# 1. "str" - a tandem repeat is a string with a contig name, a colon, and the start position
+# 2. "snp" - a SNP follows the same format as "str"
+# 3. "hap" - a haplotype
+# 4. "ld_range" - creates random two-SNP haplotypes with a range of LD values between the alleles of each haplotype
+# 5. "run" - execute happler on a locus without simulating anything
+# The STR and SNP positions should be contained within the locus.
+# The positions should be provided in the same coordinate system as the reference
+# genome of the reference panel VCFs
+# The contig should correspond with the contig name from the {chr} wildcard in the VCF
+# required! and unless otherwise noted, all attributes of each mode are required
+# locus: 19:45401409-46401409 # center: 45901409 (APOe4)
+locus: data/geuvadis/geuvadis_eqtl_genes.full.liftover.bed
+modes:
+ str:
+  pos: 19:45903857 # STR_691361
+ snp:
+  pos: 19:45910672 # rs1046282
+ hap:
+  alleles: [rs36046716:G, rs1046282:G] # 45892145, 45910672
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
+ ld_range:
+  reps: 1
+  min_ld: 0
+  max_ld: 1
+  step: 0.1
+  min_af: 0.25
+  max_af: 0.75
+  # beta: [0.35]
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
+  alpha: [0.05]
+  random: false # whether to also produce random haplotypes
+ run:
+  pheno: data/geuvadis/phenos/{trait}.pheno
+  SVs: data/geuvadis/pangenie_hprc_hg38_all-samples_bi_SVs-missing_removed.pgen
+  # pheno_matrix: data/geuvadis/EUR_converted_expr_hg38.csv # optional
+mode: run
+
+# Covariates to use if they're needed
+# Otherwise, they're assumed to be regressed out of the phenotypes
+# Note: the finemapping methods won't be able to handle these covariates
+# covar: data/geuvadis/5PCs_sex.covar
+
+# Discard rare variants with a MAF below this number
+# Defaults to 0 if not specified
+min_maf: 0.1
+
+# Sample sizes to use
+# sample_size: [500, 1000, 1500, 2000, 2500]
+# sample_size: 777
+
+# Whether to include the causal variant in the set of genotypes provided to the
+# finemapping methods. Set this to true if you're interested in seeing how the
+# methods perform when the causal variant is absent from the data.
+# Defaults to false if not specified
+# You can also provide a list of booleans, if you want to test both values
+exclude_causal: [true, false]
