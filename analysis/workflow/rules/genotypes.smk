@@ -150,7 +150,7 @@ rule vcf2plink:
         psam=out+"/snps.psam",
         log=temp(out+"/snps.log"),
     resources:
-        runtime=12,
+        runtime=15,
     threads: 2
     log:
         logs + "/vcf2plink",
