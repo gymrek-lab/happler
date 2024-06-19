@@ -305,7 +305,7 @@ rule merge:
         "happler"
     shell:
         "workflow/scripts/merge_plink.py --region {params.region} --maf {params.maf} "
-        "{input.gts} {input.hps} {output.pgen} &> {log}"
+        "--verbosity DEBUG {input.gts} {input.hps} {output.pgen} &> {log}"
 
 
 finemapper_input = lambda wildcards: rules.transform.input if (exclude_obs[wildcards.ex] and config["random"] is None) else rules.merge.output
@@ -322,6 +322,7 @@ rule finemapper:
         outdir=lambda wildcards, output: Path(output.susie).parent,
         exclude_causal="NULL",
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        # TODO: also add MAF filter
     output:
         susie=out + "/{ex}clude/susie.rds",
     resources:
@@ -412,6 +413,7 @@ rule results:
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        # TODO: also add MAF filter
     output:
         susie_pdf = out + "/{ex}clude/susie.pdf",
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
@@ -452,7 +454,7 @@ rule merge_SVs:
         "happler"
     shell:
         "workflow/scripts/merge_plink.py --region {params.region} --maf {params.maf} "
-        "{input.gts} {input.svs} {output.pgen} &> {log}"
+        "--verbosity DEBUG {input.gts} {input.svs} {output.pgen} &> {log}"
 
 
 rule gwas:

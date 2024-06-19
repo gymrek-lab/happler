@@ -205,6 +205,7 @@ elif mode == "run":
 
     def FINAL_OUTPUT(wildcards):
         files = [
+            rules.happler_pips.output.tsv,
             rules.happler_tree.output.png,
             rules.happler_linreg.output.png,
             rules.happler_heatmap.output.png,
