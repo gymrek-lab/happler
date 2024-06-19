@@ -41,7 +41,10 @@ rule run:
         idx=out + "/happler.hap.gz.tbi",
         dot=out + "/happler.dot",
     resources:
-        runtime=120,
+        runtime=lambda wildcards, input: (
+            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.5454649806119475 + 0.6935132147046765
+            if Path(input.gts).suffix == ".pgen" else 30
+        ),
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
         # mem_mb=lambda wildcards, threads: threads*4.57,
@@ -95,7 +98,10 @@ rule cond_linreg:
     output:
         png=out + "/cond_linreg.pdf",
     resources:
-        runtime=15,
+        runtime=lambda wildcards, input: (
+            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.47331710924137693 + 0.6373981876553252
+            if Path(input.gts).suffix == ".pgen" else 30
+        ),
     log:
         logs + "/cond_linreg",
     benchmark:
@@ -285,7 +291,10 @@ rule merge:
         pvar=temp(out + "/{ex}clude/merged.pvar"),
         psam=temp(out + "/{ex}clude/merged.psam"),
     resources:
-        runtime=10,
+        runtime=lambda wildcards, input: (
+            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844
+            if Path(input.gts).suffix == ".pgen" else 10
+        ),
     log:
         logs + "/{ex}clude/merge",
     benchmark:
@@ -314,8 +323,11 @@ rule finemapper:
     output:
         susie=out + "/{ex}clude/susie.rds",
     resources:
-        runtime=75,
-    threads: 6,
+        runtime=lambda wildcards, input: (
+            Path(input.gt).with_suffix(".pvar").stat().st_size/1000 * 0.07729841136772851 - 0.2394384452558187
+            if Path(input.gts).suffix == ".pgen" else 75
+        ),
+    threads: 1,
     log:
         logs + "/{ex}clude/finemapper",
     benchmark:
