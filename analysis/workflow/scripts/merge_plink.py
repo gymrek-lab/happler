@@ -1,8 +1,10 @@
 #!/usr/bin/env python
+from pathlib import Path
 
 import click
 import numpy as np
-from pathlib import Path
+
+from haptools.logging import getLogger
 from haptools.data import GenotypesPLINK
 
 
@@ -72,7 +74,12 @@ def main(
             gts.check_biallelic()
             gts.check_maf(threshold=maf, discard_also=True)
 
-    assert gts1.samples == gts2.samples
+    if gts1.samples != gts2.samples:
+        log.info("Getting intersection of samples in order of file1")
+        samples = frozenset(gts2.samples)
+        samples = tuple(samp for samp in gts1.samples if samp in samples)
+        for gts in (gts1, gts2):
+            gts.subset(samples=samples, inplace=True)
 
     if replace:
         # which variants are shared? what are their indices within each file?

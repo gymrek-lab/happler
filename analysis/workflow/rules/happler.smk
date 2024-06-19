@@ -186,6 +186,7 @@ rule transform:
         pgen=config["snp_panel"],
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        pts=config["pheno"],
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
@@ -202,6 +203,7 @@ rule transform:
         "happler"
     shell:
         "haptools transform -o {output.pgen} --region {params.region} "
+        "--samples-file <(tail -n+2 {input.pts} | cut -f1) "
         "{input.pgen} {input.hap} &>{log}"
 
 
@@ -402,6 +404,7 @@ rule results:
     """
     input:
         gt=rules.finemapper.input.gt,
+        phen=config["pheno"],
         susie=rules.finemapper.output.susie,
         happler_hap=results_happler_hap_input,
         causal_gt=config["causal_gt"].pgen if "causal_gt" in config else [],
