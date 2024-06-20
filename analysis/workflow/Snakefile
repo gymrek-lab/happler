@@ -209,7 +209,7 @@ elif mode == "run":
             rules.happler_tree.output.png,
             rules.happler_linreg.output.png,
             rules.happler_heatmap.output.png,
-            rules.happler_manhattan.output.png,
+            # rules.happler_manhattan.output.png,
             rules.happler_cond_linreg.output.png,
             rules.happler_results.output.susie_pdf,
         ]

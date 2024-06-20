@@ -92,7 +92,6 @@ rule cond_linreg:
         hap=rules.run.output.hap,
         pts=config["pheno"],
     params:
-        hap_id = "H0",
         maf = check_config("min_maf", 0),
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
@@ -110,7 +109,7 @@ rule cond_linreg:
         "happler"
     shell:
         "workflow/scripts/conditional_regression_plots.py --verbosity DEBUG "
-        "--show-original --region {params.region} -o {output.png} -i {params.hap_id} "
+        "--show-original --region {params.region} -o {output.png} "
         "--maf {params.maf} {input.pgen} {input.pts} {input.hap} &>{log}"
 
 
