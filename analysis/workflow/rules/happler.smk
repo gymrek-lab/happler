@@ -83,6 +83,12 @@ rule tree:
         "dot -T{params.file_ext} {input.dot} -o {output.png} &>{log}"
 
 
+def get_num_variants(hap_file):
+    """get the unique number of SNP rsIDs in this hap file"""
+    with open(hap_file, "r") as file:
+        return len(set(line.split("\t")[4] for line in file if line.startswith("V")))
+
+
 rule cond_linreg:
     """plot conditional regressions for a haplotype"""
     input:
@@ -98,8 +104,9 @@ rule cond_linreg:
         png=out + "/cond_linreg.pdf",
     resources:
         runtime=lambda wildcards, input: (
-            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.47331710924137693 + 0.6373981876553252
-            if Path(input.gts).suffix == ".pgen" else 30
+            1.5 * Path(input.pvar).stat().st_size/1000 * (
+                0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
+            ) if Path(input.pgen).suffix == ".pgen" else 50
         ),
     log:
         logs + "/cond_linreg",
@@ -293,7 +300,7 @@ rule merge:
         psam=temp(out + "/{ex}clude/merged.psam"),
     resources:
         runtime=lambda wildcards, input: (
-            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844
+            Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844
             if Path(input.gts).suffix == ".pgen" else 10
         ),
     log:
@@ -326,7 +333,7 @@ rule finemapper:
         susie=out + "/{ex}clude/susie.rds",
     resources:
         runtime=lambda wildcards, input: (
-            Path(input.gt).with_suffix(".pvar").stat().st_size/1000 * 0.07729841136772851 - 0.2394384452558187
+            Path(input.gt_pvar).stat().st_size/1000 * 0.07729841136772851 - 0.2394384452558187
             if Path(input.gts).suffix == ".pgen" else 75
         ),
     threads: 1,
