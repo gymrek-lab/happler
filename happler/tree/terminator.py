@@ -1,6 +1,7 @@
 from __future__ import annotations
 from logging import Logger
 from abc import ABC, abstractmethod
+from decimal import Decimal, getcontext
 
 import numpy as np
 from scipy.stats import t as t_dist
@@ -111,7 +112,7 @@ class TTestTerminator(Terminator):
             pval = pval[best_idx]
         if t_stat is not None:
             t_stat = t_stat[best_idx]
-        if np.isnan(pval):
+        if not isinstance(pval, Decimal) and np.isnan(pval):
             raise ValueError(
                 "Encountered an nan p-value! Check your data for irregularities."
             )

@@ -47,7 +47,16 @@ def make_manhattan(
         If provided, a bool array of pvals to exclude from plotting
     orange_mask: npt.NDArray, optional
     """
-    pvals = -np.log10(pvals)
+    try:
+        pvals = -np.log10(pvals)
+    except TypeError:
+        # handle Decimals mixed in with np.float64s
+        for idx in range(len(pvals)):
+            try:
+                pvals[idx] = -np.log10(pvals[idx])
+            except TypeError:
+                pvals[idx] = -np.float64(pvals[idx].log10())
+    pvals = pvals.astype(np.float64)
     if exclude_mask is not None:
         positions = positions[exclude_mask]
         pvals = pvals[exclude_mask]

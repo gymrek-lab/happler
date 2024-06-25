@@ -1,7 +1,8 @@
 from __future__ import annotations
+import math
+import logging
 from logging import Logger
 
-import logging
 import numpy as np
 import numpy.typing as npt
 from haptools.logging import getLogger
@@ -172,13 +173,13 @@ class TreeBuilder:
             if sib_idx in leaves:
                 sib_p = sibling["results"].pval
                 leaf_p = leaf["results"].pval
-                if sib_p > leaf_p and not np.isclose(sib_p, leaf_p):
+                if sib_p > leaf_p and not math.isclose(sib_p, leaf_p):
                     self.log.debug(
                         f"Left leaf {leaf_var.id} unpruned since it has a better pval"
                     )
                     # keep it if our p-value is better
                     continue
-                elif np.isclose(sib_p, leaf_p) and leaf["results"].beta > 0:
+                elif math.isclose(sib_p, leaf_p) and leaf["results"].beta > 0:
                     self.log.debug(
                         f"Left leaf {leaf_var.id} unpruned since it's beta is positive"
                     )
