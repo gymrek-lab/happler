@@ -9,6 +9,7 @@
 # param4: 1 if the causal variant should be removed from the genotype matrix and
 #         0 otherwise
 # param5: The finemapping region (ex: 19:45401409-46401409)
+# param6: The number of expected independent signals (L)
 
 
 thisFile <- function() {
@@ -37,6 +38,7 @@ phen = args[2]
 out = args[3]
 exclude_causal = args[4]
 region = args[5]
+L = args[6]
 
 dir.create(out, showWarnings = FALSE)
 
@@ -66,10 +68,17 @@ if (exclude_causal != "NULL") {
   X = cbind(X, readPGEN(exclude_causal, samples=exclude_causal_samples[,2]))
 }
 
+# handle L
+if (L != "NULL") {
+  L = as.integer(L)
+} else {
+  L = 2
+}
+
 # run SuSiE
 # write the output to an RDS file
 write("executing SuSiE", stderr())
-fitted = susieR::susie(X, y, L=1)
+fitted = susieR::susie(X, y, L=L)
 
 # when writing the output, also include information about which variant is causal
 # and whether it was included in the simulation

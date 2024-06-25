@@ -317,6 +317,12 @@ rule merge:
 finemapper_input = lambda wildcards: rules.transform.input if (exclude_obs[wildcards.ex] and config["random"] is None) else rules.merge.output
 
 
+def get_num_haplotypes(hap_file):
+    """get the number of haplotypes in this hap file"""
+    with open(hap_file, "r") as file:
+        return len(set(line.split("\t")[4] for line in file if line.startswith("H")))
+
+
 rule finemapper:
     """ execute SuSiE using the haplotypes from happler """
     input:
@@ -328,14 +334,20 @@ rule finemapper:
         outdir=lambda wildcards, output: Path(output.susie).parent,
         exclude_causal="NULL",
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        # num_signals=lambda wildcards: get_num_haplotypes(
+        #     expand(rules.run.output.hap, **wildcards)[0]
+        # ) + 1,
+        num_signals=5,
         # TODO: also add MAF filter
     output:
         susie=out + "/{ex}clude/susie.rds",
     resources:
-        runtime=lambda wildcards, input: (
-            Path(input.gt_pvar).stat().st_size/1000 * 0.07729841136772851 - 0.2394384452558187
-            if Path(input.gts).suffix == ".pgen" else 75
-        ),
+#        runtime=lambda wildcards, input: (
+#            Path(input.gt_pvar).stat().st_size/1000 * 0.08
+#            if Path(input.gt).suffix == ".pgen" else 75
+#        ),
+        runtime=120,
+        mem_mb = 7000,
     threads: 1,
     log:
         logs + "/{ex}clude/finemapper",
