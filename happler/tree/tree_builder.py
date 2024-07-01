@@ -59,6 +59,7 @@ class TreeBuilder:
         maf: float = None,
         method: AssocTest = AssocTestSimple(),
         terminator: Terminator = TTestTerminator(),
+        indep_terminator: Terminator = TTestTerminator(),
         ld_prune_thresh: float = None,
         log: Logger = None,
     ):
@@ -67,6 +68,7 @@ class TreeBuilder:
         self.maf = maf
         self.method = method
         self.terminator = terminator
+        self.indep_terminator = indep_terminator
         self.results_type = method.results_type
         self.tree = None
         self._split_method = self._find_split_rigid
@@ -251,6 +253,8 @@ class TreeBuilder:
             incorporating that variant
         """
         num_samps = len(self.gens.samples)
+        # invert the parent haplotype for later
+        inverted_parent = np.logical_not(parent.data)
         # iterate through the two possible alleles and try all SNPs with that allele
         alleles = (0, 1)
         for allele in alleles:
@@ -309,6 +313,30 @@ class TreeBuilder:
             )
             if self.terminator.check(
                 parent_res, node_res, results, best_res_idx, num_samps, num_tests
+            ):
+                yield None, allele, node_res
+                continue
+            # also perform a t-test between the current haplotype and the haplotype
+            # formed by inverting the parent hap
+            # first, we must obtain the inverted haplotype (of shape n x 2)
+            inverted_parent_allele = np.logical_and(
+                self.gens.data[:, best_var_idx] == allele,
+                inverted_parent
+            )
+            # and now we get the t-test values for the inverted parent haplotype
+            inverted_res = self.method.run(
+                inverted_parent_allele.sum(axis=1)[:, np.newaxis],
+                self.phens.data[:, 0],
+                parent_res=parent_res,
+            )
+            self.log.debug("Testing inverted parent")
+            if self.indep_terminator.check(
+                self.results_type.from_np(inverted_res.data[0]),
+                node_res,
+                inverted_res,
+                0,
+                num_samps,
+                num_tests,
             ):
                 yield None, allele, node_res
                 continue
@@ -406,6 +434,8 @@ class TreeBuilder:
         # step 5: retrieve the Variant with the best p-value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
         self.log.debug("Chose variant {}".format(best_variant.id))
+        # invert the parent haplotype for later
+        inverted_parent = np.logical_not(parent.data)
         # iterate through all of the alleles of the best variant and check if they're
         # significant
         for allele in results:
@@ -441,6 +471,30 @@ class TreeBuilder:
                 node_res,
                 results[allele],
                 best_allele_idx,
+                num_samps,
+                num_tests,
+            ):
+                yield None, allele, node_res
+                continue
+            # also perform a t-test between the current haplotype and the haplotype
+            # formed by inverting the parent hap
+            # first, we must obtain the inverted haplotype (of shape n x 2)
+            inverted_parent_allele = np.logical_and(
+                self.gens.data[:, best_var_idx] == allele,
+                inverted_parent
+            )
+            # and now we get the t-test values for the inverted parent haplotype
+            inverted_res = self.method.run(
+                inverted_parent_allele.sum(axis=1)[:, np.newaxis],
+                self.phens.data[:, 0],
+                parent_res=parent_res,
+            )
+            self.log.debug("Testing inverted parent")
+            if self.indep_terminator.check(
+                self.results_type.from_np(inverted_res.data[0]),
+                node_res,
+                inverted_res,
+                0,
                 num_samps,
                 num_tests,
             ):
