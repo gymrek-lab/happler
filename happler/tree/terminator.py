@@ -31,6 +31,47 @@ class Terminator(ABC):
         super().__init__()
 
     @abstractmethod
+    def compute_val(
+        self,
+        parent_res: NodeResults,
+        node_res: NodeResults,
+        results: AssocResults,
+        best_idx: int,
+        num_samps: int,
+        num_tests: int,
+        short_circuit: bool = True,
+    ) -> tuple[float, float]:
+        """
+        Compute p-value or other thresholded value.
+        This is a helper for the check() method
+
+        Parameters
+        ----------
+        parent_res : NodeResults
+            The results of the tests performed on the parent node
+        node_res : NodeResults
+            The results of the tests performed on the current node
+        results: AssocResults
+            All of the results for all of the variants tested on the current node
+        best_idx : int
+            The index of the best variant in the full set of results
+        num_samps : int
+            The number of samples tested
+        num_tests : int
+            The number of haplotypes tested
+        short_circuit : bool, optional
+            Should we produce values for all variants (F) or just the best ones (T)?
+
+        Returns
+        -------
+        float
+            The p-value
+        float
+            The t-score or BIC value
+        """
+        pass
+
+    @abstractmethod
     def check(
         self,
         parent_res: NodeResults,
@@ -50,6 +91,10 @@ class Terminator(ABC):
             The results of the tests performed on the parent node
         node_res : NodeResults
             The results of the tests performed on the current node
+        results: AssocResults
+            All of the results for all of the variants tested on the current node
+        best_idx : int
+            The index of the best variant in the full set of results
         num_samps : int
             The number of samples tested
         num_tests : int
@@ -66,7 +111,7 @@ class Terminator(ABC):
 
 
 class TTestTerminator(Terminator):
-    def check(
+    def compute_val(
         self,
         parent_res: NodeResults,
         node_res: NodeResults,
@@ -74,12 +119,13 @@ class TTestTerminator(Terminator):
         best_idx: int,
         num_samps: int,
         num_tests: int,
-    ) -> bool:
+        short_circuit: bool = True,
+    ) -> tuple[float, float]:
         t_stat = None
         if parent_res:
             # before we do any calculations, check whether the effect sizes have
             # improved and return True if they haven't
-            if (
+            if short_circuit and (
                 np.isnan(node_res.beta)
                 or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
             ):
@@ -95,7 +141,7 @@ class TTestTerminator(Terminator):
                 # if we have a standard error of 0, then we already know the result is
                 # significant! It doesn't matter what the effect sizes are b/c t_stat
                 # will be inf
-                return False
+                return (0, np.inf)
             # then, we compute the test statistic
             # use np.abs to account for the directions that the effect size may take
             t_stat = (np.abs(results.data["beta"]) - np.abs(parent_res.beta)) / std_err
@@ -112,6 +158,24 @@ class TTestTerminator(Terminator):
             pval = pval[best_idx]
         if t_stat is not None:
             t_stat = t_stat[best_idx]
+        return (pval, t_stat)
+
+    def check(
+        self,
+        parent_res: NodeResults,
+        node_res: NodeResults,
+        results: AssocResults,
+        best_idx: int,
+        num_samps: int,
+        num_tests: int,
+    ) -> bool:
+        computed_val = self.compute_val(
+            parent_res, node_res, results, best_idx, num_samps, num_tests,
+        )
+        if isinstance(computed_val, bool):
+            return computed_val
+        else:
+            pval, t_stat = computed_val
         if not isinstance(pval, Decimal) and np.isnan(pval):
             raise ValueError(
                 "Encountered an nan p-value! Check your data for irregularities."
@@ -133,7 +197,7 @@ class BICTerminator(Terminator):
         self.thresh = thresh
         self.log = log or getLogger(self.__class__.__name__)
 
-    def check(
+    def compute_val(
         self,
         parent_res: NodeResultsExtra,
         node_res: NodeResultsExtra,
@@ -141,12 +205,14 @@ class BICTerminator(Terminator):
         best_idx: int,
         num_samps: int,
         num_tests: int,
-    ) -> bool:
+        short_circuit: bool = True,
+    ) -> tuple[float, float]:
         stat = None
+        pval = None
         if parent_res:
             # before we do any calculations, check whether the effect sizes have
             # improved and return True if they haven't
-            if (
+            if short_circuit and (
                 np.isnan(node_res.beta)
                 or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
             ):
@@ -170,6 +236,24 @@ class BICTerminator(Terminator):
             if pval >= self.thresh:
                 self.log.debug("Terminated with p-value {}".format(pval))
                 return True
+        return pval, stat
+
+    def check(
+        self,
+        parent_res: NodeResultsExtra,
+        node_res: NodeResultsExtra,
+        results: AssocResults,
+        best_idx: int,
+        num_samps: int,
+        num_tests: int,
+    ):
+        computed_val = self.compute_val(
+            parent_res, node_res, results, best_idx, num_samps, num_tests,
+        )
+        if isinstance(computed_val, bool):
+            return computed_val
+        else:
+            pval, stat = computed_val
         self.log.debug(
             "Significant with "
             + ("delta BIC {}".format(stat) if parent_res else "pval {}".format(pval))

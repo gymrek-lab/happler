@@ -504,6 +504,13 @@ def transform(
     hp_gt.samples = gt.samples
     hp_gt.data = hp.transform(gt, allele)
 
+    # remove variants that no longer pass the MAF threshold
+    num_variants = len(hp_gt.variants)
+    hp_gt.check_maf(threshold=maf, discard_also=True)
+    removed = num_variants - len(hp_gt.variants)
+    if maf is not None:
+        log.info(f"Ignoring {removed} variants with MAF < {maf}")
+
     hp_gt.write()
 
 
