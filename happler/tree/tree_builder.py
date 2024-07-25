@@ -203,8 +203,7 @@ class TreeBuilder:
             else:
                 self.log.debug(f"Left leaf {leaf_var.id} (with LD {ld}) unpruned")
         self.log.info(
-            f"Pruned {count} leaves with LD > {self.ld_prune_thresh} with their"
-            " siblings"
+            f"Pruned {count} leaves with LD > {self.ld_prune_thresh} with their siblings"
         )
 
     def maf_mask(
@@ -309,26 +308,31 @@ class TreeBuilder:
             if parent_res is not None:
                 allele_gts = (self.gens.data[:, best_var_idx] == allele).sum(axis=1)
                 cv_data = np.vstack((parent.data.sum(axis=1), allele_gts)).T
-                hap_indep_effect = AssocTestSimpleCovariates(covars=cv_data).run(
-                    hap_matrix[:, best_res_idx][:, np.newaxis].sum(axis=1),
-                    self.phens.data[:, 0],
-                ).data["pval"][0]
+                hap_indep_effect = (
+                    AssocTestSimpleCovariates(covars=cv_data)
+                    .run(
+                        hap_matrix[:, best_res_idx][:, np.newaxis].sum(axis=1),
+                        self.phens.data[:, 0],
+                    )
+                    .data["pval"][0]
+                )
                 if hap_indep_effect > self.indep_thresh:
                     self.log.debug(
-                        f"Terminating because the haplotype had a pval of {hap_indep_effect} >"
-                        f" {self.indep_thresh} in an additive model with the allele and parent"
+                        "Terminating because the haplotype had a pval of"
+                        f" {hap_indep_effect} > {self.indep_thresh} in an additive model"
+                        " with the allele and parent"
                     )
                     yield None, allele, node_res
                     continue
                 self.log.debug(
-                    f"The haplotype had a pval of {hap_indep_effect} < {self.indep_thresh}"
-                    " in an additive model with the allele and parent"
+                    f"The haplotype had a pval of {hap_indep_effect} <"
+                    f" {self.indep_thresh} in an additive model with the allele and"
+                    " parent"
                 )
             # step 7: check if this allele is significant and whether we should terminate the branch
             self.log.debug(
-                "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
-                    best_variant.id, allele, parent_res, node_res
-                )
+                "Testing variant {} / allele {} with parent_res {} and node_res {}"
+                .format(best_variant.id, allele, parent_res, node_res)
             )
             if self.terminator.check(
                 parent_res, node_res, results, best_res_idx, num_samps, num_tests
@@ -415,14 +419,14 @@ class TreeBuilder:
             best_allele: best_var_idx,
             int(not best_allele): np.searchsorted(
                 maf_mask[int(not best_allele)], maf_mask[best_allele][best_var_idx]
-            )
+            ),
         }
         num_tests = len(parent.nodes) + 1
         # step 4: find the index of the best variant within the genotype matrix
         # We need to account for the rare variants that were masked out and indices
         # that we removed when running transform()
         best_var_idx += maf_mask[best_allele][best_res_idx[best_allele]] - len(
-            maf_mask[best_allele][:best_res_idx[best_allele]]
+            maf_mask[best_allele][: best_res_idx[best_allele]]
         )
         # There might be a faster way of doing this but for now we're just going to
         # live with it
@@ -439,14 +443,19 @@ class TreeBuilder:
         if parent_res is not None:
             allele_gts = self.gens.data[:, best_var_idx].sum(axis=1)
             cv_data = np.vstack((parent.data.sum(axis=1), allele_gts)).T
-            hap_indep_effect = AssocTestSimpleCovariates(covars=cv_data).run(
-                hap_matrix[:, best_res_idx[1]][:, np.newaxis].sum(axis=1),
-                self.phens.data[:, 0],
-            ).data["pval"][0]
+            hap_indep_effect = (
+                AssocTestSimpleCovariates(covars=cv_data)
+                .run(
+                    hap_matrix[:, best_res_idx[1]][:, np.newaxis].sum(axis=1),
+                    self.phens.data[:, 0],
+                )
+                .data["pval"][0]
+            )
             if hap_indep_effect > self.indep_thresh:
                 self.log.debug(
-                    f"Terminating because the haplotype had a pval of {hap_indep_effect} >"
-                    f" {self.indep_thresh} in an additive model with the allele and parent"
+                    "Terminating because the haplotype had a pval of"
+                    f" {hap_indep_effect} > {self.indep_thresh} in an additive model with"
+                    " the allele and parent"
                 )
                 for allele in results:
                     yield None, allele, None
@@ -478,9 +487,8 @@ class TreeBuilder:
             node_res = self.results_type.from_np(best_results)
             # step 8: check whether we should terminate the branch
             self.log.debug(
-                "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
-                    best_variant.id, allele, parent_res, node_res
-                )
+                "Testing variant {} / allele {} with parent_res {} and node_res {}"
+                .format(best_variant.id, allele, parent_res, node_res)
             )
             if self.terminator.check(
                 parent_res,
