@@ -487,7 +487,7 @@ rule gwas:
         maf = check_config("min_maf", 0),
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
-        covar = lambda wildcards, input: ("'no-x-sex' --covar 'iid-only' " + input["covar"]) if check_config("covar") else "allow-no-covars",
+        covar = lambda wildcards, input: ("no-x-sex hide-covar --covar 'iid-only' " + input["covar"]) if check_config("covar") else "allow-no-covars",
         start=lambda wildcards: parse_locus(wildcards.locus)[1],
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
