@@ -113,6 +113,14 @@ def main():
     help="The alpha threshold used to determine when to terminate tree building",
 )
 @click.option(
+    "--indep-thresh",
+    type=float,
+    default=0.1,
+    show_default=True,
+    hidden=True,
+    help="Threshold used to detect whether SNP and haplotype are independently causal",
+)
+@click.option(
     "--ld-prune-thresh",
     type=float,
     default=0.95,
@@ -172,6 +180,7 @@ def run(
     maf: float = None,
     phased: bool = False,
     threshold: float = 0.05,
+    indep_thresh: float = 0.1,
     ld_prune_thresh: float = None,
     show_tree: bool = False,
     covars: Path = None,
@@ -293,7 +302,9 @@ def run(
         corrector = None
     log.debug(f"Using alpha threshold of {threshold}")
     terminator = tree.terminator.TTestTerminator(
-        thresh=threshold, corrector=corrector, log=log
+        thresh=threshold,
+        corrector=corrector,
+        log=log,
     )
     log.info("Running tree builder")
     hap_tree = tree.TreeBuilder(
@@ -302,6 +313,7 @@ def run(
         maf=maf,
         method=test_method,
         terminator=terminator,
+        indep_thresh=indep_thresh,
         ld_prune_thresh=ld_prune_thresh,
         log=log,
     ).run()
