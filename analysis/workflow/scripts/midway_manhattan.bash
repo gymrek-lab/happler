@@ -84,6 +84,8 @@ if [ "$condition" -eq 1 ]; then
     # incorporate the parent and child nodes as covariates in the model
     plink2 \
     --maf $maf \
+    --vif 10000000000 \
+    --max-corr 0.9999999999 \
     --glm no-x-sex hide-covar \
     --out "$out_prefix" \
     --pfile "$out_prefix" \
@@ -104,7 +106,7 @@ else
     last_arg="-a $(grep -P '^V\t.*\t'"$parent_snp_id"'\t' "$hap_file" | cut -f7)"
 fi
 
-linear_file="$(ls -1 "$out_prefix".*.glm.linear | head -n1)"
+linear_file="$(ls -1 "$out_prefix".*.glm.linear | tail -n1)"
 
 if [ "$condition" -eq 2 ]; then
     # first, get the parent haplotype as a PGEN file

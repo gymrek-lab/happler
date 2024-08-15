@@ -2,6 +2,7 @@
 from typing import Tuple
 from pathlib import Path
 from logging import Logger
+from decimal import Decimal
 
 import click
 import numpy as np
@@ -31,6 +32,7 @@ def load_linear_file(linear_fname: Path):
         sep="\t",
         header=0,
         usecols=keep_cols,
+        converters={"P": lambda val: Decimal(val if val != "NA" else 1)},
     ).rename(columns=PLINK_COLS)
     df = df.sort_values("pos")
     df["pval"] = df["pval"].fillna(np.inf)

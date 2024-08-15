@@ -36,6 +36,9 @@ Merge variants from two PGEN files that have the same set of samples.
 ## [midway_manhattan.bash](midway_manhattan.bash)
 Create a "midway" manhattan plot depicting the p-values on a branch of a tree mid-way through happler's tree-building process.
 
+## [midway_manhattan_summary.py](midway_manhattan_summary.py)
+Summarize the results of multiple midway manhattan plots via an ROC curve
+
 ## [parameter_plot.py](parameter_plot.py)
 Plot the LD between a causal haplotype and a set of observed haplotypes across a range of hyper-parameters.
 

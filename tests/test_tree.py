@@ -226,6 +226,12 @@ def test_haplotype_transform():
         :, np.newaxis
     ]
     np.testing.assert_allclose(hap.transform(gens, allele), gens_without_variant)
+    for idx in range(gens.data.shape[1]):
+        if idx != variant_idx:
+            np.testing.assert_allclose(
+                hap.transform(gens, allele, idx),
+                gens_without_variant[:,(idx-1,)],
+            )
 
 
 def test_haplotypes_write():

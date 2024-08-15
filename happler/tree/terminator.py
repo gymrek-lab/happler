@@ -8,7 +8,7 @@ from scipy.stats import t as t_dist
 from haptools.logging import getLogger
 from .corrector import Corrector, Bonferroni
 
-from .assoc_test import NodeResults, NodeResultsExtra, AssocResults
+from .assoc_test import NodeResults, NodeResultsExtra, AssocResults, AssocTest
 
 
 class Terminator(ABC):
@@ -147,7 +147,15 @@ class TTestTerminator(Terminator):
             t_stat = (np.abs(results.data["beta"]) - np.abs(parent_res.beta)) / std_err
             # use a one-tailed test here b/c either the effect size becomes more
             # negative or it becomes more positive
-            pval = t_dist.sf(t_stat, df=2 * (num_samps - 2))
+            dof = 2 * (num_samps - 2)
+            pval = t_dist.sf(t_stat, df=dof)
+            if (pval == 0).any():
+                pval = pval.astype(object)
+                # retrieve the pvals at a higher precision as Decimal objects
+                pval[pval == 0] = [
+                    AssocTest.pval_as_decimal(tval, dof, precision=10)
+                    for tval in t_stat[pval == 0]
+                ]
         else:
             # parent_res = None when the parent node is the root node
             pval = results.data["pval"]

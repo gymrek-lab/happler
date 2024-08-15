@@ -125,7 +125,8 @@ class AssocTest(ABC):
         standardized[:, zero_elements] = np.zeros((X.shape[0], np.sum(zero_elements)))
         return standardized
 
-    def pval_as_decimal(self, t_stat: float, df: int, precision: int = 1000) -> Decimal:
+    @staticmethod
+    def pval_as_decimal(t_stat: float, df: int, precision: int = 1000) -> Decimal:
         """
         Given a t statistic, return the associated p-value as a high precision Decimal
 
@@ -325,7 +326,7 @@ class AssocTestSimpleSM(AssocTestSimple):
         # handle cases where our p-values are too powerful
         if pval == 0:
             # retrieve the pval at a higher precision
-            pval = self.pval_as_decimal(res.tvalues[-1], res.df_resid, precision=10)
+            pval = AssocTestSimpleSM.pval_as_decimal(res.tvalues[-1], res.df_resid, precision=10)
         if self.with_bic:
             return param, pval, stderr, bic
         else:
