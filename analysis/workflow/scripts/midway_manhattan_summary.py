@@ -141,6 +141,13 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors, zoom=True):
     help="A file containing a list of linear files to exclude from the analysis",
 )
 @click.option(
+    "--max-val",
+    type=float,
+    default=np.inf,
+    show_default=True,
+    help="Don't show p-values larger than this -log10 val"
+)
+@click.option(
     "-c",
     "--color",
     type=str,
@@ -186,6 +193,7 @@ def main(
     case_type: str,
     files: Path = None,
     exclude: Path = None,
+    max_val: float = np.inf,
     color: str = None,
     pos_type: str = None,
     thresh: float = 0.05,
@@ -301,7 +309,8 @@ def main(
     ).T
 
     # remove any vals that were NA (but got converted to 0)
-    na_rows = (vals == 0).any(axis=1)
+    # and also any vals that were greater than max-val
+    na_rows = (vals == 0).any(axis=1) | (vals > max_val).any(axis=1)
     not_na_rows_idxs = {k: v[~na_rows] for k,v in axes_idxs.items()}
     if color is not None:
         colors = colors[~na_rows]
