@@ -43,13 +43,14 @@ dir.create(out, showWarnings = FALSE)
 # load functions to help read various file types
 source(paste0(thisDir, "/utils.R"))
 
-write("reading genotype matrix and phenotypes", stderr())
+write("Reading sample list and phenotypes", stderr())
 samples = readPSAM(gt, samples=readPheno(phen)[,1])
 phen = readPheno(phen, samples=samples[,1])
 # load psam and ensure sample names are the same
 stopifnot(samples[,1] == phen[,1])
 y = as.matrix(phen[,2])
 # import genotype matrices as proper matrices
+write(paste("Trying to read genotype matrix with", nrow(samples), "samples"), stderr())
 X = readPGEN(gt, region=region, samples=samples[,2])
 # the number of samples and the number of variants:
 n = nrow(X)

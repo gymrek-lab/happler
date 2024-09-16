@@ -66,7 +66,7 @@ readPSAM = function(pfile, samples=NULL) {
   } else {
     idxs = match(intersect(psam[,1], samples), psam[,1])
   }
-  cbind(psam[,1][idxs], idxs)
+  data.frame(ids=psam[,1][idxs], idxs)
 }
 
 # If a samples subset is specified, the phenotypes will also be reordered to match
