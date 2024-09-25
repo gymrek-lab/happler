@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from sklearn.metrics import roc_curve, auc
+# this gets imported later down only if --pos-type is specified
+# from sklearn.metrics import roc_curve, auc
 
 from snakemake_io import glob_wildcards, remove_regexes
 
@@ -324,6 +325,7 @@ def main(
     # Also adjust the subplot parameters for a square plot.
     # And if requested, compute an ROC curve, as well
     if pos_type is not None:
+        from sklearn.metrics import roc_curve, auc
         # first, get the roc curve vals
         pos_labs = np.zeros(vals.shape, dtype=np.bool_)
         pos_labs[:,pos_type] = True
