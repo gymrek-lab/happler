@@ -35,17 +35,24 @@ rule run:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
         covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else "",
         maf = check_config("min_maf", 0),
+        indep=lambda wildcards: 0.05 if "indep_alpha" not in wildcards else wildcards.indep_alpha,
     output:
         hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
         idx=out + "/happler.hap.gz.tbi",
         dot=out + "/happler.dot",
     resources:
-        runtime=120,
+        runtime=lambda wildcards, input: (
+            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.5454649806119475 + 0.6935132147046765
+            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 45
+        ),
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
         # mem_mb=lambda wildcards, threads: threads*4.57,
-        mem_mb=lambda wildcards: 5000,
+        mem_mb=lambda wildcards, input: (
+            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 14.90840694595845 + 401.8011129664152
+            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 5000
+        ),
     threads: 1
     log:
         logs + "/run",
@@ -55,9 +62,9 @@ rule run:
         "happler"
     shell:
         "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
-        "--discard-multiallelic --region {params.region} {params.covar}"
-        "-t {params.thresh} --show-tree {input.gts} {input.pts} &>{log} && "
-        "haptools index -o {output.gz} {output.hap} &>>{log}"
+        "--discard-multiallelic --region {params.region} {params.covar} --indep-thresh"
+        " {params.indep} -t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
+        " && haptools index -o {output.gz} {output.hap} &>>{log}"
 
 
 rule tree:
@@ -80,6 +87,12 @@ rule tree:
         "dot -T{params.file_ext} {input.dot} -o {output.png} &>{log}"
 
 
+def get_num_variants(hap_file):
+    """get the unique number of SNP rsIDs in this hap file"""
+    with open(hap_file, "r") as file:
+        return len(set(line.split("\t")[4] for line in file if line.startswith("V")))
+
+
 rule cond_linreg:
     """plot conditional regressions for a haplotype"""
     input:
@@ -89,13 +102,16 @@ rule cond_linreg:
         hap=rules.run.output.hap,
         pts=config["pheno"],
     params:
-        hap_id = "H0",
         maf = check_config("min_maf", 0),
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         png=out + "/cond_linreg.pdf",
     resources:
-        runtime=15,
+        runtime=lambda wildcards, input: (
+            1.5 * Path(input.pvar).stat().st_size/1000 * (
+                0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
+            ) if Path(input.pgen).suffix == ".pgen" and check_config("dynamic_resources") else 50
+        ),
     log:
         logs + "/cond_linreg",
     benchmark:
@@ -104,7 +120,7 @@ rule cond_linreg:
         "happler"
     shell:
         "workflow/scripts/conditional_regression_plots.py --verbosity DEBUG "
-        "--show-original --region {params.region} -o {output.png} -i {params.hap_id} "
+        "--show-original --region {params.region} -o {output.png} "
         "--maf {params.maf} {input.pgen} {input.pts} {input.hap} &>{log}"
 
 
@@ -180,6 +196,7 @@ rule transform:
         pgen=config["snp_panel"],
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        pts=config["pheno"],
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
@@ -196,6 +213,7 @@ rule transform:
         "happler"
     shell:
         "haptools transform -o {output.pgen} --region {params.region} "
+        "--samples-file <(tail -n+2 {input.pts} | cut -f1) "
         "{input.pgen} {input.hap} &>{log}"
 
 
@@ -285,7 +303,10 @@ rule merge:
         pvar=temp(out + "/{ex}clude/merged.pvar"),
         psam=temp(out + "/{ex}clude/merged.psam"),
     resources:
-        runtime=10,
+        runtime=lambda wildcards, input: (
+            Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844
+            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 10
+        ),
     log:
         logs + "/{ex}clude/merge",
     benchmark:
@@ -294,10 +315,16 @@ rule merge:
         "happler"
     shell:
         "workflow/scripts/merge_plink.py --region {params.region} --maf {params.maf} "
-        "{input.gts} {input.hps} {output.pgen} &> {log}"
+        "--verbosity DEBUG {input.gts} {input.hps} {output.pgen} &> {log}"
 
 
 finemapper_input = lambda wildcards: rules.transform.input if (exclude_obs[wildcards.ex] and config["random"] is None) else rules.merge.output
+
+
+def get_num_haplotypes(hap_file):
+    """get the number of haplotypes in this hap file"""
+    with open(hap_file, "r") as file:
+        return len(set(line.split("\t")[4] for line in file if line.startswith("H")))
 
 
 rule finemapper:
@@ -311,11 +338,21 @@ rule finemapper:
         outdir=lambda wildcards, output: Path(output.susie).parent,
         exclude_causal="NULL",
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        # num_signals=lambda wildcards: get_num_haplotypes(
+        #     expand(rules.run.output.hap, **wildcards)[0]
+        # ) + 1,
+        num_signals=5,
+        # TODO: also add MAF filter
     output:
         susie=out + "/{ex}clude/susie.rds",
     resources:
-        runtime=75,
-    threads: 6,
+#        runtime=lambda wildcards, input: (
+#            Path(input.gt_pvar).stat().st_size/1000 * 0.08
+#            if Path(input.gt).suffix == ".pgen" and check_config("dynamic_resources") else 75
+#        ),
+        runtime=120,
+        mem_mb = 7000,
+    threads: 1,
     log:
         logs + "/{ex}clude/finemapper",
     benchmark:
@@ -390,6 +427,7 @@ rule results:
     """
     input:
         gt=rules.finemapper.input.gt,
+        phen=config["pheno"],
         susie=rules.finemapper.output.susie,
         happler_hap=results_happler_hap_input,
         causal_gt=config["causal_gt"].pgen if "causal_gt" in config else [],
@@ -397,6 +435,7 @@ rule results:
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        # TODO: also add MAF filter
     output:
         susie_pdf = out + "/{ex}clude/susie.pdf",
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
@@ -437,7 +476,7 @@ rule merge_SVs:
         "happler"
     shell:
         "workflow/scripts/merge_plink.py --region {params.region} --maf {params.maf} "
-        "{input.gts} {input.svs} {output.pgen} &> {log}"
+        "--verbosity DEBUG {input.gts} {input.svs} {output.pgen} &> {log}"
 
 
 rule gwas:
@@ -452,7 +491,7 @@ rule gwas:
         maf = check_config("min_maf", 0),
         in_prefix = lambda w, input: Path(input.pgen).with_suffix(""),
         out_prefix = lambda w, output: Path(output.log).with_suffix(""),
-        covar = lambda wildcards, input: ("'no-x-sex' --covar 'iid-only' " + input["covar"]) if check_config("covar") else "allow-no-covars",
+        covar = lambda wildcards, input: ("no-x-sex hide-covar --covar 'iid-only' " + input["covar"]) if check_config("covar") else "allow-no-covars",
         start=lambda wildcards: parse_locus(wildcards.locus)[1],
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],

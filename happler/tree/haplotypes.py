@@ -132,7 +132,12 @@ class Haplotype:
         """
         return tuple(node[0].idx for node in self.nodes)
 
-    def transform(self, genotypes: Genotypes, allele: int) -> npt.NDArray[bool]:
+    def transform(
+        self,
+        genotypes: Genotypes,
+        allele: int,
+        idxs: tuple[int] = None,
+    ) -> npt.NDArray[bool]:
         """
         Transform a genotypes matrix via the current haplotype:
 
@@ -145,6 +150,9 @@ class Haplotype:
             The genotypes which to transform using the current haplotype
         allele : int
             The allele (either 0 or 1) of the SNPs we're adding
+        idxs : tuple[int], optional
+            If specified, we will only output haplotypes for the variants at these
+            indices. Otherwise, we'll output all of them.
 
         Returns
         -------
@@ -157,10 +165,16 @@ class Haplotype:
         # first, remove any variants that are already in this haplotype using np.delete
         # TODO: consider moving this outside of this function
         gens = np.delete(genotypes.data, self.node_indices, axis=1)
+        # how does the deletion change the desired indices?
+        if idxs is not None:
+            idxs -= np.sum(np.array(self.node_indices)[:, np.newaxis] < idxs, axis=0)
+        else:
+            # alias for all of the indices
+            idxs = np.s_[:]
         # add extra axes to match shape of gens
         hap_data = self.data[:, np.newaxis]
         # use np.logical_and to superimpose the current haplotype onto the GT matrix
-        return np.logical_and(gens == allele, hap_data)
+        return np.logical_and(gens[:, idxs] == allele, hap_data)
 
 
 @dataclass

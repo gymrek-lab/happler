@@ -77,7 +77,6 @@ class Bonferroni(Corrector):
 
 
 class BH(Corrector):
-
     if false_discovery_control is None:
 
         def correct(

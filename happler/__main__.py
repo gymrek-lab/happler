@@ -113,6 +113,14 @@ def main():
     help="The alpha threshold used to determine when to terminate tree building",
 )
 @click.option(
+    "--indep-thresh",
+    type=float,
+    default=0.1,
+    show_default=True,
+    hidden=True,
+    help="Threshold used to detect whether SNP and haplotype are independently causal",
+)
+@click.option(
     "--ld-prune-thresh",
     type=float,
     default=0.95,
@@ -172,6 +180,7 @@ def run(
     maf: float = None,
     phased: bool = False,
     threshold: float = 0.05,
+    indep_thresh: float = 0.1,
     ld_prune_thresh: float = None,
     show_tree: bool = False,
     covars: Path = None,
@@ -293,7 +302,9 @@ def run(
         corrector = None
     log.debug(f"Using alpha threshold of {threshold}")
     terminator = tree.terminator.TTestTerminator(
-        thresh=threshold, corrector=corrector, log=log
+        thresh=threshold,
+        corrector=corrector,
+        log=log,
     )
     log.info("Running tree builder")
     hap_tree = tree.TreeBuilder(
@@ -302,6 +313,7 @@ def run(
         maf=maf,
         method=test_method,
         terminator=terminator,
+        indep_thresh=indep_thresh,
         ld_prune_thresh=ld_prune_thresh,
         log=log,
     ).run()
@@ -449,10 +461,10 @@ def transform(
         )
     if samples_file:
         with samples_file as samps_file:
-            samples = samps_file.read().splitlines()
+            samples = set(samps_file.read().splitlines())
     elif samples:
-        # needs to be converted from tuple to list
-        samples = list(samples)
+        # needs to be converted from tuple to set
+        samples = set(samples)
     else:
         samples = None
     # load data
@@ -503,6 +515,13 @@ def transform(
     hp_gt.variants = np.delete(gt.variants, hp.node_indices)
     hp_gt.samples = gt.samples
     hp_gt.data = hp.transform(gt, allele)
+
+    # remove variants that no longer pass the MAF threshold
+    num_variants = len(hp_gt.variants)
+    hp_gt.check_maf(threshold=maf, discard_also=True)
+    removed = num_variants - len(hp_gt.variants)
+    if maf is not None:
+        log.info(f"Ignoring {removed} variants with MAF < {maf}")
 
     hp_gt.write()
 

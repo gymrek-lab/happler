@@ -36,8 +36,8 @@ def plot_hapmatrix(ax, hpmt, hap_id, snps, colors = None):
     ax.imshow(hpmt, vmin=0, vmax=1, cmap=plt.cm.Greys, aspect="auto", interpolation="none")
     ax.set_yticks([])
     ax.set_yticklabels([])
-    ax.set_xticks(np.arange(0, len(snps), 1))
-    ax.set_xticklabels(snps, fontsize=6.5)
+    ax.set_xticks(np.arange(0, len(snps), 1), labels=snps)
+    ax.tick_params(labeltop=True, labelbottom=False, length=0, labelsize=6.5)
     # map between list of indices and list of colors from CAUSAL_COLOR_KEY
     if colors is not None:
         colors = map(list(CAUSAL_COLOR_KEY.keys()).__getitem__, colors)
@@ -106,8 +106,10 @@ def plot_hap_label_table(ax, hps, hps_vars, ref_alleles):
         np.ones((snp_colors.shape[0], 1, snp_colors.shape[2])),
         1
     )
-    if len(hps_ids) <= 2:
+    if len(hps_ids) == 2:
         extra_buffer = -0.006*len(hps_ids)
+    elif len(hps_ids) == 1:
+        extra_buffer = -0.04
     else:
         extra_buffer = 0
     # now finally create the plot
@@ -266,7 +268,7 @@ def main(
     fig = plt.figure()
     ax = fig.add_subplot(111)
     plot_hapmatrix(
-        ax, hpmt, hap_id, list(gts.variants["id"])+["pheno"], (
+        ax, hpmt, hap_id, snps=list(gts.variants["id"])+["pheno"], colors=(
             snp_colors.values() if snp_colors is not None else None
         ),
     )

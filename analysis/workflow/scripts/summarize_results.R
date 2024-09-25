@@ -20,17 +20,21 @@ source("workflow/scripts/utils.R")
 
 write("Loading input data", stderr())
 region = snakemake@params[["region"]]
+phen = snakemake@input[["phen"]]
+samples = readPSAM(snakemake@input[["gt"]], samples=readPheno(phen)[,1])
 # import the finemap and susie results
 # and the path to an output directory
-X = readPGEN(snakemake@input[["gt"]], region=region)
+X = readPGEN(snakemake@input[["gt"]], region=region, samples=samples[,2])
 # also load the positions of each of the variants
 pos = readPVAR(snakemake@input[["gt"]], region=region)
 if (length(snakemake@input[["causal_gt"]])) {
-    causal_gt = readPGEN(snakemake@input[["causal_gt"]], region=region)
+    causal_gt_file = snakemake@input[["causal_gt"]]
+    causal_gt_samples = readPSAM(causal_gt_file, samples=readPheno(phen)[,1])
+    causal_gt = readPGEN(causal_gt_file, region=region, samples=causal_gt_samples)
     X = cbind(X, causal_gt)
     causal_variant = colnames(causal_gt)[1]
     # also load the positions of each of the variants
-    pos = c(pos, readPVAR(snakemake@input[["causal_gt"]], region=region))
+    pos = c(pos, readPVAR(causal_gt_file, region=region))
     write(paste("Loaded", length(pos), "positions"), stderr())
 } else {
     causal_variant = NULL

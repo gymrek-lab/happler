@@ -9,6 +9,7 @@
 # param4: 1 if the causal variant should be removed from the genotype matrix and
 #         0 otherwise
 # param5: The finemapping region (ex: 19:45401409-46401409)
+# param6: The number of expected independent signals (L)
 
 
 thisFile <- function() {
@@ -37,37 +38,48 @@ phen = args[2]
 out = args[3]
 exclude_causal = args[4]
 region = args[5]
+L = args[6]
 
 dir.create(out, showWarnings = FALSE)
 
 # load functions to help read various file types
 source(paste0(thisDir, "/utils.R"))
 
-write("reading genotype matrix", stderr())
+write("Reading sample list and phenotypes", stderr())
+samples = readPSAM(gt, samples=readPheno(phen)[,1])
+phen = readPheno(phen, samples=samples[,1])
+# load psam and ensure sample names are the same
+stopifnot(samples[,1] == phen[,1])
+y = as.matrix(phen[,2])
 # import genotype matrices as proper matrices
-X = readPGEN(gt, region=region)
-phen = readPheno(phen)
+write(paste("Trying to read genotype matrix with", nrow(samples), "samples"), stderr())
+X = readPGEN(gt, region=region, samples=samples[,2])
 # the number of samples and the number of variants:
 n = nrow(X)
 p = ncol(X)
 stopifnot(n > 0)
 stopifnot(p > 0)
 storage.mode(X) = 'double'
-# load psam and ensure sample names are the same
-stopifnot(readPSAM(gt) == phen[,1])
-y = as.matrix(phen[,2])
 
 # remove the causal variant if requested
 causal_variant = NULL
 if (exclude_causal != "NULL") {
-  stopifnot(readPSAM(exclude_causal) == phen[,1])
-  X = cbind(X, readPGEN(exclude_causal))
+  exclude_causal_samples = readPSAM(exclude_causal, samples=phen[,1])
+  stopifnot(exclude_causal_samples[,1] == phen[,1])
+  X = cbind(X, readPGEN(exclude_causal, samples=exclude_causal_samples[,2]))
+}
+
+# handle L
+if (L != "NULL") {
+  L = as.integer(L)
+} else {
+  L = 2
 }
 
 # run SuSiE
 # write the output to an RDS file
 write("executing SuSiE", stderr())
-fitted = susieR::susie(X, y, L=1)
+fitted = susieR::susie(X, y, L=L)
 
 # when writing the output, also include information about which variant is causal
 # and whether it was included in the simulation
