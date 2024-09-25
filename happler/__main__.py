@@ -104,6 +104,20 @@ def main():
     help="Do not check that variants are phased. Saves time and memory.",
 )
 @click.option(
+    "--max-signals",
+    type=int,
+    default=1,
+    show_default=True,
+    help="The maximum number of expected causal signals",
+)
+@click.option(
+    "--max-iterations",
+    type=int,
+    default=1,
+    show_default=True,
+    help="The max number of times to repeat the tree building",
+)
+@click.option(
     "-t",
     "--threshold",
     type=float,
@@ -151,6 +165,13 @@ def main():
     ),
 )
 @click.option(
+    "--remove-SNPs",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Remove haplotypes with only a single variant",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -179,12 +200,15 @@ def run(
     chunk_size: int = None,
     maf: float = None,
     phased: bool = False,
+    max_signals: int = 1,
+    max_iterations: int = 1,
     threshold: float = 0.05,
     indep_thresh: float = 0.1,
     ld_prune_thresh: float = None,
     show_tree: bool = False,
     covars: Path = None,
     corrector: str = "n",
+    remove_snps: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "INFO",
 ):
@@ -316,9 +340,35 @@ def run(
         indep_thresh=indep_thresh,
         ld_prune_thresh=ld_prune_thresh,
         log=log,
-    ).run()
+    )
+    forest = tree.ForestBuilder(
+        hap_tree,
+        num_bins=max_signals,
+        max_iterations=max_iterations,
+        log=log,
+    )
     log.info("Outputting haplotypes")
-    tree.Haplotypes.from_tree(fname=output, tree=hap_tree, gts=gt, log=log).write()
+    haplotypes = data.Haplotypes(
+        fname=output,
+        haplotype=tree.haplotypes.HapplerHaplotype,
+        variant=tree.haplotypes.HapplerVariant,
+        log=log,
+    )
+    haplotypes.data = {}
+    hap_id = 0
+    # merge the Haplotypes objects
+    # TODO: use a method of the Haplotypes class
+    for haps in forest.run():
+        if haps is None:
+            continue
+        for hap in haps.data.values():
+            if len(hap.variants) <= 1 and remove_snps:
+                continue
+            hap.id = f"H{hap_id}"
+            haplotypes.data[hap.id] = hap
+            hap_id += 1
+    haplotypes.index()
+    haplotypes.write()
     if show_tree:
         dot_output = output
         if Path(output) != Path("/dev/stdout"):

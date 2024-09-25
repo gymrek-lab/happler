@@ -89,10 +89,6 @@ class TreeBuilder:
         """
         Run the tree builder and create a tree rooted at the provided variant
         """
-        if self.tree is not None:
-            raise AssertionError(
-                "A tree already exists for this TreeBuilder. Please create a new one."
-            )
         # step one: initialize the tree
         self.tree = Tree(log=self.log)
         # step two: create a haplotype

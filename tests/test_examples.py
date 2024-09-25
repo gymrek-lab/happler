@@ -684,6 +684,26 @@ def test_1000G_simulated(capfd):
     assert filecmp.cmp(hp_file, out_hp_file)
 
 
+def test_1000G_simulated_multihap(capfd):
+    """
+    Test using simulated data from the 1000G dataset
+
+    In this case, more than one haplotype is causal
+    """
+    gt_file = DATADIR / "19_45401409-46401409_1000G.pgen"
+    pt_file = DATADIR / "19_45401409-46401409_1000G.multi.pheno"
+    hp_file = DATADIR / "19_45401409-46401409_1000G.multi.hap"
+    out_hp_file = "test.hap"
+
+    cmd = f"run --remove-SNPs --max-signals 3 --max-iterations 3 -o {out_hp_file} {gt_file} {pt_file}"
+    runner = CliRunner()
+    result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
+    captured = capfd.readouterr()
+    assert captured.out == ""
+    assert result.exit_code == 0
+    assert filecmp.cmp(hp_file, out_hp_file)
+
+
 def test_1000G_simulated_maf(capfd):
     """
     Test MAF filtering using simulated data from the 1000G dataset
