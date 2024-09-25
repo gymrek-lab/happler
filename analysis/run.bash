@@ -10,6 +10,9 @@
 #SBATCH --time 0:30:00
 #SBATCH --mem 2G
 #SBATCH --output /dev/null
+#SBATCH --signal=B:SIGUSR1@15
+
+trap "slack job terminating early" SIGUSR1
 
 # An example bash script demonstrating how to run the entire snakemake pipeline
 # This script creates two separate log files in the output dir:

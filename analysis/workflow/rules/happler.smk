@@ -35,6 +35,7 @@ rule run:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
         covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else "",
         maf = check_config("min_maf", 0),
+        indep=lambda wildcards: 0.05 if "indep_alpha" not in wildcards else wildcards.indep_alpha,
     output:
         hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
@@ -43,12 +44,15 @@ rule run:
     resources:
         runtime=lambda wildcards, input: (
             Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.5454649806119475 + 0.6935132147046765
-            if Path(input.gts).suffix == ".pgen" else 30
+            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 45
         ),
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
         # mem_mb=lambda wildcards, threads: threads*4.57,
-        mem_mb=lambda wildcards: 5000,
+        mem_mb=lambda wildcards, input: (
+            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 14.90840694595845 + 401.8011129664152
+            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 5000
+        ),
     threads: 1
     log:
         logs + "/run",
@@ -58,9 +62,9 @@ rule run:
         "happler"
     shell:
         "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
-        "--discard-multiallelic --region {params.region} {params.covar}"
-        "-t {params.thresh} --show-tree {input.gts} {input.pts} &>{log} && "
-        "haptools index -o {output.gz} {output.hap} &>>{log}"
+        "--discard-multiallelic --region {params.region} {params.covar} --indep-thresh"
+        " {params.indep} -t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
+        " && haptools index -o {output.gz} {output.hap} &>>{log}"
 
 
 rule tree:
@@ -106,7 +110,7 @@ rule cond_linreg:
         runtime=lambda wildcards, input: (
             1.5 * Path(input.pvar).stat().st_size/1000 * (
                 0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
-            ) if Path(input.pgen).suffix == ".pgen" else 50
+            ) if Path(input.pgen).suffix == ".pgen" and check_config("dynamic_resources") else 50
         ),
     log:
         logs + "/cond_linreg",
@@ -301,7 +305,7 @@ rule merge:
     resources:
         runtime=lambda wildcards, input: (
             Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844
-            if Path(input.gts).suffix == ".pgen" else 10
+            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 10
         ),
     log:
         logs + "/{ex}clude/merge",
@@ -344,7 +348,7 @@ rule finemapper:
     resources:
 #        runtime=lambda wildcards, input: (
 #            Path(input.gt_pvar).stat().st_size/1000 * 0.08
-#            if Path(input.gt).suffix == ".pgen" else 75
+#            if Path(input.gt).suffix == ".pgen" and check_config("dynamic_resources") else 75
 #        ),
         runtime=120,
         mem_mb = 7000,
