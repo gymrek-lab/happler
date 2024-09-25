@@ -448,8 +448,8 @@ class TreeBuilder:
             != maf_mask[best_allele][best_res_idx[best_allele]]
         ):
             self.log.debug(
-                f"Ignoring variant {best_variant.id} / allele {not best_allele}, since"
-                " it results in a haplotype with low MAF"
+                f"Ignoring variant {best_variant.id} / allele {int(not best_allele)}, "
+                "since it results in a haplotype with low MAF"
             )
             yield None, allele, None
             del best_res_idx[int(not best_allele)]
