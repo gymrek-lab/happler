@@ -371,9 +371,9 @@ def run(
         log.critical("No haplotypes were found")
         with open(output, "w") as hap_file:
             pass
-        return 1
-    haplotypes.index()
-    haplotypes.write()
+    else:
+        haplotypes.index()
+        haplotypes.write()
     if show_tree:
         dot_output = output
         if Path(output) != Path("/dev/stdout"):
@@ -382,7 +382,7 @@ def run(
             dot_output = dot_output.with_suffix(".dot")
         log.info("Writing tree to dot file")
         with open(dot_output, "w") as dot_file:
-            dot_file.write(forest.dot())
+            dot_file.write(forest.dot(remove_singletons=remove_snps))
 
 
 @main.command(context_settings=CONTEXT_SETTINGS)

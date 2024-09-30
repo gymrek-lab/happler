@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from logging import Logger
 
 import numpy as np
@@ -109,7 +110,7 @@ class ForestBuilder:
     def __repr__(self):
         return self.dot()
 
-    def dot(self) -> str:
+    def dot(self, remove_singletons: bool = False) -> str:
         """
         Convert the trees to a representation in the dot language
         This is useful for quickly viewing the forest on the command line
@@ -120,12 +121,28 @@ class ForestBuilder:
             A string representing the trees
 
             Nodes are labeled by their variant ID and edges are labeled by their allele
+        remove_singletons: bool
+            Whether to ignore trees composed of only a single SNP
         """
+        node_pattern = r'(?<!\d)(\d+)(?=\s\[|\s\s\[|\s->)'
+        max_node_id = 0
         trees_str = "strict digraph {\nforcelabels=true;\nrankdir=TB;\n"
         for idx, tree in enumerate(self.trees):
             if tree is None:
                 continue
+            tree_str = tree.dot().split("\n")[2:]
+            if remove_singletons and len(tree_str) <= 5:
+                continue
             trees_str += f"subgraph tree_{idx}"+" {\nlabel=\""+f"Tree {idx}"+"\";\n"
-            trees_str += "\n".join(tree.dot().split("\n")[2:])
+            tree_str = "\n".join(tree_str)
+            # increment the node IDs to ensure they remain unique across all trees
+            increment = lambda match: str(int(match.group(1))+max_node_id)
+            trees_str += re.sub(node_pattern, increment, tree_str)
+            # what was the greatest node ID in this tree?
+            # increment the next tree's IDs by that number + 1 if there were any nodes
+            try:
+                max_node_id = max(map(int, re.findall(node_pattern, tree_str))) + max_node_id + 1
+            except ValueError:
+                pass
         trees_str += "}"
         return trees_str
