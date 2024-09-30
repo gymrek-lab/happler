@@ -17,11 +17,11 @@ def find_haps(
     log: Logger,
     min_ld: float,
     max_ld: float,
-    reps: int = 1,
+    num_haps: int = 1,
     step: float = 0.1,
     seed: np.random.Generator = np.random.default_rng(None),
 ):
-    log.info(f"Using min_ld {min_ld}, max_ld {max_ld}, reps {reps}, and step {step}")
+    log.info(f"Using min_ld {min_ld}, max_ld {max_ld}, num_haps {num_haps}, and step {step}")
     sum_gts = gts.data.sum(axis=2)
 
     chrom = np.unique(gts.variants["chrom"])
@@ -29,8 +29,8 @@ def find_haps(
     chrom = chrom[0]
 
     intervals = np.arange(max(0, min_ld), min(1, max_ld), step) + step
-    ld_bins = {idx: 0 for idx in range(len(intervals))}
-    count = len(intervals) * reps
+    ld_bins = {idx: [] for idx in range(len(intervals))}
+    count = len(intervals) * num_haps
 
     combos = np.array(list(range(len(gts.variants))))
     seed.shuffle(combos)
@@ -51,10 +51,11 @@ def find_haps(
             combo_ld = np.abs(pearson_corr_ld(*tuple(sum_gts[:, snp_id] for snp_id in combo_id)))
             # which bin does this LD value fall in?
             bin_idx = np.argmax(combo_ld < intervals)
-            if ld_bins[bin_idx] < reps:
-                log.info(f"Outputting {hp_id} with LD {combo_ld} for bin {intervals[bin_idx]}")
-                yield combo_ld, hp
-                ld_bins[bin_idx] += 1
+            if len(ld_bins[bin_idx]) < num_haps:
+                log.info(f"Adding {hp_id} with LD {combo_ld} to bin {intervals[bin_idx]}")
+                ld_bins[bin_idx].append((combo_ld, hp))
+                if len(ld_bins[bin_idx]) == num_haps:
+                    yield ld_bins[bin_idx]
                 count -= 1
                 break
         if count == 0:
@@ -64,14 +65,6 @@ def find_haps(
 @click.command()
 @click.argument("gts", type=click.Path(exists=True, path_type=Path))
 @click.argument("output", type=click.Path(path_type=Path))
-@click.option(
-    "-r",
-    "--reps",
-    type=int,
-    default=1,
-    show_default=True,
-    help="The number of replicates to perform within each LD bin",
-)
 @click.option(
     "--min-ld",
     type=float,
@@ -108,6 +101,13 @@ def find_haps(
     help="The maximum LD value to allow",
 )
 @click.option(
+    "--num-haps",
+    type=int,
+    default=1,
+    show_default=True,
+    help="The number of haplotypes to output",
+)
+@click.option(
     "--seed",
     type=int,
     default=None,
@@ -125,12 +125,12 @@ def find_haps(
 def main(
     gts: Path,
     output: Path,
-    reps: int = 1,
     min_ld: float = 0,
     max_ld: float = 1,
     step: float = 0.1,
     min_af: float = 0.25,
     max_af: float = 0.75,
+    num_haps: int = 1,
     seed: int = None,
     verbosity: str = "DEBUG",
 ):
@@ -138,7 +138,7 @@ def main(
     Create haplotypes with a range of LD values between their alleles
 
     LD values are injected into the output from brace expressions
-    For example, if we are given a a path like "ld_{ld}/happler.hap", then
+    For example, if we are given a path like "ld_{ld}/happler.hap", then
     we will replace {ld} with the provided ld value
     """
     log = getLogger("choose", verbosity)
@@ -155,21 +155,22 @@ def main(
 
     seed = np.random.default_rng(seed)
 
-    for combo_ld, hp in find_haps(
+    for haps in find_haps(
         gts,
         log,
         min_ld=min_ld,
         max_ld=max_ld,
-        reps=reps,
+        num_haps=num_haps,
         step=step,
         seed=seed,
     ):
-        out_path = Path(str(output).format(ld=round(combo_ld, 2)))
+        avg_combo_ld = np.mean([combo_ld for combo_ld, hp in haps])
+        out_path = Path(str(output).format(ld=round(avg_combo_ld, 2)))
         out_path.parent.mkdir(parents=True, exist_ok=True)
         hps = Haplotypes(
             out_path, log=log, haplotype=Haplotype,
         )
-        hps.data = {hp.id: hp}
+        hps.data = {hp.id: hp for combo_ld, hp in haps}
         hps.write()
 
 
