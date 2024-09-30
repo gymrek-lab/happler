@@ -367,6 +367,11 @@ def run(
             hap.id = f"H{hap_id}"
             haplotypes.data[hap.id] = hap
             hap_id += 1
+    if haplotypes.data == {}:
+        log.critical("No haplotypes were found")
+        with open(output, "w") as hap_file:
+            pass
+        return 1
     haplotypes.index()
     haplotypes.write()
     if show_tree:
