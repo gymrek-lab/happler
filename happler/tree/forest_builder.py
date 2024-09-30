@@ -105,3 +105,27 @@ class ForestBuilder:
         self.log.debug(f"Computing residuals for tree {tree_idx}")
         resids.data = sm.OLS(self.phenotypes.data, sm.add_constant(effects)).fit().resid[:, np.newaxis]
         return resids
+
+    def __repr__(self):
+        return self.dot()
+
+    def dot(self) -> str:
+        """
+        Convert the trees to a representation in the dot language
+        This is useful for quickly viewing the forest on the command line
+
+        Returns
+        -------
+        str
+            A string representing the trees
+
+            Nodes are labeled by their variant ID and edges are labeled by their allele
+        """
+        trees_str = "strict digraph {\nforcelabels=true;\nrankdir=TB;\n"
+        for idx, tree in enumerate(self.trees):
+            if tree is None:
+                continue
+            trees_str += f"subgraph tree_{idx}"+" {\nlabel=\""+f"Tree {idx}"+"\";\n"
+            trees_str += "\n".join(tree.dot().split("\n")[2:])
+        trees_str += "}"
+        return trees_str

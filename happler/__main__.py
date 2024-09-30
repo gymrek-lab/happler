@@ -377,7 +377,7 @@ def run(
             dot_output = dot_output.with_suffix(".dot")
         log.info("Writing tree to dot file")
         with open(dot_output, "w") as dot_file:
-            dot_file.write(hap_tree.dot())
+            dot_file.write(forest.dot())
 
 
 @main.command(context_settings=CONTEXT_SETTINGS)
