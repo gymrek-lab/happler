@@ -36,6 +36,8 @@ rule run:
         covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else "",
         maf = check_config("min_maf", 0),
         indep=lambda wildcards: 0.05 if "indep_alpha" not in wildcards else wildcards.indep_alpha,
+        max_signals=3,
+        max_iterations=3,
     output:
         hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
@@ -62,8 +64,10 @@ rule run:
         "happler"
     shell:
         "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
-        "--discard-multiallelic --region {params.region} {params.covar} --indep-thresh"
-        " {params.indep} -t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
+        "--max-signals {params.max_signals} --max-iterations {params.max_iterations} "
+        "--discard-multiallelic --remove-SNPs --region {params.region}"
+        " {params.covar} --indep-thresh {params.indep} -t {params.thresh} "
+        "--show-tree {input.gts} {input.pts} &>{log}"
         " && haptools index -o {output.gz} {output.hap} &>>{log}"
 
 
