@@ -31,13 +31,15 @@ checkpoint create_hap_ld_range:
         gts_pvar=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
         gts_psam=Path(config["gts_snp_panel"]).with_suffix(".psam"),
     params:
-        reps = config["modes"]["ld_range"]["reps"],
         min_ld = config["modes"]["ld_range"]["min_ld"],
         max_ld = config["modes"]["ld_range"]["max_ld"],
         step = config["modes"]["ld_range"]["step"],
         min_af = config["modes"]["ld_range"]["min_af"],
         max_af = config["modes"]["ld_range"]["max_af"],
-        out = lambda wildcards: hap_ld_range_output,
+        out = lambda wildcards: expand(
+            hap_ld_range_output, **wildcards, allow_missing=True,
+        ),
+        seed = 42,
     output:
         hap=directory(out + "/create_ld_range")
     resources:
@@ -49,9 +51,9 @@ checkpoint create_hap_ld_range:
     conda:
         "happler"
     shell:
-        "workflow/scripts/choose_different_ld.py -r {params.reps} "
+        "workflow/scripts/choose_different_ld.py "
         "--min-ld {params.min_ld} --max-ld {params.max_ld} "
-        "--step {params.step} --min-af {params.min_af} "
+        "--step {params.step} --min-af {params.min_af} --seed {params.seed} "
         "--max-af {params.max_af} {input.gts} {params.out} &> {log}"
 
 
@@ -115,6 +117,7 @@ rule simphenotype:
         psam=rules.transform.output.psam,
     params:
         beta=lambda wildcards: wildcards.beta,
+        seed = 42,
     output:
         pheno=out + "/{beta}.pheno",
     resources:
@@ -126,5 +129,5 @@ rule simphenotype:
     conda:
         "happler"
     shell:
-        "haptools simphenotype -o {output.pheno} {input.pgen} "
+        "haptools simphenotype --seed {params.seed} -o {output.pheno} {input.pgen} "
         "<( sed 's/\\t0.99$/\\t{params.beta}/' {input.hap} ) &>{log}"
