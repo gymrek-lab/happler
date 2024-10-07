@@ -59,6 +59,10 @@ else:
     config["gts_snp_panel"] = rules.genotypes_subset.input.pgen
 config["random"] = False
 
+if mode == "ld_range" and check_config("num_haps", place=config["modes"][mode]):
+    if isinstance(config["modes"][mode]["num_haps"], int):
+        config["modes"][mode]["num_haps"] = [config["modes"][mode]["num_haps"],]
+
 if mode != "run":
     module simulate:
         snakefile: "rules/simulate.smk"
@@ -106,7 +110,7 @@ if mode in ("snp", "hap", "ld_range"):
             happler_config["snps"] = config["modes"][mode]["alleles"]
         happler_config["causal_gt"] = rules.simulate_transform.output
     if mode == "ld_range":
-        happler_config["out"] = config["out"] + "/happler/"+mode+"/ld_{ld}/beta_{beta}/alpha_{alpha}"
+        happler_config["out"] = config["out"] + "/happler/"+mode+"/{num_haps}_haps/ld_{ld}/beta_{beta}/alpha_{alpha}"
 elif mode == "run":
     happler_config = {
         "pheno": config["modes"][mode]["pheno"],
@@ -133,7 +137,7 @@ merged_happler = rules.happler_merge.output.pgen
 if mode == "ld_range" and config["modes"][mode]["random"]:
     happler_config["random"] = rules.simulate_random_transform.output
     happler_config["random_hap"] = rules.simulate_random_transform.input.hap
-    happler_config["out"] = config["out"] + "/happler/"+mode+"/random/ld_{ld}/beta_{beta}/alpha_{alpha}"
+    happler_config["out"] = config["out"] + "/happler/"+mode+"/random/{num_haps}_haps/ld_{ld}/beta_{beta}/alpha_{alpha}"
     module happler_random:
         snakefile: "rules/happler.smk"
         config: happler_config

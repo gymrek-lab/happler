@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from typing import Tuple
 from pathlib import Path
 from logging import Logger
 from itertools import product
@@ -29,6 +30,7 @@ def find_haps(
     chrom = chrom[0]
 
     intervals = np.arange(max(0, min_ld), min(1, max_ld), step) + step
+    # we return lists of haplotypes: one list for each bin
     ld_bins = {idx: [] for idx in range(len(intervals))}
     count = len(intervals) * num_haps
 
@@ -101,11 +103,16 @@ def find_haps(
     help="The maximum LD value to allow",
 )
 @click.option(
+    "-n",
     "--num-haps",
     type=int,
-    default=1,
+    multiple=True,
+    default=(1,),
     show_default=True,
-    help="The number of haplotypes to output",
+    help=(
+        "The number of haplotypes to output in each hap file. "
+        "If multiple, we will also match on the {num_haps} brace expression"
+    ),
 )
 @click.option(
     "--seed",
@@ -130,7 +137,7 @@ def main(
     step: float = 0.1,
     min_af: float = 0.25,
     max_af: float = 0.75,
-    num_haps: int = 1,
+    num_haps: Tuple[int] = (1,),
     seed: int = None,
     verbosity: str = "DEBUG",
 ):
@@ -155,23 +162,33 @@ def main(
 
     seed = np.random.default_rng(seed)
 
+    if "{num_haps}" not in str(output) and len(num_haps) > 1:
+        log.warning(
+            "Multiple num_haps values provided, but {num_haps} brace expression is "
+            "absent from output path. Only the last --num-haps value will be used."
+        )
+
     for haps in find_haps(
         gts,
         log,
         min_ld=min_ld,
         max_ld=max_ld,
-        num_haps=num_haps,
+        num_haps=max(num_haps),
         step=step,
         seed=seed,
     ):
         avg_combo_ld = np.mean([combo_ld for combo_ld, hp in haps])
-        out_path = Path(str(output).format(ld=round(avg_combo_ld, 2)))
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        hps = Haplotypes(
-            out_path, log=log, haplotype=Haplotype,
+        out_path_temp = Path(str(output).format(
+            ld=round(avg_combo_ld, 2), num_haps="{num_haps}"),
         )
-        hps.data = {hp.id: hp for combo_ld, hp in haps}
-        hps.write()
+        for num_hap in num_haps:
+            out_path = Path(str(out_path_temp).format(num_haps=num_hap))
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            hps = Haplotypes(
+                out_path, log=log, haplotype=Haplotype,
+            )
+            hps.data = {hp.id: hp for combo_ld, hp in haps[:num_hap]}
+            hps.write()
 
 
 if __name__ == "__main__":

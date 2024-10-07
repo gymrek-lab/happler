@@ -22,6 +22,7 @@ DTYPES = {
     "gt": "U5",
     "alpha": np.float64,
     "samp": np.uint32,
+    "num_haps": np.uint8,
 }
 
 LOG_SCALE = {"alpha",}

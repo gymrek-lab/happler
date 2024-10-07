@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 out = config["out"]
@@ -12,8 +13,8 @@ bench += "/" + mode
 def agg_ld(wildcards):
     """ a helper function for the other agg functions """
     checkpoint_output = config["ld_range_checkpoint"].get(**wildcards).output.hap
-    ld_vals = glob_wildcards(Path(checkpoint_output) / "ld_{ld}/haplotype.hap").ld
-    return checkpoint_output, ld_vals
+    ld_vals = glob_wildcards(Path(checkpoint_output) / "{num_haps}_haps/ld_{ld}/haplotype.hap").ld
+    return checkpoint_output, sorted(list(set(ld_vals)))
 
 def agg_ld_range_obs(wildcards):
     """ return a list of hap files from happler """
@@ -24,12 +25,14 @@ def agg_ld_range_obs(wildcards):
             ld=ld_vals,
             alpha=config["mode_attrs"]["alpha"],
             beta=config["mode_attrs"]["beta"],
+            num_haps=config["mode_attrs"]["num_haps"],
             **wildcards,
         )
     else:
         return expand(
             config["happler_hap"],
             beta=config["mode_attrs"]["beta"],
+            num_haps=config["mode_attrs"]["num_haps"],
             **wildcards,
         )
 
@@ -41,12 +44,14 @@ def agg_ld_range_causal(wildcards):
             str(checkpoint_output),
             ld=ld_vals,
             beta=config["mode_attrs"]["beta"],
+            num_haps=config["mode_attrs"]["num_haps"],
             **wildcards,
         )
     else:
         return expand(
             config["causal_hap"],
             beta=config["mode_attrs"]["beta"],
+            num_haps=config["mode_attrs"]["num_haps"],
             **wildcards,
         )
 
@@ -58,6 +63,7 @@ def agg_ld_range_metrics(wildcards):
             config["happler_metrics"],
             ld=ld_vals,
             beta=config["mode_attrs"]["beta"],
+            num_haps=config["mode_attrs"]["num_haps"],
             alpha=config["mode_attrs"]["alpha"],
             **wildcards,
         )
@@ -65,6 +71,7 @@ def agg_ld_range_metrics(wildcards):
         return expand(
             config["happler_metrics"],
             beta=config["mode_attrs"]["beta"],
+            num_haps=config["mode_attrs"]["num_haps"],
             **wildcards,
         )
 

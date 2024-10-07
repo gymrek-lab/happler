@@ -65,7 +65,7 @@ rule run:
     shell:
         "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
         "--max-signals {params.max_signals} --max-iterations {params.max_iterations} "
-        "--discard-multiallelic --remove-SNPs --region {params.region}"
+        "--discard-multiallelic --region {params.region}"
         " {params.covar} --indep-thresh {params.indep} -t {params.thresh} "
         "--show-tree {input.gts} {input.pts} &>{log}"
         " && haptools index -o {output.gz} {output.hap} &>>{log}"

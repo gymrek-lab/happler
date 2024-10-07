@@ -22,7 +22,7 @@ def parse_locus(locus):
     start = locus.split("_")[1].split("-")[0]
     return chrom, start, end
 
-hap_ld_range_output = out + "/create_ld_range/ld_{ld}/haplotype.hap"
+hap_ld_range_output = out + "/create_ld_range/{num_haps}_haps/ld_{ld}/haplotype.hap"
 
 checkpoint create_hap_ld_range:
     """ create a hap file suitable for haptools transform and simphenotype """
@@ -36,6 +36,7 @@ checkpoint create_hap_ld_range:
         step = config["modes"]["ld_range"]["step"],
         min_af = config["modes"]["ld_range"]["min_af"],
         max_af = config["modes"]["ld_range"]["max_af"],
+        num_haps = "-n " + " -n ".join(map(str, config["modes"]["ld_range"]["num_haps"])),
         out = lambda wildcards: expand(
             hap_ld_range_output, **wildcards, allow_missing=True,
         ),
@@ -51,7 +52,7 @@ checkpoint create_hap_ld_range:
     conda:
         "happler"
     shell:
-        "workflow/scripts/choose_different_ld.py "
+        "workflow/scripts/choose_different_ld.py {params.num_haps} "
         "--min-ld {params.min_ld} --max-ld {params.max_ld} "
         "--step {params.step} --min-af {params.min_af} --seed {params.seed} "
         "--max-af {params.max_af} {input.gts} {params.out} &> {log}"
@@ -81,9 +82,9 @@ rule create_hap:
         "../scripts/create_hap_file.sh"
 
 if mode == "ld_range":
-    out += "/pheno/ld_{ld}"
-    logs += "/pheno/ld_{ld}"
-    bench += "/pheno/ld_{ld}"
+    out += "/pheno/{num_haps}_haps/ld_{ld}"
+    logs += "/pheno/{num_haps}_haps/ld_{ld}"
+    bench += "/pheno/{num_haps}_haps/ld_{ld}"
 
 rule transform:
     """ use the hap file to create a pgen of the haplotype """
