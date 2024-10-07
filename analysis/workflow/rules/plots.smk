@@ -104,7 +104,7 @@ rule params:
     conda:
         "happler"
     shell:
-        "workflow/scripts/parameter_plot.py -o {output.png} "
+        "workflow/scripts/parameter_plot.py --show-extras -o {output.png} "
         "{input.gts} {params.observed_haps} {params.causal_hap} &> {log}"
 
 
