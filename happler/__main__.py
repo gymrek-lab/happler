@@ -142,6 +142,13 @@ def main():
     help="The LD threshold used to prune leaf nodes based on LD with their siblings",
 )
 @click.option(
+    "--out-thresh",
+    type=float,
+    default=5e-8,
+    show_default=True,
+    help="Threshold used to determine whether to output haplotypes (single-SNP)",
+)
+@click.option(
     "--show-tree",
     is_flag=True,
     show_default=True,
@@ -203,6 +210,7 @@ def run(
     max_signals: int = 1,
     max_iterations: int = 1,
     threshold: float = 0.05,
+    out_thresh: float = 5e-8,
     indep_thresh: float = 0.1,
     ld_prune_thresh: float = None,
     show_tree: bool = False,
@@ -223,6 +231,7 @@ def run(
     Ex: happler run tests/data/simple.vcf tests/data/simple.tsv > simple.hap
     """
     from . import tree
+    import numpy as np
     from haptools import data
     from haptools import logging
 
@@ -361,6 +370,11 @@ def run(
     for haps in forest.run():
         if haps is None:
             continue
+        if len(haps.data) == 1:
+            hap = next(iter(haps.data.values()))
+            if hap.pval < -np.log10(out_thresh):
+                log.info("Ignoring haplotype with low pval")
+                continue
         for hap in haps.data.values():
             if len(hap.variants) <= 1 and remove_snps:
                 continue
