@@ -58,6 +58,9 @@ def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes, drop_ex
     npt.NDArray
         An array of the column indices indicating the optimal match of causal haplotypes
         to observed haplotypes
+    npt.NDArray
+        An array of boolean values indicating whether each observed haplotype has a match
+        in the causal haplotypes
     """
     obs = observed.transform(gts).data.sum(axis=2)
     exp = causal.transform(gts).data.sum(axis=2)
@@ -72,13 +75,17 @@ def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes, drop_ex
     ld_mat = np.abs(ld_mat[:obs.shape[1], obs.shape[1]:])
     # Return the ld_mat idxs of the optimal match of each observed hap to a causal hap
     row_idx, col_idx = linear_sum_assignment(ld_mat, maximize=True)
+    extras_labels = np.zeros(
+        len(row_idx) if drop_extras else ld_mat.shape[0], dtype=np.bool_,
+    )
     if not drop_extras:
         missing_rows = np.setdiff1d(range(ld_mat.shape[0]), row_idx)
+        extras_labels[missing_rows] = True
         # If there are more observed haps than causal haps, then we just assign the
         # remaining haps to the best causal hap that matches for each of them
         row_idx = np.concatenate((row_idx, missing_rows))
         col_idx = np.concatenate((col_idx, ld_mat[missing_rows].argmax(axis=1)))
-    return ld_mat, row_idx, col_idx
+    return ld_mat, row_idx, col_idx, extras_labels
 
 
 def get_best_ld(
@@ -121,6 +128,10 @@ def get_best_ld(
     observed_hap = Haplotypes(observed_hap, log=log)
     observed_hap.read(haplotypes=(set((observed_id,)) if observed_id is not None else None))
 
+    # if there are no observed haplotypes, then we can't compute LD
+    if len(observed_hap.data) == 0:
+        return np.array([np.nan,]), np.array([False,])
+
     # load the genotypes
     variants = {
         v.id for hap in causal_hap.data
@@ -137,11 +148,11 @@ def get_best_ld(
     gts.check_biallelic()
 
     # compute LD between every observed haplotype and the causal haplotype
-    observed_ld, best_row_idx, best_col_idx = match_haps(
+    observed_ld, best_row_idx, best_col_idx, extras_labels = match_haps(
         gts, observed_hap, causal_hap, drop_extras=(not show_extras),
     )
     # return the strongest possible LD for each observed hap with a causal hap
-    return observed_ld[best_row_idx, best_col_idx]
+    return observed_ld[best_row_idx, best_col_idx], extras_labels
 
 
 def get_finemap_metrics(metrics_path: Path, log: Logger = None):
@@ -199,6 +210,7 @@ def plot_params(
         params: npt.NDArray,
         vals: npt.NDArray,
         val_title: str,
+        val_color: npt.NDArray,
     ):
     """
     Plot vals against parameter values
@@ -207,10 +219,12 @@ def plot_params(
     ----------
     params: npt.NDArray
         A numpy array of mixed dtype. Each column contains the values of a parameter
-    vals: npt.NDArray
+    vals: list[npt.NDArray]
         A numpy array containing the values of the plot
     val_title: str
         The name of the value that we are plotting
+    val_color: list[npt.NDArray]
+        Whether to color each point corresponding to this value
     """
     figsize = matplotlib.rcParams["figure.figsize"]
     if len(params) > 75:
@@ -224,7 +238,8 @@ def plot_params(
     fig.subplots_adjust(hspace=0)
     # create a plot for the vals, first
     x_vals = [j for j, arr in enumerate(vals) for i in arr]
-    axs[0].plot(x_vals, np.concatenate(vals), "go", markersize=2)
+    val_color = ["red" if j else "green" for i in val_color for j in i]
+    axs[0].scatter(x_vals, np.concatenate(vals), marker="o", color=val_color, s=5)
     axs[0].set_ylabel(val_title, rotation="horizontal", ha="right")
     axs[0].set_xticks(range(0, len(vals)))
     axs[0].set_xticklabels([])
@@ -249,6 +264,7 @@ def plot_params_simple(
         params: npt.NDArray,
         vals: npt.NDArray,
         val_title: str,
+        val_color: npt.NDArray,
     ):
     """
     Plot vals against only a single column of parameter values
@@ -257,10 +273,12 @@ def plot_params_simple(
     ----------
     params: npt.NDArray
         A numpy array containing the values of a parameter
-    vals: npt.NDArray
+    vals: list[npt.NDArray]
         A numpy array containing the values of the plot
     val_title: str
         The name of the value that we are plotting
+    val_color: list[npt.NDArray]
+        Whether to color each point corresponding to this value
     """
     fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
     val_xlabel = params.dtype.names[0]
@@ -268,8 +286,9 @@ def plot_params_simple(
         params = -np.log10(params)
         val_xlabel = "-log " + val_xlabel
     params = [j for j, arr in zip(params, vals) for i in arr]
+    val_color = ["red" if j else "green" for i in val_color for j in i]
     # plot params against vals
-    ax.plot(params, np.concatenate(vals), "go", markersize=2)
+    ax.scatter(params, np.concatenate(vals), marker="o", color=val_color, s=5)
     ax.set_ylabel(val_title, color="g")
     ax.set_xlabel(val_xlabel)
     return fig
@@ -372,7 +391,7 @@ def main(
     get_hap_fname = lambda hap_path, param_set: Path(str(hap_path).format(**dict(zip(dtypes.keys(), param_set))))
 
     # compute LD between the causal hap and the best observed hap across param vals
-    ld_vals = [
+    ld_vals, ld_extras_labels = zip(*tuple(
         get_best_ld(
             gts,
             get_hap_fname(observed_hap, params[idx]),
@@ -384,7 +403,7 @@ def main(
             log=log
         )
         for idx in range(len(params))
-    ]
+    ))
 
     # extract fine-mapping metrics for the observed hap
     if metrics is not None:
@@ -400,9 +419,9 @@ def main(
         merged = params
         if metrics is not None:
             merged = np.lib.recfunctions.merge_arrays([params, metrics], flatten=True)
-        fig = plot_params(merged, ld_vals, "causal LD")
+        fig = plot_params(merged, ld_vals, "causal LD", ld_extras_labels)
     elif len(dtypes) == 1:
-        fig = plot_params_simple(params, ld_vals, "causal LD")
+        fig = plot_params_simple(params, ld_vals, "causal LD", ld_extras_labels)
     else:
         raise ValueError("No parameter values found")
 
