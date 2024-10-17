@@ -297,10 +297,6 @@ def run(
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
 
     # subset to just one phenotype
-    if len(ph.names) > 1:
-        log.warning("Ignoring all but the first trait in the phenotypes file")
-        ph.names = ph.names[:1]
-        ph.data = ph.data[:, :1]
     # also reorder and subset samples in Phenotypes to match those in the Genotypes
     ph.subset(samples=tuple(gt.samples), names=(pheno,), inplace=True)
 

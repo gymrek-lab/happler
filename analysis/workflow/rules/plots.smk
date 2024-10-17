@@ -26,6 +26,7 @@ def agg_ld_range_obs(wildcards):
             alpha=config["mode_attrs"]["alpha"],
             beta=config["mode_attrs"]["beta"],
             num_haps=config["mode_attrs"]["num_haps"],
+            rep=range(config["mode_attrs"]["reps"]),
             **wildcards,
         )
     else:
@@ -65,6 +66,7 @@ def agg_ld_range_metrics(wildcards):
             beta=config["mode_attrs"]["beta"],
             num_haps=config["mode_attrs"]["num_haps"],
             alpha=config["mode_attrs"]["alpha"],
+            rep=range(config["mode_attrs"]["reps"]),
             **wildcards,
         )
     else:
@@ -104,7 +106,7 @@ rule params:
     conda:
         "happler"
     shell:
-        "workflow/scripts/parameter_plot.py --show-extras -o {output.png} "
+        "workflow/scripts/parameter_plot.py -o {output.png} "
         "{input.gts} {params.observed_haps} {params.causal_hap} &> {log}"
 
 

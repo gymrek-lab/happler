@@ -7,6 +7,7 @@ import matplotlib
 import numpy as np
 matplotlib.use('Agg')
 import numpy.typing as npt
+from scipy.stats import sem
 from haptools import logging
 import matplotlib.pyplot as plt
 from haptools.ld import pearson_corr_ld
@@ -28,8 +29,10 @@ DTYPES = {
 
 LOG_SCALE = {"alpha",}
 
+plt.rcParams['figure.dpi'] = 400  # Set the figure DPI to 300
+plt.rcParams['savefig.dpi'] = plt.rcParams['figure.dpi']  # Set the DPI for saving figures
 
-def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes, drop_extras: bool = True) -> tuple:
+def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes) -> tuple:
     """
     Match the observed and causal haplotypes to maximize best pairwise LD
 
@@ -44,9 +47,6 @@ def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes, drop_ex
         A path to a .hap file containing haplotypes output by happler
     causal: Path
         A path to a .hap file containing a simulated causal haplotype
-    drop_extras: bool, optional
-        Drop any observed haplotypes that don't have a match in the causal haps.
-        Otherwise, include a match for every observed haplotype!
 
     Returns
     -------
@@ -58,6 +58,8 @@ def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes, drop_ex
     npt.NDArray
         An array of the column indices indicating the optimal match of causal haplotypes
         to observed haplotypes
+    npt.NDArray
+        The index of the causal haplotype that each observed haplotype is matched to
     npt.NDArray
         An array of boolean values indicating whether each observed haplotype has a match
         in the causal haplotypes
@@ -75,17 +77,20 @@ def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes, drop_ex
     ld_mat = np.abs(ld_mat[:obs.shape[1], obs.shape[1]:])
     # Return the ld_mat idxs of the optimal match of each observed hap to a causal hap
     row_idx, col_idx = linear_sum_assignment(ld_mat, maximize=True)
-    extras_labels = np.zeros(
-        len(row_idx) if drop_extras else ld_mat.shape[0], dtype=np.bool_,
-    )
-    if not drop_extras:
-        missing_rows = np.setdiff1d(range(ld_mat.shape[0]), row_idx)
-        extras_labels[missing_rows] = True
-        # If there are more observed haps than causal haps, then we just assign the
-        # remaining haps to the best causal hap that matches for each of them
-        row_idx = np.concatenate((row_idx, missing_rows))
-        col_idx = np.concatenate((col_idx, ld_mat[missing_rows].argmax(axis=1)))
-    return ld_mat, row_idx, col_idx, extras_labels
+    # now deal with the extras (observed haps with no causal hap match)
+    extras_labels = np.zeros(ld_mat.shape[0], dtype=np.uint8)
+    extras_labels_bool = np.zeros(ld_mat.shape[0], dtype=bool)
+    missing_rows = np.setdiff1d(range(ld_mat.shape[0]), row_idx)
+    extras_labels[row_idx] = col_idx
+    extras_labels_bool[row_idx] = True
+    # If there are more observed haps than causal haps, then we just assign the
+    # remaining haps to the best causal hap that matches for each of them
+    row_idx = np.concatenate((row_idx, missing_rows))
+    missing_cols = ld_mat[missing_rows].argmax(axis=1)
+    col_idx = np.concatenate((col_idx, missing_cols))
+    extras_labels[missing_rows] = missing_cols
+    extras_labels_bool[missing_rows] = False
+    return ld_mat, row_idx, col_idx, extras_labels, extras_labels_bool
 
 
 def get_best_ld(
@@ -95,7 +100,6 @@ def get_best_ld(
         region: str = None,
         observed_id: str = None,
         causal_id: str = None,
-        show_extras: bool = False,
         log: Logger = None
     ):
     """
@@ -115,8 +119,6 @@ def get_best_ld(
         The ID to load from the observed_hap file (or just all of the IDs, otherwise)
     causal_id: str, optional
         The ID to load from the causal_hap file (or just the first hap, otherwise)
-    show_extras: bool, optional
-        Whether to show observed haps that don't match with a causal hap
     log: Logger, optional
         A logging module to pass to haptools
     """
@@ -130,7 +132,11 @@ def get_best_ld(
 
     # if there are no observed haplotypes, then we can't compute LD
     if len(observed_hap.data) == 0:
-        return np.array([np.nan,]), np.array([False,])
+        return (
+            np.array([np.nan,]),
+            np.array([np.iinfo(np.uint8).max,], dtype=np.uint8),
+            np.array([False,], dtype=bool),
+        )
 
     # load the genotypes
     variants = {
@@ -148,11 +154,11 @@ def get_best_ld(
     gts.check_biallelic()
 
     # compute LD between every observed haplotype and the causal haplotype
-    observed_ld, best_row_idx, best_col_idx, extras_labels = match_haps(
-        gts, observed_hap, causal_hap, drop_extras=(not show_extras),
+    observed_ld, best_row_idx, best_col_idx, extras_labels, labels_bool = match_haps(
+        gts, observed_hap, causal_hap,
     )
     # return the strongest possible LD for each observed hap with a causal hap
-    return observed_ld[best_row_idx, best_col_idx], extras_labels
+    return observed_ld[best_row_idx, best_col_idx], extras_labels, labels_bool
 
 
 def get_finemap_metrics(metrics_path: Path, log: Logger = None):
@@ -209,6 +215,7 @@ def count_shared(observed, causal, log, observed_id: str = None, causal_id: str 
 def plot_params(
         params: npt.NDArray,
         vals: npt.NDArray,
+        vals_sem: npt.NDArray,
         val_title: str,
         val_color: npt.NDArray,
     ):
@@ -219,11 +226,13 @@ def plot_params(
     ----------
     params: npt.NDArray
         A numpy array of mixed dtype. Each column contains the values of a parameter
-    vals: list[npt.NDArray]
-        A numpy array containing the values of the plot
+    vals: npt.NDArray
+        A numpy array of numpy arrays containing the values of the plot
+    vals_sem: npt.NDArray
+        A numpy array of numpy arrays containing the standard error of the values
     val_title: str
         The name of the value that we are plotting
-    val_color: list[npt.NDArray]
+    val_color: npt.NDArray
         Whether to color each point corresponding to this value
     """
     figsize = matplotlib.rcParams["figure.figsize"]
@@ -238,10 +247,13 @@ def plot_params(
     fig.subplots_adjust(hspace=0)
     # create a plot for the vals, first
     x_vals = [j for j, arr in enumerate(vals) for i in arr]
-    val_color = ["red" if j else "green" for i in val_color for j in i]
-    axs[0].scatter(x_vals, np.concatenate(vals), marker="o", color=val_color, s=5)
+    val_color = ["green" if j else "red" for i in val_color for j in i]
+    vals = np.concatenate(vals)
+    vals_sem = np.concatenate(vals_sem)
+    for v in zip(x_vals, vals, vals_sem, val_color):
+        axs[0].errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=3)
     axs[0].set_ylabel(val_title, rotation="horizontal", ha="right")
-    axs[0].set_xticks(range(0, len(vals)))
+    axs[0].set_xticks(range(0, len(x_vals)))
     axs[0].set_xticklabels([])
     axs[0].grid(axis="x")
     axs[0].set_ylim(None, 1)
@@ -263,6 +275,7 @@ def plot_params(
 def plot_params_simple(
         params: npt.NDArray,
         vals: npt.NDArray,
+        val_sem: npt.NDArray,
         val_title: str,
         val_color: npt.NDArray,
     ):
@@ -273,11 +286,13 @@ def plot_params_simple(
     ----------
     params: npt.NDArray
         A numpy array containing the values of a parameter
-    vals: list[npt.NDArray]
-        A numpy array containing the values of the plot
+    vals: npt.NDArray
+        A numpy array of numpy arrays containing the values of the plot
+    val_sem: npt.NDArray
+        A numpy array of numpy arrays containing the standard error of the values
     val_title: str
         The name of the value that we are plotting
-    val_color: list[npt.NDArray]
+    val_color: npt.NDArray
         Whether to color each point corresponding to this value
     """
     fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
@@ -286,12 +301,83 @@ def plot_params_simple(
         params = -np.log10(params)
         val_xlabel = "-log " + val_xlabel
     params = [j for j, arr in zip(params, vals) for i in arr]
-    val_color = ["red" if j else "green" for i in val_color for j in i]
+    val_color = ["green" if j else "red" for i in val_color for j in i]
     # plot params against vals
     ax.scatter(params, np.concatenate(vals), marker="o", color=val_color, s=5)
     ax.set_ylabel(val_title, color="g")
     ax.set_xlabel(val_xlabel)
     return fig
+
+
+def group_by_rep(params: npt.NDArray, vals: npt.NDArray, causal_idxs: npt.NDArray, bools: npt.NDArray):
+    """
+    Group replicates with identical parameter values
+
+    Compute mean and standard error of the values for each group
+
+    Parameters
+    ----------
+    params: npt.NDArray
+        A numpy array of mixed dtype. Each column contains the values of a parameter
+    vals: npt.NDArray
+        A numpy array containing the values of the plot
+    causal_idxs: npt.NDArray
+        The index of the causal haplotype that each observed haplotype belongs to
+    bools: npt.NDArray
+        An array of boolean values indicating whether each observed haplotype has a match
+
+    Returns
+    -------
+    npt.NDArray
+        A numpy array of the unique parameter values
+    npt.NDArray
+        A numpy array containing the mean and std of the values over the replicates
+    """
+    other_param_names = [name for name in params.dtype.names if name != "rep"]
+    grouped_params = np.unique(params[other_param_names])
+    get_mean_std = lambda x: (np.mean(x), sem(x) if len(x) > 1 else np.nan)
+    filter_causal_idxs = lambda x: np.unique(x[x != np.iinfo(np.uint8).max])
+    grouped_vals = []
+    grouped_sem = []
+    grouped_bools = []
+    for group in grouped_params:
+        subgrouped_vals = []
+        subgrouped_sem = []
+        subgrouped_bools = []
+        curr_vals = vals[params[other_param_names] == group]
+        curr_causal_idxs = causal_idxs[params[other_param_names] == group]
+        curr_bools = bools[params[other_param_names] == group]
+        # compute mean and std err for each causal match
+        for causal_idx in filter_causal_idxs(np.concatenate(curr_causal_idxs)):
+            try:
+                curr_vals_causal_idxs = np.concatenate([
+                    val[(indices == causal_idx) & curr_bool]
+                    for val, indices, curr_bool in zip(curr_vals, curr_causal_idxs, curr_bools)
+                ])
+            except ValueError:
+                continue
+            val_mean, val_sem = get_mean_std(curr_vals_causal_idxs)
+            subgrouped_vals.append(val_mean)
+            subgrouped_sem.append(val_sem)
+            subgrouped_bools.append(True)
+            # compute mean and std err for each unmatched observed hap
+            for unmatched_idx in range(max([(~i).sum() for i in curr_bools])):
+                try:
+                    curr_vals_unmatched_idxs = np.array([
+                        val[(indices == causal_idx) & ~curr_bool][unmatched_idx]
+                        for val, indices, curr_bool in zip(curr_vals, curr_causal_idxs, curr_bools)
+                        if unmatched_idx < ((indices == causal_idx) & ~curr_bool).sum()
+                    ])
+                except ValueError:
+                    continue
+                val_mean, val_sem = get_mean_std(curr_vals_unmatched_idxs)
+                subgrouped_vals.append(val_mean)
+                subgrouped_sem.append(val_sem)
+                subgrouped_bools.append(False)
+        grouped_vals.append(np.array(subgrouped_vals, dtype=object))
+        grouped_sem.append(np.array(subgrouped_sem, dtype=object))
+        grouped_bools.append(np.array(subgrouped_bools, dtype=object))
+    return grouped_params, grouped_vals, grouped_sem, grouped_bools
 
 
 @click.command()
@@ -330,13 +416,6 @@ def plot_params_simple(
     help="A haplotype ID from the causal .hap file",
 )
 @click.option(
-    "--show-extras",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Whether to show observed haps that don't match with a causal hap",
-)
-@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -360,7 +439,6 @@ def main(
     region: str = None,
     observed_id: str = None,
     causal_id: str = None,
-    show_extras: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "ERROR",
 ):
@@ -391,7 +469,7 @@ def main(
     get_hap_fname = lambda hap_path, param_set: Path(str(hap_path).format(**dict(zip(dtypes.keys(), param_set))))
 
     # compute LD between the causal hap and the best observed hap across param vals
-    ld_vals, ld_extras_labels = zip(*tuple(
+    ld_vals, ld_extras_idxs, ld_extras_bool = zip(*tuple(
         get_best_ld(
             gts,
             get_hap_fname(observed_hap, params[idx]),
@@ -399,11 +477,13 @@ def main(
             region=region,
             observed_id=observed_id,
             causal_id=causal_id,
-            show_extras=show_extras,
             log=log
         )
         for idx in range(len(params))
     ))
+    ld_vals = np.array(ld_vals, dtype=object)
+    ld_extras_idxs = np.array(ld_extras_idxs, dtype=object)
+    ld_extras_bool = np.array(ld_extras_bool, dtype=object)
 
     # extract fine-mapping metrics for the observed hap
     if metrics is not None:
@@ -415,13 +495,18 @@ def main(
             for idx in range(len(params))
         ])
 
+    # TODO: also handle the metrics in group_by_rep()
+    params, ld_vals, ld_sem, ld_extras_bool = group_by_rep(
+        params, ld_vals, ld_extras_idxs, ld_extras_bool,
+    )
+
     if len(dtypes) > 1 or metrics is not None:
         merged = params
         if metrics is not None:
             merged = np.lib.recfunctions.merge_arrays([params, metrics], flatten=True)
-        fig = plot_params(merged, ld_vals, "causal LD", ld_extras_labels)
+        fig = plot_params(merged, ld_vals, ld_sem, "causal LD", ld_extras_bool)
     elif len(dtypes) == 1:
-        fig = plot_params_simple(params, ld_vals, "causal LD", ld_extras_labels)
+        fig = plot_params_simple(params, ld_vals, ld_sem, "causal LD", ld_extras_bool)
     else:
         raise ValueError("No parameter values found")
 

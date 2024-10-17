@@ -38,6 +38,7 @@ rule run:
         indep=lambda wildcards: 0.05 if "indep_alpha" not in wildcards else wildcards.indep_alpha,
         max_signals=3,
         max_iterations=3,
+        rep=lambda wildcards: int(wildcards.rep),
     output:
         hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
@@ -65,8 +66,8 @@ rule run:
     shell:
         "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
         "--max-signals {params.max_signals} --max-iterations {params.max_iterations} "
-        "--discard-multiallelic --region {params.region}"
-        " {params.covar} --indep-thresh {params.indep} -t {params.thresh} "
+        "--discard-multiallelic --region {params.region} --pheno {params.rep} "
+        "{params.covar}--indep-thresh {params.indep} -t {params.thresh} "
         "--show-tree {input.gts} {input.pts} &>{log}"
         " && haptools index -o {output.gz} {output.hap} &>>{log}"
 

@@ -119,6 +119,7 @@ rule simphenotype:
     params:
         beta=lambda wildcards: wildcards.beta,
         seed = 42,
+        reps = config["modes"]["ld_range"]["reps"],
     output:
         pheno=out + "/{beta}.pheno",
     resources:
@@ -130,5 +131,6 @@ rule simphenotype:
     conda:
         "happler"
     shell:
-        "haptools simphenotype --seed {params.seed} -o {output.pheno} {input.pgen} "
+        "haptools simphenotype --seed {params.seed} -o {output.pheno} "
+        "--replications {params.reps} {input.pgen} "
         "<( sed 's/\\t0.99$/\\t{params.beta}/' {input.hap} ) &>{log}"
