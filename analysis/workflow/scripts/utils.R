@@ -97,3 +97,16 @@ save_curr_env = function(env = parent.frame(), filePath = "myenv.RData") {
 
   save(list = ls(all.names = TRUE, envir = env), file = filePath, envir = env)
 }
+
+readHap = function(hapfile) {
+  # Return a data.frame with the start, end, and ID columns of the haplotyp lines
+  # in the .hap file
+  # Parameters:
+  #   hapfile: The path to the .hap file
+  data <- read.table(hapfile, header = FALSE, fill = TRUE, stringsAsFactors = FALSE)
+  # Filter rows that start with "H" and select columns 3 to 5
+  h_data <- data[grep("^H", data$V1), c(3, 4, 5)]
+  # Rename the columns for clarity (optional)
+  colnames(h_data) <- c("start", "end", "id")
+  h_data
+}

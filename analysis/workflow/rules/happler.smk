@@ -392,11 +392,11 @@ rule metrics:
     input:
         finemap=expand(rules.finemapper.output.susie, ex="in", allow_missing=True),
         obs_hap=rules.run.output.hap,
-        caus_hap=config["hap_file"],
+        # caus_hap=config["hap_file"],
     output:
         metrics=out + "/susie_metrics.tsv",
     resources:
-        runtime=5,
+        runtime=10,
     threads: 6,
     log:
         logs + "/metrics",
