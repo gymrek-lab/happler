@@ -218,6 +218,7 @@ def plot_params(
         vals_sem: npt.NDArray,
         val_title: str,
         val_color: npt.NDArray,
+        hide_extras: bool = False,
     ):
     """
     Plot vals against parameter values
@@ -234,6 +235,8 @@ def plot_params(
         The name of the value that we are plotting
     val_color: npt.NDArray
         Whether to color each point corresponding to this value
+    hide_extras: bool
+        Whether to hide the observed haps that have no causal hap match
     """
     figsize = matplotlib.rcParams["figure.figsize"]
     if len(params) > 75:
@@ -251,6 +254,8 @@ def plot_params(
     vals = np.concatenate(vals)
     vals_sem = np.concatenate(vals_sem)
     for v in zip(x_vals, vals, vals_sem, val_color):
+        if hide_extras and v[3] != "green":
+            continue
         axs[0].errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=3)
     axs[0].set_ylabel(val_title, rotation="horizontal", ha="right")
     axs[0].set_xticks(range(0, len(x_vals)))
@@ -275,9 +280,10 @@ def plot_params(
 def plot_params_simple(
         params: npt.NDArray,
         vals: npt.NDArray,
-        val_sem: npt.NDArray,
+        vals_sem: npt.NDArray,
         val_title: str,
         val_color: npt.NDArray,
+        hide_extras: bool = False,
     ):
     """
     Plot vals against only a single column of parameter values
@@ -288,12 +294,14 @@ def plot_params_simple(
         A numpy array containing the values of a parameter
     vals: npt.NDArray
         A numpy array of numpy arrays containing the values of the plot
-    val_sem: npt.NDArray
+    vals_sem: npt.NDArray
         A numpy array of numpy arrays containing the standard error of the values
     val_title: str
         The name of the value that we are plotting
     val_color: npt.NDArray
         Whether to color each point corresponding to this value
+    hide_extras: bool
+        Whether to hide the observed haps that have no causal hap match
     """
     fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
     val_xlabel = params.dtype.names[0]
@@ -302,8 +310,13 @@ def plot_params_simple(
         val_xlabel = "-log " + val_xlabel
     params = [j for j, arr in zip(params, vals) for i in arr]
     val_color = ["green" if j else "red" for i in val_color for j in i]
+    vals = np.concatenate(vals)
+    vals_sem = np.concatenate(vals_sem)
     # plot params against vals
-    ax.scatter(params, np.concatenate(vals), marker="o", color=val_color, s=5)
+    for v in zip(params, vals, vals_sem, val_color):
+        if hide_extras and v[3] != "green":
+            continue
+        ax.errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=5)
     ax.set_ylabel(val_title, color="g")
     ax.set_xlabel(val_xlabel)
     return fig
@@ -416,6 +429,20 @@ def group_by_rep(params: npt.NDArray, vals: npt.NDArray, causal_idxs: npt.NDArra
     help="A haplotype ID from the causal .hap file",
 )
 @click.option(
+    "--hide-extras",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Hide the observed haps that have no causal hap match",
+)
+@click.option(
+    "--order",
+    type=str,
+    default=None,
+    show_default="The order of the wildcards in the observed_hap path",
+    help="The order of the parameters in the plot, as a comma-separated list",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -439,6 +466,8 @@ def main(
     region: str = None,
     observed_id: str = None,
     causal_id: str = None,
+    hide_extras: bool = False,
+    order: str = None,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "ERROR",
 ):
@@ -463,6 +492,17 @@ def main(
     params = dict(glob_wildcards(observed_hap)._asdict())
     # convert the dictionary to a numpy mixed dtype array
     dtypes = {k: DTYPES[k] for k in params.keys()}
+    # if the user specified an order, then we will sort the parameters by that order
+    if order is not None:
+        new_params = {}
+        for k in order.split(",")[::-1]:
+            if k not in dtypes:
+                log.warning(f"Parameter {k} not found in the observed hap path")
+                continue
+            dtypes = {k: dtypes.pop(k), **dtypes}
+        for k in dtypes:
+            new_params[k] = params.pop(k)
+        params = new_params
     params = np.array(list(zip(*params.values())), dtype=list(dtypes.items()))
     params.sort()
 
@@ -499,14 +539,15 @@ def main(
     params, ld_vals, ld_sem, ld_extras_bool = group_by_rep(
         params, ld_vals, ld_extras_idxs, ld_extras_bool,
     )
+    del dtypes["rep"]
 
     if len(dtypes) > 1 or metrics is not None:
         merged = params
         if metrics is not None:
             merged = np.lib.recfunctions.merge_arrays([params, metrics], flatten=True)
-        fig = plot_params(merged, ld_vals, ld_sem, "causal LD", ld_extras_bool)
+        fig = plot_params(merged, ld_vals, ld_sem, "causal LD", ld_extras_bool, hide_extras)
     elif len(dtypes) == 1:
-        fig = plot_params_simple(params, ld_vals, ld_sem, "causal LD", ld_extras_bool)
+        fig = plot_params_simple(params, ld_vals, ld_sem, "causal LD", ld_extras_bool, hide_extras)
     else:
         raise ValueError("No parameter values found")
 

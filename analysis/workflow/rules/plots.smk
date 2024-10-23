@@ -98,7 +98,7 @@ rule params:
     output:
         png=out + "/happler_params.png",
     resources:
-        runtime=10,
+        runtime=20,
     log:
         logs + "/plot_params",
     benchmark:
@@ -107,6 +107,7 @@ rule params:
         "happler"
     shell:
         "workflow/scripts/parameter_plot.py -o {output.png} "
+        "--order num_haps,beta,ld "
         "{input.gts} {params.observed_haps} {params.causal_hap} &> {log}"
 
 
@@ -126,7 +127,7 @@ rule metrics:
     output:
         png=out + "/finemapping_metrics.png",
     resources:
-        runtime=10,
+        runtime=20,
     log:
         logs + "/metrics",
     benchmark:
@@ -135,4 +136,5 @@ rule metrics:
         "happler"
     shell:
         "workflow/scripts/parameter_plot.py -o {output.png} -m {params.metrics} "
+        "--order num_haps,beta,ld "
         "{input.gts} {params.observed_haps} {params.causal_hap} &> {log}"
