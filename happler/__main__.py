@@ -369,7 +369,7 @@ def run(
         if len(haps.data) == 1:
             hap = next(iter(haps.data.values()))
             if hap.pval < -np.log10(out_thresh):
-                log.info("Ignoring haplotype with low pval")
+                log.info(f"Ignoring haplotype with low pval {hap.pval}")
                 continue
         for hap in haps.data.values():
             if len(hap.variants) <= 1 and remove_snps:

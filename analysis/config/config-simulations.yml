@@ -78,7 +78,7 @@ min_maf: 0.05
 sample_size: 777
 
 # A threshold on the pvalues of the haplotypes
-out_thresh: 5e-5
+out_thresh: 5e-3
 
 # Whether to include the causal variant in the set of genotypes provided to the
 # finemapping methods. Set this to true if you're interested in seeing how the
