@@ -24,11 +24,36 @@ def parse_locus(locus):
     return chrom, start, end
 
 
+rule sub_pheno:
+    """subset the phenotype file to include only the desired replicate"""
+    input:
+        pheno=config["pheno"],
+    params:
+        rep=lambda wildcards: int(wildcards.rep)+2,
+    output:
+        pheno=out + "/phen.pheno",
+    resources:
+        runtime=1,
+    threads: 1,
+    log:
+        logs + "/sub_pheno",
+    benchmark:
+        bench + "/sub_pheno",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "cut -f 1,{params.rep} {input.pheno} | "
+        "(echo -e \"#IID\\thap\" && tail -n+2) >{output.pheno} 2>{log}"
+
+
+pheno = rules.sub_pheno.output.pheno if "{rep}" in out else config["pheno"]
+
+
 rule run:
     """ execute happler! """
     input:
         gts=config["snp_panel"],
-        pts=config["pheno"],
+        pts=pheno,
         covar=config["covar"],
     params:
         thresh=lambda wildcards: 0.05 if "alpha" not in wildcards else wildcards.alpha,
@@ -106,7 +131,7 @@ rule cond_linreg:
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
         hap=rules.run.output.hap,
-        pts=config["pheno"],
+        pts=pheno,
     params:
         maf = check_config("min_maf", 0),
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
@@ -138,7 +163,7 @@ rule heatmap:
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
         hap=rules.run.output.hap,
-        pts=config["pheno"],
+        pts=pheno,
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
@@ -202,7 +227,7 @@ rule transform:
         pgen=config["snp_panel"],
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
-        pts=config["pheno"],
+        pts=pheno,
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
@@ -229,7 +254,7 @@ rule linreg:
         hap=rules.transform.output.pgen,
         hap_pvar=rules.transform.output.pvar,
         hap_psam=rules.transform.output.psam,
-        pts=config["pheno"],
+        pts=pheno,
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
@@ -339,7 +364,7 @@ rule finemapper:
         gt=lambda wildcards: finemapper_input(wildcards).pgen,
         gt_pvar=lambda wildcards: finemapper_input(wildcards).pvar,
         gt_psam=lambda wildcards: finemapper_input(wildcards).psam,
-        phen=config["pheno"],
+        phen=pheno,
     params:
         outdir=lambda wildcards, output: Path(output.susie).parent,
         exclude_causal="NULL",
@@ -347,7 +372,7 @@ rule finemapper:
         # num_signals=lambda wildcards: get_num_haplotypes(
         #     expand(rules.run.output.hap, **wildcards)[0]
         # ) + 1,
-        num_signals=5,
+        num_signals=10,
         # TODO: also add MAF filter
     output:
         susie=out + "/{ex}clude/susie.rds",
@@ -433,7 +458,7 @@ rule results:
     """
     input:
         gt=rules.finemapper.input.gt,
-        phen=config["pheno"],
+        phen=pheno,
         susie=rules.finemapper.output.susie,
         happler_hap=results_happler_hap_input,
         causal_gt=config["causal_gt"].pgen if "causal_gt" in config else [],
@@ -491,7 +516,7 @@ rule gwas:
         pgen=(rules.merge_SVs if check_config("SVs") else rules.merge).output.pgen,
         pvar=(rules.merge_SVs if check_config("SVs") else rules.merge).output.pvar,
         psam=(rules.merge_SVs if check_config("SVs") else rules.merge).output.psam,
-        pts=config["pheno"],
+        pts=pheno,
         covar=config["covar"],
     params:
         maf = check_config("min_maf", 0),
