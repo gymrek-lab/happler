@@ -51,7 +51,7 @@ for (happler_hap_file_idx in 1:nrow(happler_hap)) {
         }
     }
     purity = 0
-    cs_len = 0
+    cs_length = 0
     if (!is.null(credible_set)) {
         purity = fitted$sets$purity[cs, "mean.abs.corr"]
         cs_length = length(fitted$sets$cs[credible_set])
