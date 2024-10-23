@@ -39,6 +39,7 @@ rule run:
         max_signals=3,
         max_iterations=3,
         rep=lambda wildcards: int(wildcards.rep),
+        out_thresh=check_config("out_thresh", 5e-8),
     output:
         hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
@@ -68,7 +69,7 @@ rule run:
         "--max-signals {params.max_signals} --max-iterations {params.max_iterations} "
         "--discard-multiallelic --region {params.region} --pheno {params.rep} "
         "{params.covar}--indep-thresh {params.indep} -t {params.thresh} "
-        "--show-tree {input.gts} {input.pts} &>{log}"
+        "--out-thresh {params.out_thresh} --show-tree {input.gts} {input.pts} &>{log}"
         " && haptools index -o {output.gz} {output.hap} &>>{log}"
 
 

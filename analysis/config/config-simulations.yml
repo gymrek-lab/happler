@@ -74,8 +74,11 @@ mode: ld_range
 min_maf: 0.05
 
 # Sample sizes to use
-# sample_size: [500, 1000, 1500, 2000, 2500]
+# sample_size: [777, 800, 1600, 2400, 3200]
 sample_size: 777
+
+# A threshold on the pvalues of the haplotypes
+out_thresh: 5e-5
 
 # Whether to include the causal variant in the set of genotypes provided to the
 # finemapping methods. Set this to true if you're interested in seeing how the

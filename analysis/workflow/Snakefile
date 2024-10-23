@@ -103,6 +103,7 @@ if mode in ("snp", "hap", "ld_range"):
         "random": None,
         "covar": covar_file,
         "min_maf": check_config("min_maf", 0),
+        "out_thresh": check_config("out_thresh", 5e-8),
     }
     if mode in ("hap", "ld_range"):
         happler_config["snps"] = []
