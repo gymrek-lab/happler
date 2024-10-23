@@ -7,7 +7,7 @@ import numpy as np
 
 from haptools.logging import getLogger
 from haptools.ld import pearson_corr_ld
-from haptools.data import Data, Genotypes, GenotypesPLINK
+from haptools.data import Data, GenotypesPLINK
 
 
 def corr(a, b):
