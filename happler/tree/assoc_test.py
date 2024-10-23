@@ -146,7 +146,7 @@ class AssocTest(ABC):
         ------
         ValueError
             This function is only valid when the t distribution is approximately
-            equivalent to the normal distribution. Thus, if df < 10000, we raise a
+            equivalent to the normal distribution. Thus, if df < 1000, we raise a
             ValueError to indicate that the function will not return an accurate value
 
         Returns
@@ -154,8 +154,8 @@ class AssocTest(ABC):
         Decimal
             An approximate, higher precision p-value for the provided t statistic
         """
-        if df < 10000:
-            raise ValueError("You need a larger sample size to approximate this p-value")
+        if df < 1000:
+            log.warning("You need a larger sample size to approximate this p-value")
         log10_pval = stats.norm.logsf(np.abs(t_stat)) / np.log(10) + np.log10(2)
         # set the desired precision
         getcontext().prec = precision
