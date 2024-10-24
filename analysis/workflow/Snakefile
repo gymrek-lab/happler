@@ -121,6 +121,7 @@ elif mode == "run":
         "random": None,
         "covar": covar_file,
         "min_maf": check_config("min_maf", 0),
+        "out_thresh": check_config("out_thresh", 5e-8),
     }
     if check_config("SVs", place=config["modes"][mode]):
         happler_config["SVs"] = config["modes"][mode]["SVs"]

@@ -33,7 +33,7 @@ rule sub_pheno:
     output:
         pheno=out + "/phen.pheno",
     resources:
-        runtime=1,
+        runtime=5,
     threads: 1,
     log:
         logs + "/sub_pheno",
@@ -63,8 +63,8 @@ rule run:
         indep=lambda wildcards: 0.05 if "indep_alpha" not in wildcards else wildcards.indep_alpha,
         max_signals=3,
         max_iterations=3,
-        rep=lambda wildcards: int(wildcards.rep),
         out_thresh=check_config("out_thresh", 5e-8),
+        keep_SNPs="--remove-SNPs " if "{rep}" in out else "",
     output:
         hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
@@ -72,15 +72,12 @@ rule run:
         dot=out + "/happler.dot",
     resources:
         runtime=lambda wildcards, input: (
-            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.5454649806119475 + 0.6935132147046765
-            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 45
+            max(45, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.5454649806119475 + 0.6935132147046765)
         ),
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
-        # mem_mb=lambda wildcards, threads: threads*4.57,
         mem_mb=lambda wildcards, input: (
-            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 14.90840694595845 + 401.8011129664152
-            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 5000
+            max(5000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 14.90840694595845 + 401.8011129664152)
         ),
     threads: 1
     log:
@@ -92,7 +89,7 @@ rule run:
     shell:
         "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
         "--max-signals {params.max_signals} --max-iterations {params.max_iterations} "
-        "--discard-multiallelic --region {params.region} --pheno {params.rep} "
+        "--discard-multiallelic --region {params.region} {params.keep_SNPs}"
         "{params.covar}--indep-thresh {params.indep} -t {params.thresh} "
         "--out-thresh {params.out_thresh} --show-tree {input.gts} {input.pts} &>{log}"
         " && haptools index -o {output.gz} {output.hap} &>>{log}"
@@ -139,9 +136,9 @@ rule cond_linreg:
         png=out + "/cond_linreg.pdf",
     resources:
         runtime=lambda wildcards, input: (
-            1.5 * Path(input.pvar).stat().st_size/1000 * (
+            max(50, 1.5 * Path(input.pvar).stat().st_size/1000 * (
                 0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
-            ) if Path(input.pgen).suffix == ".pgen" and check_config("dynamic_resources") else 50
+            ))
         ),
     log:
         logs + "/cond_linreg",
@@ -335,8 +332,7 @@ rule merge:
         psam=temp(out + "/{ex}clude/merged.psam"),
     resources:
         runtime=lambda wildcards, input: (
-            Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844
-            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 10
+            max(10, Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844)
         ),
     log:
         logs + "/{ex}clude/merge",
@@ -377,11 +373,9 @@ rule finemapper:
     output:
         susie=out + "/{ex}clude/susie.rds",
     resources:
-#        runtime=lambda wildcards, input: (
-#            Path(input.gt_pvar).stat().st_size/1000 * 0.08
-#            if Path(input.gt).suffix == ".pgen" and check_config("dynamic_resources") else 75
-#        ),
-        runtime=120,
+        runtime=lambda wildcards, input: (
+            max(120, Path(input.gt_pvar).stat().st_size/1000 * 0.08)
+        ),
         mem_mb = 7000,
     threads: 1,
     log:
