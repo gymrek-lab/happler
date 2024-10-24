@@ -7,7 +7,6 @@ import numpy as np
 from scipy import stats
 import numpy.typing as npt
 import statsmodels.api as sm
-from scipy.stats import t as t_dist
 
 
 # We declare this class to be a dataclass to automatically define __init__ and a few

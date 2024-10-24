@@ -132,7 +132,7 @@ class TTestTerminator(Terminator):
                 # terminate if the effect sizes have gone in the opposite direction
                 self.log.debug("Terminated b/c effect size did not improve")
                 return True
-            # perform a two tailed, two-sample t-test using the difference of the effect sizes
+            # perform a one tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
             std_err = np.sqrt(
                 ((results.data["stderr"] ** 2) + (parent_res.stderr**2)) / 2
