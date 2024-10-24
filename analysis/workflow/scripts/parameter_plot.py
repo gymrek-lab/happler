@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import pickle
 from pathlib import Path
 from logging import Logger
 
@@ -303,7 +304,7 @@ def plot_params_simple(
     hide_extras: bool
         Whether to hide the observed haps that have no causal hap match
     """
-    fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True)
+    fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, figsize=(3.5, 3))
     val_xlabel = params.dtype.names[0]
     if val_xlabel in LOG_SCALE:
         params = -np.log10(params)
@@ -319,6 +320,7 @@ def plot_params_simple(
         ax.errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=5)
     ax.set_ylabel(val_title, color="g")
     ax.set_xlabel(val_xlabel)
+    ax.set_ylim(0, 1.03)
     return fig
 
 
@@ -436,6 +438,13 @@ def group_by_rep(params: npt.NDArray, vals: npt.NDArray, causal_idxs: npt.NDArra
     help="Hide the observed haps that have no causal hap match",
 )
 @click.option(
+    "--pickle-out",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Save the output as a pickle file as well",
+)
+@click.option(
     "--order",
     type=str,
     default=None,
@@ -467,6 +476,7 @@ def main(
     observed_id: str = None,
     causal_id: str = None,
     hide_extras: bool = False,
+    pickle_out: bool = False,
     order: str = None,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "ERROR",
@@ -540,6 +550,10 @@ def main(
         params, ld_vals, ld_extras_idxs, ld_extras_bool,
     )
     del dtypes["rep"]
+
+    if pickle_out:
+        with open(output.with_suffix(".pickle"), "wb") as f:
+            pickle.dump([params, ld_vals, ld_sem, ld_extras_bool], f)
 
     if len(dtypes) > 1 or metrics is not None:
         merged = params
