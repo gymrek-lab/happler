@@ -196,7 +196,7 @@ elif mode == "run":
         output:
             hps = orig_out + "/multiline.tsv",
         resources:
-            runtime=3,
+            runtime=10,
         log:
             orig_out + "/logs/multiline",
         benchmark:

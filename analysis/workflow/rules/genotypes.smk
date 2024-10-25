@@ -163,7 +163,7 @@ rule vcf2plink:
 
 
 rule subset_str:
-    """ subset samples from a STR VCF """
+    """ subset samples from an STR VCF """
     input:
         vcf=lambda wildcards: expand(config["str_panel"], chr=parse_locus(wildcards.locus)[0])[0],
         vcf_idx=lambda wildcards: expand(config["str_panel"] + ".tbi", chr=parse_locus(wildcards.locus)[0]),
