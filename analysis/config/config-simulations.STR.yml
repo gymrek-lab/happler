@@ -14,7 +14,7 @@
 # required!
 snp_panel: "data/simulations/1000G/19_45401409-46401409.pgen"
 # str_panel: "/tscc/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
-# str_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.pgen"
+str_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.STRs.pgen"
 
 # Path to a list of samples to exclude from the analysis
 # There should be one sample ID per line
@@ -41,7 +41,7 @@ snp_panel: "data/simulations/1000G/19_45401409-46401409.pgen"
 locus: 19:45401409-46401409 # center: 45901409 (APOe4)
 modes:
  str:
-  pos: 19:45903857 # STR_691361
+  pos: 19:45903859
  snp:
   pos: 19:45910672 # rs1046282
  hap:
@@ -63,7 +63,7 @@ modes:
   pheno: data/geuvadis/phenos/{trait}.pheno
   SVs: data/geuvadis/pangenie_hprc_hg38_all-samples_bi_SVs-missing_removed.pgen
   # pheno_matrix: data/geuvadis/EUR_converted_expr_hg38.csv # optional
-mode: ld_range
+mode: str
 
 # Covariates to use if they're needed
 # Otherwise, they're assumed to be regressed out of the phenotypes
