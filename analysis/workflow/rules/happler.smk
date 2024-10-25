@@ -64,7 +64,7 @@ rule run:
         max_signals=3,
         max_iterations=3,
         out_thresh=check_config("out_thresh", 5e-8),
-        keep_SNPs="--remove-SNPs " if "{rep}" in out else "",
+        keep_SNPs="--remove-SNPs " if not ("{rep}" in out) else "",
     output:
         hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
@@ -72,12 +72,12 @@ rule run:
         dot=out + "/happler.dot",
     resources:
         runtime=lambda wildcards, input: (
-            max(45, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.5454649806119475 + 0.6935132147046765)
+            min(45, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.5454649806119475 + 0.6935132147046765)
         ),
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
         mem_mb=lambda wildcards, input: (
-            max(5000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 14.90840694595845 + 401.8011129664152)
+            min(5000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 14.90840694595845 + 401.8011129664152)
         ),
     threads: 1
     log:
@@ -136,7 +136,7 @@ rule cond_linreg:
         png=out + "/cond_linreg.pdf",
     resources:
         runtime=lambda wildcards, input: (
-            max(50, 1.5 * Path(input.pvar).stat().st_size/1000 * (
+            min(50, 1.5 * Path(input.pvar).stat().st_size/1000 * (
                 0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
             ))
         ),
@@ -280,7 +280,7 @@ rule sv_ld:
         sv_pvar=lambda wildcards: Path(config["SVs"]).with_suffix(".pvar"),
         sv_psam=lambda wildcards: Path(config["SVs"]).with_suffix(".psam"),
     params:
-        start=lambda wildcards: max(0, int(parse_locus(wildcards.locus)[1])-1000000),
+        start=lambda wildcards: min(0, int(parse_locus(wildcards.locus)[1])-1000000),
         end=lambda wildcards: int(parse_locus(wildcards.locus)[2])+1000000,
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
         maf = check_config("min_maf", 0),
@@ -332,7 +332,7 @@ rule merge:
         psam=temp(out + "/{ex}clude/merged.psam"),
     resources:
         runtime=lambda wildcards, input: (
-            max(10, Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844)
+            min(10, Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844)
         ),
     log:
         logs + "/{ex}clude/merge",
@@ -374,7 +374,7 @@ rule finemapper:
         susie=out + "/{ex}clude/susie.rds",
     resources:
         runtime=lambda wildcards, input: (
-            max(120, Path(input.gt_pvar).stat().st_size/1000 * 0.08)
+            min(120, Path(input.gt_pvar).stat().st_size/1000 * 0.08)
         ),
         mem_mb = 7000,
     threads: 1,
@@ -455,8 +455,8 @@ rule results:
         phen=pheno,
         susie=rules.finemapper.output.susie,
         happler_hap=results_happler_hap_input,
-        causal_gt=config["causal_gt"].pgen if "causal_gt" in config else [],
-        causal_hap=results_causal_hap_input,
+        # causal_gt=config["causal_gt"].pgen if "causal_gt" in config else [],
+        # causal_hap=results_causal_hap_input,
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
