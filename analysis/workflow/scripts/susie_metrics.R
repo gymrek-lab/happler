@@ -42,6 +42,7 @@ for (happler_hap_file_idx in 1:nrow(happler_hap)) {
     # 6) What is the length of the credible set?
     obs_pip = susie_pip[happler_hap_id]
     has_highest_pip = as.integer(sum(obs_pip < susie_pip) == 0)
+    # TODO: fix this so that it also excludes other haplotypes besides obs_pip
     best_variant_pip = max(susie_pip[names(susie_pip) != names(obs_pip)])
     credible_set = NULL
     for (cs in names(fitted$sets$cs)) {
