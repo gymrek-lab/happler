@@ -179,17 +179,59 @@ def get_finemap_metrics(metrics_path: Path, log: Logger = None):
     # 3) What is the best PIP among the variants?
     # 4) Is the observed hap in a credible set?
     # 5) What is the purity of the credible set?
-    return np.loadtxt(
-        fname=metrics_path,
-        delimiter=" ",
-        dtype=[
-            ("pip", np.float64),
-            ("has_highest_pip", np.bool_),
-            ("best_variant_pip", np.float64),
-            ("in_credible_set", np.bool_),
-            ("cs_purity", np.float64),
-        ],
+    # 6) What is the length of the credible set?
+    # If you add or remove any metrics here, make sure to also change the
+    # "num_expected_vals" in get_metrics_mean_std so it knows the number of metrics
+    dtype = [
+        ("pip", np.float64),
+        ("has_highest_pip", np.bool_),
+        ("best_variant_pip", np.float64),
+        ("in_credible_set", np.bool_),
+        ("cs_purity", np.float64),
+        ("cs_length", np.float64)
+    ]
+    null_val = np.array([
+        (np.nan, False, np.nan, False, np.nan, np.nan),
+    ], dtype=dtype)
+    # if there are no observed haplotypes, then we can't compute LD
+    if not metrics_path.exists():
+        return null_val
+    metrics = np.loadtxt(fname=metrics_path, delimiter=" ", dtype=dtype)
+    if not metrics.shape:
+        log.debug(f"No metrics found in the metrics file {metrics_path}")
+        return null_val
+    return metrics
+
+
+def get_metrics_mean_std(metrics_vals: npt.NDArray, num_expected_vals: int = 6):
+    """
+    Compute the mean and standard error of the metrics
+
+    Parameters
+    ----------
+    metrics_vals: npt.NDArray
+        A numpy array containing the metrics for each observed hap
+    num_expected_vals: int, optional
+        The number of expected metrics
+
+    Returns
+    -------
+    npt.NDArray
+        A numpy array containing the mean of the metrics
+    npt.NDArray
+        A numpy array containing the standard error of the metrics
+    """
+    if len(metrics_vals) == 0:
+        return np.array([np.nan,]*6), np.array([np.nan,]*6)
+    nan_vals = np.isnan(metrics_vals["pip"])
+    metrics_vals = metrics_vals[~nan_vals]
+    mean_vals = np.array(
+        [np.nanmean(metrics_vals[field]) for field in metrics_vals.dtype.names],
     )
+    sem_vals = np.array(
+        [sem(metrics_vals[field], nan_policy="omit") for field in metrics_vals.dtype.names],
+    )
+    return mean_vals, sem_vals
 
 
 def count_shared(observed, causal, log, observed_id: str = None, causal_id: str = None):
@@ -219,6 +261,7 @@ def plot_params(
         vals_sem: npt.NDArray,
         val_title: str,
         val_color: npt.NDArray,
+        metrics: dict = None,
         hide_extras: bool = False,
     ):
     """
@@ -236,16 +279,22 @@ def plot_params(
         The name of the value that we are plotting
     val_color: npt.NDArray
         Whether to color each point corresponding to this value
-    hide_extras: bool
+    metrics: dict, optional
+        A dict mapping fine-mapping metrics to tuples of two lists of numpy arrays
+        containing means and standard errors of fine-mapping metrics for each observed hap
+    hide_extras: bool, optional
         Whether to hide the observed haps that have no causal hap match
     """
     figsize = matplotlib.rcParams["figure.figsize"]
     if len(params) > 75:
         figsize[0] = len(params) / 15
-    if len(params.dtype) > 5:
-        figsize[1] = len(params.dtype) * 1.25
+    num_rows = len(params.dtype)
+    if metrics is not None:
+        num_rows = len(params.dtype) + len(metrics)
+    if num_rows > 5:
+        figsize[1] = num_rows * 1.25
     fig, axs = plt.subplots(
-        nrows=len(params.dtype)+1, ncols=1,
+        nrows=num_rows+1, ncols=1,
         sharex=True, figsize=figsize,
     )
     fig.subplots_adjust(hspace=0)
@@ -275,6 +324,21 @@ def plot_params(
         axs[idx+1].plot(params[param], "-")
         axs[idx+1].set_ylabel(val_title, rotation="horizontal", ha="right")
         axs[idx+1].grid(axis="x")
+    if metrics is not None:
+        for idx, metric in enumerate(metrics.keys()):
+            curr_ax = axs[idx+len(params.dtype)+1]
+            val_title = metric
+            vals = np.concatenate(metrics[metric][0])
+            if len(np.unique(vals)) == 1:
+                curr_ax.remove()
+                continue
+            vals_sem = np.concatenate(metrics[metric][1])
+            for v in zip(x_vals, vals, vals_sem, val_color):
+                if hide_extras and v[3] != "green":
+                    continue
+                curr_ax.errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=3)
+            curr_ax.set_ylabel(val_title, rotation="horizontal", ha="right")
+            curr_ax.grid(axis="x")
     return fig
 
 
@@ -301,7 +365,7 @@ def plot_params_simple(
         The name of the value that we are plotting
     val_color: npt.NDArray
         Whether to color each point corresponding to this value
-    hide_extras: bool
+    hide_extras: bool, optional
         Whether to hide the observed haps that have no causal hap match
     """
     fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, figsize=(3.5, 3))
@@ -324,7 +388,13 @@ def plot_params_simple(
     return fig
 
 
-def group_by_rep(params: npt.NDArray, vals: npt.NDArray, causal_idxs: npt.NDArray, bools: npt.NDArray):
+def group_by_rep(
+        params: npt.NDArray,
+        vals: npt.NDArray,
+        causal_idxs: npt.NDArray,
+        bools: npt.NDArray,
+        metrics: npt.NDArray = None,
+    ):
     """
     Group replicates with identical parameter values
 
@@ -340,6 +410,8 @@ def group_by_rep(params: npt.NDArray, vals: npt.NDArray, causal_idxs: npt.NDArra
         The index of the causal haplotype that each observed haplotype belongs to
     bools: npt.NDArray
         An array of boolean values indicating whether each observed haplotype has a match
+    metrics: npt.NDArray
+        A numpy array of numpy arrays containing the metrics for each observed hap
 
     Returns
     -------
@@ -350,18 +422,25 @@ def group_by_rep(params: npt.NDArray, vals: npt.NDArray, causal_idxs: npt.NDArra
     """
     other_param_names = [name for name in params.dtype.names if name != "rep"]
     grouped_params = np.unique(params[other_param_names])
-    get_mean_std = lambda x: (np.mean(x), sem(x) if len(x) > 1 else np.nan)
+    get_mean_std = lambda x: (np.nanmean(x), sem(x, nan_policy="omit") if len(x) > 1 else np.nan)
     filter_causal_idxs = lambda x: np.unique(x[x != np.iinfo(np.uint8).max])
     grouped_vals = []
     grouped_sem = []
     grouped_bools = []
+    grouped_metrics = []
+    grouped_metrics_sem = []
     for group in grouped_params:
         subgrouped_vals = []
         subgrouped_sem = []
         subgrouped_bools = []
+        subgrouped_metrics = []
+        subgrouped_metrics_sem = []
         curr_vals = vals[params[other_param_names] == group]
         curr_causal_idxs = causal_idxs[params[other_param_names] == group]
         curr_bools = bools[params[other_param_names] == group]
+        curr_metrics = None
+        if metrics is not None:
+            curr_metrics = metrics[params[other_param_names] == group]
         # compute mean and std err for each causal match
         for causal_idx in filter_causal_idxs(np.concatenate(curr_causal_idxs)):
             try:
@@ -375,6 +454,14 @@ def group_by_rep(params: npt.NDArray, vals: npt.NDArray, causal_idxs: npt.NDArra
             subgrouped_vals.append(val_mean)
             subgrouped_sem.append(val_sem)
             subgrouped_bools.append(True)
+            if curr_metrics is not None:
+                curr_metrics_causal_idxs = np.concatenate([
+                    val[(indices == causal_idx) & curr_bool]
+                    for val, indices, curr_bool in zip(curr_metrics, curr_causal_idxs, curr_bools)
+                ])
+                metrics_mean, metrics_sem = get_metrics_mean_std(curr_metrics_causal_idxs)
+                subgrouped_metrics.append(metrics_mean)
+                subgrouped_metrics_sem.append(metrics_sem)
             # compute mean and std err for each unmatched observed hap
             for unmatched_idx in range(max([(~i).sum() for i in curr_bools])):
                 try:
@@ -389,9 +476,23 @@ def group_by_rep(params: npt.NDArray, vals: npt.NDArray, causal_idxs: npt.NDArra
                 subgrouped_vals.append(val_mean)
                 subgrouped_sem.append(val_sem)
                 subgrouped_bools.append(False)
+                if curr_metrics is not None:
+                    curr_metrics_unmatched_idxs = np.array([
+                        val[(indices == causal_idx) & ~curr_bool][unmatched_idx]
+                        for val, indices, curr_bool in zip(curr_metrics, curr_causal_idxs, curr_bools)
+                        if unmatched_idx < ((indices == causal_idx) & ~curr_bool).sum()
+                    ])
+                    metrics_mean, metrics_sem = get_metrics_mean_std(curr_metrics_unmatched_idxs)
+                    subgrouped_metrics.append(metrics_mean)
+                    subgrouped_metrics_sem.append(metrics_sem)
         grouped_vals.append(np.array(subgrouped_vals, dtype=object))
         grouped_sem.append(np.array(subgrouped_sem, dtype=object))
         grouped_bools.append(np.array(subgrouped_bools, dtype=object))
+        if curr_metrics is not None:
+            grouped_metrics.append(np.array(subgrouped_metrics, dtype=object))
+            grouped_metrics_sem.append(np.array(subgrouped_metrics_sem, dtype=object))
+    if curr_metrics is not None:
+        return grouped_params, grouped_vals, grouped_sem, grouped_bools, grouped_metrics, grouped_metrics_sem
     return grouped_params, grouped_vals, grouped_sem, grouped_bools
 
 
@@ -406,6 +507,13 @@ def group_by_rep(params: npt.NDArray, vals: npt.NDArray, causal_idxs: npt.NDArra
     default=None,
     show_default=True,
     help="Plot fine-mapping metrics, as well",
+)
+@click.option(
+    "--use-metric",
+    type=str,
+    default=None,
+    show_default="observed LD",
+    help="Use this fine-mapping metric to color the plot",
 )
 @click.option(
     "--region",
@@ -472,6 +580,7 @@ def main(
     observed_hap: Path,
     causal_hap: Path,
     metrics: Path,
+    use_metric: str = None,
     region: str = None,
     observed_id: str = None,
     causal_id: str = None,
@@ -543,30 +652,74 @@ def main(
                 log=log
             )
             for idx in range(len(params))
-        ])
-
-    # TODO: also handle the metrics in group_by_rep()
-    params, ld_vals, ld_sem, ld_extras_bool = group_by_rep(
-        params, ld_vals, ld_extras_idxs, ld_extras_bool,
-    )
+        ], dtype=object)
+        params, ld_vals, ld_sem, ld_extras_bool, metrics_vals, metrics_vals_sem = group_by_rep(
+            params, ld_vals, ld_extras_idxs, ld_extras_bool, metrics,
+        )
+        extract_metrics_vals = lambda x, idx: np.array([i[:, idx] for i in x], dtype=object)
+        metrics = {
+            name: (
+                extract_metrics_vals(metrics_vals, idx),
+                extract_metrics_vals(metrics_vals_sem, idx)
+            ) for idx, name in enumerate(metrics[0].dtype.names)
+        }
+    else:
+        params, ld_vals, ld_sem, ld_extras_bool = group_by_rep(
+            params, ld_vals, ld_extras_idxs, ld_extras_bool,
+        )
     del dtypes["rep"]
 
     if pickle_out:
         with open(output.with_suffix(".pickle"), "wb") as f:
-            pickle.dump([params, ld_vals, ld_sem, ld_extras_bool], f)
+            if metrics is not None:
+                pickle.dump([params, ld_vals, ld_sem, ld_extras_bool, metrics], f)
+            else:
+                pickle.dump([params, ld_vals, ld_sem, ld_extras_bool], f)
 
-    if len(dtypes) > 1 or metrics is not None:
-        merged = params
-        if metrics is not None:
-            merged = np.lib.recfunctions.merge_arrays([params, metrics], flatten=True)
-        fig = plot_params(merged, ld_vals, ld_sem, "causal LD", ld_extras_bool, hide_extras)
-    elif len(dtypes) == 1:
-        fig = plot_params_simple(params, ld_vals, ld_sem, "causal LD", ld_extras_bool, hide_extras)
+    if use_metric is None:
+        if len(dtypes) > 1:
+            fig = plot_params(
+                params,
+                ld_vals,
+                ld_sem,
+                "Observed LD",
+                ld_extras_bool,
+                metrics=metrics,
+                hide_extras=hide_extras
+            )
+        elif len(dtypes) == 1:
+            fig = plot_params_simple(
+                params,
+                ld_vals,
+                ld_sem,
+                "Observed LD",
+                ld_extras_bool,
+                hide_extras=hide_extras
+            )
     else:
-        raise ValueError("No parameter values found")
+        if len(dtypes) > 2:
+            fig = plot_params(
+                params,
+                metrics[use_metric][0],
+                metrics[use_metric][1],
+                use_metric,
+                ld_extras_bool,
+                hide_extras=hide_extras
+            )
+        elif len(dtypes) == 1:
+            fig = plot_params_simple(
+                params,
+                metrics[use_metric][0],
+                metrics[use_metric][1],
+                use_metric,
+                ld_extras_bool,
+                ld_extras_bool,
+                hide_extras=hide_extras
+            )
 
     fig.tight_layout()
-    fig.savefig(output, bbox_inches="tight", pad_inches=0.05)
+    fig.savefig(output,
+    bbox_inches="tight", pad_inches=0.05)
 
 if __name__ == "__main__":
     main()
