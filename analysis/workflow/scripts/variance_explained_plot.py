@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import pickle
 from pathlib import Path
 from logging import Logger
 
@@ -299,6 +300,9 @@ def main(
     max_r2_val = rsquareds.max()
 
     f, (ax1, ax2) = plt.subplots(1, 2)
+
+    with open(output.with_suffix(".pickle"), "wb") as picklef:
+        pickle.dump((explained_variances, rsquareds), picklef)
 
     ax1.scatter(explained_variances[:, 1], explained_variances[:, 0])
     ax1.axline([0, 0], [max_ev_val, max_ev_val])
