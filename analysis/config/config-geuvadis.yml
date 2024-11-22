@@ -42,24 +42,6 @@ snp_panel: "data/geuvadis/geuvadis_ensemble_phasing.pgen"
 # locus: 19:45401409-46401409 # center: 45901409 (APOe4)
 locus: data/geuvadis/geuvadis_eqtl_genes.full.liftover.bed
 modes:
- str:
-  pos: 19:45903857 # STR_691361
- snp:
-  pos: 19:45910672 # rs1046282
- hap:
-  alleles: [rs36046716:G, rs1046282:G] # 45892145, 45910672
-  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
- ld_range:
-  reps: 1
-  min_ld: 0
-  max_ld: 1
-  step: 0.1
-  min_af: 0.25
-  max_af: 0.75
-  # beta: [0.35]
-  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
-  alpha: [0.05]
-  random: false # whether to also produce random haplotypes
  run:
   pheno: data/geuvadis/phenos/{trait}.pheno
   SVs: data/geuvadis/pangenie_hprc_hg38_all-samples_bi_SVs-missing_removed.pgen
