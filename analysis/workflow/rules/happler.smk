@@ -47,6 +47,8 @@ rule sub_pheno:
 
 
 pheno = rules.sub_pheno.output.pheno if "{rep}" in out else config["pheno"]
+# if the pvar size is larger than 0.5 GB, just use the default memory instead
+rsrc_func = lambda x: max if .5 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000/1000 else min
 
 
 rule run:
@@ -72,12 +74,12 @@ rule run:
         dot=out + "/happler.dot",
     resources:
         runtime=lambda wildcards, input: (
-            min(45, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.5454649806119475 + 0.6935132147046765)
+            rsrc_func(input.gts)(45, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
         ),
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
         mem_mb=lambda wildcards, input: (
-            min(5000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 14.90840694595845 + 401.8011129664152)
+            rsrc_func(input.gts)(2500, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
         ),
     threads: 1
     log:
@@ -136,7 +138,7 @@ rule cond_linreg:
         png=out + "/cond_linreg.pdf",
     resources:
         runtime=lambda wildcards, input: (
-            min(50, 1.5 * Path(input.pvar).stat().st_size/1000 * (
+            rsrc_func(input.pgen)(50, 1.5 * Path(input.pvar).stat().st_size/1000 * (
                 0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
             ))
         ),
@@ -166,7 +168,7 @@ rule heatmap:
     output:
         png=out + "/heatmap.pdf",
     resources:
-        runtime=4,
+        runtime=10,
     log:
         logs + "/heatmap",
     benchmark:
@@ -232,7 +234,7 @@ rule transform:
         pvar=temp(out + "/happler.pvar"),
         psam=temp(out + "/happler.psam"),
     resources:
-        runtime=4,
+        runtime=10,
     log:
         logs + "/transform",
     benchmark:
@@ -332,7 +334,7 @@ rule merge:
         psam=temp(out + "/{ex}clude/merged.psam"),
     resources:
         runtime=lambda wildcards, input: (
-            min(10, Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844)
+            rsrc_func(input.gts)(10, Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844)
         ),
     log:
         logs + "/{ex}clude/merge",
@@ -374,9 +376,9 @@ rule finemapper:
         susie=out + "/{ex}clude/susie.rds",
     resources:
         runtime=lambda wildcards, input: (
-            min(120, Path(input.gt_pvar).stat().st_size/1000 * 0.08)
+            rsrc_func(input.gt)(120, Path(input.gt_pvar).stat().st_size/1000 * 0.3)
         ),
-        mem_mb = 7000,
+        mem_mb = 8500,
     threads: 1,
     log:
         logs + "/{ex}clude/finemapper",
@@ -395,7 +397,7 @@ rule pips:
     output:
         tsv=out + "/{ex}clude/susie_pips.tsv",
     resources:
-        runtime=5,
+        runtime=10,
     threads: 3,
     log:
         logs + "/{ex}clude/pips",
@@ -465,7 +467,7 @@ rule results:
         susie_pdf = out + "/{ex}clude/susie.pdf",
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
     resources:
-        runtime=5,
+        runtime=10,
     log:
         logs + "/{ex}clude/results",
     benchmark:
