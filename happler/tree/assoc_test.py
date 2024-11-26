@@ -325,7 +325,9 @@ class AssocTestSimpleSM(AssocTestSimple):
         # handle cases where our p-values are too powerful
         if pval == 0:
             # retrieve the pval at a higher precision
-            pval = AssocTestSimpleSM.pval_as_decimal(res.tvalues[-1], res.df_resid, precision=10)
+            pval = AssocTestSimpleSM.pval_as_decimal(
+                res.tvalues[-1], res.df_resid, precision=10
+            )
         if self.with_bic:
             return param, pval, stderr, bic
         else:

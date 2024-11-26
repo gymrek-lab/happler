@@ -474,7 +474,7 @@ class TreeBuilder:
                 self.log.debug(
                     f"The haplotype had a pval of {hap_indep_effect} < {self.indep_thresh}"
                     " in an additive model with the allele and parent"
-            )
+                )
             best_allele_idx = best_res_idx[best_allele]
             best_results = results[allele].data[best_allele_idx]
             node_res = self.results_type.from_np(best_results)

@@ -178,7 +178,12 @@ class TTestTerminator(Terminator):
         num_tests: int,
     ) -> bool:
         computed_val = self.compute_val(
-            parent_res, node_res, results, best_idx, num_samps, num_tests,
+            parent_res,
+            node_res,
+            results,
+            best_idx,
+            num_samps,
+            num_tests,
         )
         if isinstance(computed_val, bool):
             return computed_val
@@ -256,7 +261,12 @@ class BICTerminator(Terminator):
         num_tests: int,
     ):
         computed_val = self.compute_val(
-            parent_res, node_res, results, best_idx, num_samps, num_tests,
+            parent_res,
+            node_res,
+            results,
+            best_idx,
+            num_samps,
+            num_tests,
         )
         if isinstance(computed_val, bool):
             return computed_val
