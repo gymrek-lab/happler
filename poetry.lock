@@ -673,14 +673,12 @@ woff = ["brotli (>=1.0.1)", "brotlicffi (>=0.8.0)", "zopfli (>=0.1.4)"]
 
 [[package]]
 name = "haptools"
-version = "0.4.0"
+version = "0.4.2"
 description = "Ancestry and haplotype aware simulation of genotypes and phenotypes for complex trait analysis"
 optional = false
 python-versions = ">=3.7,<4.0"
-files = [
-    {file = "haptools-0.4.0-py3-none-any.whl", hash = "sha256:73fa3c4b6f6119f71e59b84de226c34808646075f61a7fa033d84f434ec59738"},
-    {file = "haptools-0.4.0.tar.gz", hash = "sha256:85dba0bde58e33ac71c298eb37e1272ca83276d06714d6516f8bc722c3455fe0"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 click = ">=8.0.3"
@@ -689,6 +687,12 @@ matplotlib = ">=3.5.1"
 numpy = ">=1.20.0"
 Pgenlib = ">=0.90.1"
 pysam = ">=0.19.0"
+
+[package.source]
+type = "git"
+url = "https://github.com/cast-genomics/haptools.git"
+reference = "f0ba9a3a464725fe66b9bbf31726af886c516374"
+resolved_reference = "f0ba9a3a464725fe66b9bbf31726af886c516374"
 
 [[package]]
 name = "humanfriendly"
@@ -2127,4 +2131,4 @@ test = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more-it
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4.0"
-content-hash = "1bb0c82732e8ba5ac5ac5ab616189cede6a4136e3652496196d6ba629fbf1172"
+content-hash = "269cf6b4b6f2ca34cd1b9b3483109a94fa95a3748ccd2a3051786d5e26b39091"
