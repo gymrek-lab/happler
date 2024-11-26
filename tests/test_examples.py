@@ -716,7 +716,7 @@ def test_1000G_simulated_maf(capfd):
     out_vars = ("rs1046282", "rs36046716")
 
     for maf in (0.05, 0.30, 0.31, 0.38):
-        cmd = f"run --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        cmd = f"run --out-thresh 1 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
         runner = CliRunner()
         result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
         captured = capfd.readouterr()
@@ -758,7 +758,7 @@ def test_1000G_real(capfd, caplog):
     caplog.set_level(logging.INFO)
 
     for maf in (0.05, 0.14, 0.22, 0.23, 0.35):
-        cmd = f"run --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        cmd = f"run --out-thresh 1 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
         runner = CliRunner()
         result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
         captured = capfd.readouterr()
