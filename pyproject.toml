@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.8,<4.0"
+python = ">=3.9,<4.0"
 click = ">=8.0.4"
 networkx = ">=2.6.3"
 scipy = ">=1.7.3"
