@@ -132,7 +132,7 @@ class TTestTerminator(Terminator):
                 # terminate if the effect sizes have gone in the opposite direction
                 self.log.debug("Terminated b/c effect size did not improve")
                 return True
-            # perform a two tailed, two-sample t-test using the difference of the effect sizes
+            # perform a one tailed, two-sample t-test using the difference of the effect sizes
             # first, we compute the standard error of the difference of the effect sizes
             std_err = np.sqrt(
                 ((results.data["stderr"] ** 2) + (parent_res.stderr**2)) / 2
@@ -178,7 +178,12 @@ class TTestTerminator(Terminator):
         num_tests: int,
     ) -> bool:
         computed_val = self.compute_val(
-            parent_res, node_res, results, best_idx, num_samps, num_tests,
+            parent_res,
+            node_res,
+            results,
+            best_idx,
+            num_samps,
+            num_tests,
         )
         if isinstance(computed_val, bool):
             return computed_val
@@ -256,7 +261,12 @@ class BICTerminator(Terminator):
         num_tests: int,
     ):
         computed_val = self.compute_val(
-            parent_res, node_res, results, best_idx, num_samps, num_tests,
+            parent_res,
+            node_res,
+            results,
+            best_idx,
+            num_samps,
+            num_tests,
         )
         if isinstance(computed_val, bool):
             return computed_val

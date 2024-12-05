@@ -230,7 +230,7 @@ def test_haplotype_transform():
         if idx != variant_idx:
             np.testing.assert_allclose(
                 hap.transform(gens, allele, idx),
-                gens_without_variant[:,(idx-1,)],
+                gens_without_variant[:, (idx - 1,)],
             )
 
 

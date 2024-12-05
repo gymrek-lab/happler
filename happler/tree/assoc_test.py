@@ -7,7 +7,6 @@ import numpy as np
 from scipy import stats
 import numpy.typing as npt
 import statsmodels.api as sm
-from scipy.stats import t as t_dist
 
 
 # We declare this class to be a dataclass to automatically define __init__ and a few
@@ -146,7 +145,7 @@ class AssocTest(ABC):
         ------
         ValueError
             This function is only valid when the t distribution is approximately
-            equivalent to the normal distribution. Thus, if df < 10000, we raise a
+            equivalent to the normal distribution. Thus, if df < 1000, we raise a
             ValueError to indicate that the function will not return an accurate value
 
         Returns
@@ -154,8 +153,8 @@ class AssocTest(ABC):
         Decimal
             An approximate, higher precision p-value for the provided t statistic
         """
-        if df < 10000:
-            raise ValueError("You need a larger sample size to approximate this p-value")
+        if df < 1000:
+            log.warning("You need a larger sample size to approximate this p-value")
         log10_pval = stats.norm.logsf(np.abs(t_stat)) / np.log(10) + np.log10(2)
         # set the desired precision
         getcontext().prec = precision
@@ -326,7 +325,9 @@ class AssocTestSimpleSM(AssocTestSimple):
         # handle cases where our p-values are too powerful
         if pval == 0:
             # retrieve the pval at a higher precision
-            pval = AssocTestSimpleSM.pval_as_decimal(res.tvalues[-1], res.df_resid, precision=10)
+            pval = AssocTestSimpleSM.pval_as_decimal(
+                res.tvalues[-1], res.df_resid, precision=10
+            )
         if self.with_bic:
             return param, pval, stderr, bic
         else:

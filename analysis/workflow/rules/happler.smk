@@ -24,11 +24,38 @@ def parse_locus(locus):
     return chrom, start, end
 
 
+rule sub_pheno:
+    """subset the phenotype file to include only the desired replicate"""
+    input:
+        pheno=config["pheno"],
+    params:
+        rep=lambda wildcards: int(wildcards.rep)+2,
+    output:
+        pheno=out + "/phen.pheno",
+    resources:
+        runtime=5,
+    threads: 1,
+    log:
+        logs + "/sub_pheno",
+    benchmark:
+        bench + "/sub_pheno",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "cut -f 1,{params.rep} {input.pheno} | "
+        "(echo -e \"#IID\\thap\" && tail -n+2) >{output.pheno} 2>{log}"
+
+
+pheno = rules.sub_pheno.output.pheno if "{rep}" in out else config["pheno"]
+# if the pvar size is larger than 0.5 GB, just use the default memory instead
+rsrc_func = lambda x: max if .5 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000/1000 else min
+
+
 rule run:
     """ execute happler! """
     input:
         gts=config["snp_panel"],
-        pts=config["pheno"],
+        pts=pheno,
         covar=config["covar"],
     params:
         thresh=lambda wildcards: 0.05 if "alpha" not in wildcards else wildcards.alpha,
@@ -36,22 +63,23 @@ rule run:
         covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else "",
         maf = check_config("min_maf", 0),
         indep=lambda wildcards: 0.05 if "indep_alpha" not in wildcards else wildcards.indep_alpha,
+        max_signals=3,
+        max_iterations=3,
+        out_thresh=check_config("out_thresh", 5e-8),
+        keep_SNPs="--remove-SNPs " if not ("{rep}" in out) else "",
     output:
-        hap=out + "/happler.hap",
+        hap=ensure(out + "/happler.hap", non_empty=True),
         gz=out + "/happler.hap.gz",
         idx=out + "/happler.hap.gz.tbi",
         dot=out + "/happler.dot",
     resources:
         runtime=lambda wildcards, input: (
-            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.5454649806119475 + 0.6935132147046765
-            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 45
+            rsrc_func(input.gts)(45, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
         ),
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
-        # mem_mb=lambda wildcards, threads: threads*4.57,
         mem_mb=lambda wildcards, input: (
-            Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 14.90840694595845 + 401.8011129664152
-            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 5000
+            rsrc_func(input.gts)(2500, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
         ),
     threads: 1
     log:
@@ -62,8 +90,10 @@ rule run:
         "happler"
     shell:
         "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
-        "--discard-multiallelic --region {params.region} {params.covar} --indep-thresh"
-        " {params.indep} -t {params.thresh} --show-tree {input.gts} {input.pts} &>{log}"
+        "--max-signals {params.max_signals} --max-iterations {params.max_iterations} "
+        "--discard-multiallelic --region {params.region} {params.keep_SNPs}"
+        "{params.covar}--indep-thresh {params.indep} -t {params.thresh} "
+        "--out-thresh {params.out_thresh} --show-tree {input.gts} {input.pts} &>{log}"
         " && haptools index -o {output.gz} {output.hap} &>>{log}"
 
 
@@ -100,7 +130,7 @@ rule cond_linreg:
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
         hap=rules.run.output.hap,
-        pts=config["pheno"],
+        pts=pheno,
     params:
         maf = check_config("min_maf", 0),
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
@@ -108,9 +138,9 @@ rule cond_linreg:
         png=out + "/cond_linreg.pdf",
     resources:
         runtime=lambda wildcards, input: (
-            1.5 * Path(input.pvar).stat().st_size/1000 * (
+            rsrc_func(input.pgen)(50, 1.5 * Path(input.pvar).stat().st_size/1000 * (
                 0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
-            ) if Path(input.pgen).suffix == ".pgen" and check_config("dynamic_resources") else 50
+            ))
         ),
     log:
         logs + "/cond_linreg",
@@ -132,13 +162,13 @@ rule heatmap:
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
         hap=rules.run.output.hap,
-        pts=config["pheno"],
+        pts=pheno,
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
         png=out + "/heatmap.pdf",
     resources:
-        runtime=4,
+        runtime=10,
     log:
         logs + "/heatmap",
     benchmark:
@@ -196,7 +226,7 @@ rule transform:
         pgen=config["snp_panel"],
         pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["snp_panel"]).with_suffix(".psam"),
-        pts=config["pheno"],
+        pts=pheno,
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
@@ -204,7 +234,7 @@ rule transform:
         pvar=temp(out + "/happler.pvar"),
         psam=temp(out + "/happler.psam"),
     resources:
-        runtime=4,
+        runtime=10,
     log:
         logs + "/transform",
     benchmark:
@@ -223,7 +253,7 @@ rule linreg:
         hap=rules.transform.output.pgen,
         hap_pvar=rules.transform.output.pvar,
         hap_psam=rules.transform.output.psam,
-        pts=config["pheno"],
+        pts=pheno,
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
@@ -252,7 +282,7 @@ rule sv_ld:
         sv_pvar=lambda wildcards: Path(config["SVs"]).with_suffix(".pvar"),
         sv_psam=lambda wildcards: Path(config["SVs"]).with_suffix(".psam"),
     params:
-        start=lambda wildcards: max(0, int(parse_locus(wildcards.locus)[1])-1000000),
+        start=lambda wildcards: min(0, int(parse_locus(wildcards.locus)[1])-1000000),
         end=lambda wildcards: int(parse_locus(wildcards.locus)[2])+1000000,
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
         maf = check_config("min_maf", 0),
@@ -304,8 +334,7 @@ rule merge:
         psam=temp(out + "/{ex}clude/merged.psam"),
     resources:
         runtime=lambda wildcards, input: (
-            Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844
-            if Path(input.gts).suffix == ".pgen" and check_config("dynamic_resources") else 10
+            rsrc_func(input.gts)(10, Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844)
         ),
     log:
         logs + "/{ex}clude/merge",
@@ -333,7 +362,7 @@ rule finemapper:
         gt=lambda wildcards: finemapper_input(wildcards).pgen,
         gt_pvar=lambda wildcards: finemapper_input(wildcards).pvar,
         gt_psam=lambda wildcards: finemapper_input(wildcards).psam,
-        phen=config["pheno"],
+        phen=pheno,
     params:
         outdir=lambda wildcards, output: Path(output.susie).parent,
         exclude_causal="NULL",
@@ -341,17 +370,15 @@ rule finemapper:
         # num_signals=lambda wildcards: get_num_haplotypes(
         #     expand(rules.run.output.hap, **wildcards)[0]
         # ) + 1,
-        num_signals=5,
+        num_signals=10,
         # TODO: also add MAF filter
     output:
         susie=out + "/{ex}clude/susie.rds",
     resources:
-#        runtime=lambda wildcards, input: (
-#            Path(input.gt_pvar).stat().st_size/1000 * 0.08
-#            if Path(input.gt).suffix == ".pgen" and check_config("dynamic_resources") else 75
-#        ),
-        runtime=120,
-        mem_mb = 7000,
+        runtime=lambda wildcards, input: (
+            rsrc_func(input.gt)(120, Path(input.gt_pvar).stat().st_size/1000 * 0.3)
+        ),
+        mem_mb = 8500,
     threads: 1,
     log:
         logs + "/{ex}clude/finemapper",
@@ -370,7 +397,7 @@ rule pips:
     output:
         tsv=out + "/{ex}clude/susie_pips.tsv",
     resources:
-        runtime=5,
+        runtime=10,
     threads: 3,
     log:
         logs + "/{ex}clude/pips",
@@ -387,11 +414,11 @@ rule metrics:
     input:
         finemap=expand(rules.finemapper.output.susie, ex="in", allow_missing=True),
         obs_hap=rules.run.output.hap,
-        caus_hap=config["hap_file"],
+        # caus_hap=config["hap_file"],
     output:
         metrics=out + "/susie_metrics.tsv",
     resources:
-        runtime=5,
+        runtime=10,
     threads: 6,
     log:
         logs + "/metrics",
@@ -427,11 +454,11 @@ rule results:
     """
     input:
         gt=rules.finemapper.input.gt,
-        phen=config["pheno"],
+        phen=pheno,
         susie=rules.finemapper.output.susie,
         happler_hap=results_happler_hap_input,
-        causal_gt=config["causal_gt"].pgen if "causal_gt" in config else [],
-        causal_hap=results_causal_hap_input,
+        # causal_gt=config["causal_gt"].pgen if "causal_gt" in config else [],
+        # causal_hap=results_causal_hap_input,
     params:
         outdir=lambda wildcards, output: Path(output.susie_pdf).parent,
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
@@ -440,7 +467,7 @@ rule results:
         susie_pdf = out + "/{ex}clude/susie.pdf",
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
     resources:
-        runtime=5,
+        runtime=10,
     log:
         logs + "/{ex}clude/results",
     benchmark:
@@ -485,7 +512,7 @@ rule gwas:
         pgen=(rules.merge_SVs if check_config("SVs") else rules.merge).output.pgen,
         pvar=(rules.merge_SVs if check_config("SVs") else rules.merge).output.pvar,
         psam=(rules.merge_SVs if check_config("SVs") else rules.merge).output.psam,
-        pts=config["pheno"],
+        pts=pheno,
         covar=config["covar"],
     params:
         maf = check_config("min_maf", 0),

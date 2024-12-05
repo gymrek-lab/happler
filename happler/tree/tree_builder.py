@@ -89,10 +89,6 @@ class TreeBuilder:
         """
         Run the tree builder and create a tree rooted at the provided variant
         """
-        if self.tree is not None:
-            raise AssertionError(
-                "A tree already exists for this TreeBuilder. Please create a new one."
-            )
         # step one: initialize the tree
         self.tree = Tree(log=self.log)
         # step two: create a haplotype
@@ -478,7 +474,7 @@ class TreeBuilder:
                 self.log.debug(
                     f"The haplotype had a pval of {hap_indep_effect} < {self.indep_thresh}"
                     " in an additive model with the allele and parent"
-            )
+                )
             best_allele_idx = best_res_idx[best_allele]
             best_results = results[allele].data[best_allele_idx]
             node_res = self.results_type.from_np(best_results)
