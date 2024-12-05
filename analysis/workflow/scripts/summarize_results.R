@@ -20,17 +20,22 @@ source("workflow/scripts/utils.R")
 
 write("Loading input data", stderr())
 region = snakemake@params[["region"]]
+phen = snakemake@input[["phen"]]
+samples = readPSAM(snakemake@input[["gt"]], samples=readPheno(phen)[,1])
 # import the finemap and susie results
 # and the path to an output directory
-X = readPGEN(snakemake@input[["gt"]], region=region)
+X = readPGEN(snakemake@input[["gt"]], region=region, samples=samples[,2])
 # also load the positions of each of the variants
 pos = readPVAR(snakemake@input[["gt"]], region=region)
 if (length(snakemake@input[["causal_gt"]])) {
-    causal_gt = readPGEN(snakemake@input[["causal_gt"]], region=region)
+    write("Loading causal genotype data too", stderr())
+    causal_gt_file = snakemake@input[["causal_gt"]]
+    causal_gt_samples = readPSAM(causal_gt_file, samples=readPheno(phen)[,1])
+    causal_gt = readPGEN(causal_gt_file, region=region, samples=causal_gt_samples[,2])
     X = cbind(X, causal_gt)
     causal_variant = colnames(causal_gt)[1]
     # also load the positions of each of the variants
-    pos = c(pos, readPVAR(snakemake@input[["causal_gt"]], region=region))
+    pos = c(pos, readPVAR(causal_gt_file, region=region))
     write(paste("Loaded", length(pos), "positions"), stderr())
 } else {
     causal_variant = NULL
@@ -48,43 +53,24 @@ hap = FALSE
 causal_hap_is_provided = FALSE
 if (length(snakemake@input[["happler_hap"]]) > 0) {
     hap = TRUE
-    happler_haplotype = file(snakemake@input[["happler_hap"]], "rt")
+    happler_haplotype = snakemake@input[["happler_hap"]]
 }
 if (length(snakemake@params[["causal_hap"]]) > 0) {
     causal_hap_is_provided = TRUE
-    causal_haplotype = file(snakemake@params[["causal_hap"]], "rt")
+    causal_haplotype = snakemake@params[["causal_hap"]]
 }
 
 if (hap) {
     write("Parsing happler hap file", stderr())
-    while(TRUE) {
-        line = readLines(happler_haplotype, 1)
-        # we assume the first line in the hap file that begins with H denotes the haplotype
-        if (grepl("^H\\t", line)) break
-    }
-    # extract the start, end, and ID of the haplotype
-    happler_hap = as.integer(strsplit(line, "\t")[[1]][c(3,4)])
-    happler_hap_id = strsplit(line, "\t")[[1]][c(5)]
+    happler_hap = readHap(happler_haplotype)
 }
 if (causal_hap_is_provided) {
     write("Parsing causal hap file", stderr())
-    while(TRUE) {
-        line = readLines(causal_haplotype, 1)
-        # we assume the first line in the hap file that begins with H denotes the haplotype
-        if (grepl("^H\\t", line)) break
-    }
-    # extract the start, end, and ID of the haplotype
-    causal_hap = as.integer(strsplit(line, "\t")[[1]][c(3,4)])
-    causal_hap_id = strsplit(line, "\t")[[1]][c(5)]
-    stopifnot(causal_hap_id == causal_variant)
-    haplotypes = t(data.frame(
-        causal_hap = c("start"=causal_hap[1], "end"=causal_hap[2], "id"=causal_hap_id),
-        happler_hap = c("start"=happler_hap[1], "end"=happler_hap[2], "id"=happler_hap_id)
-    ))
-} else {
-    haplotypes = t(data.frame(
-        happler_hap = c("start"=happler_hap[1], "end"=happler_hap[2], "id"=happler_hap_id)
-    ))
+    causal_hap = readHap(causal_haplotype)
+    stopifnot(causal_variant %in% causal_hap["id"])
+    haplotypes = cbind(causal_hap, happler_hap)
+} else if (hap) {
+    haplotypes = happler_hap
 }
 
 write("Formatting genotypes and creating output dir", stderr())
@@ -249,7 +235,7 @@ if (hap) {
 } else {
     pip_plot(susie_pip, X, b, pos, susie_cs=names(susie_pip[fitted$sets$cs[['L1']]]))
 }
-ggsave(paste0(out,'/susie.pdf'), width=10, height=5, device='pdf')
+ggsave(paste0(out,'/susie.pdf'), width=6, height=5, device='pdf')
 dev.off()
 
 if (!is.null(finemap_results)) {
@@ -259,6 +245,6 @@ if (!is.null(finemap_results)) {
     } else {
         pip_plot(finemap_pip, X, b, pos)
     }
-    ggsave(paste0(out,'/finemap.pdf'), width=10, height=5, device='pdf')
+    ggsave(paste0(out,'/finemap.pdf'), width=6, height=5, device='pdf')
     while (!is.null(dev.list())) dev.off()
 }

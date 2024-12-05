@@ -28,6 +28,7 @@ def make_manhattan(
     pvals: npt.NDArray,
     red_mask: npt.NDArray = None,
     exclude_mask: npt.NDArray = None,
+    orange_mask: npt.NDArray = None,
 ):
     """
     Add a Manhattan plot to the desired Axes object
@@ -44,8 +45,18 @@ def make_manhattan(
         If provided, a bool array of pvals to highlight in red
     exclude_mask: npt.NDArray, optional
         If provided, a bool array of pvals to exclude from plotting
+    orange_mask: npt.NDArray, optional
     """
-    pvals = -np.log10(pvals)
+    try:
+        pvals = -np.log10(pvals)
+    except TypeError:
+        # handle Decimals mixed in with np.float64s
+        for idx in range(len(pvals)):
+            try:
+                pvals[idx] = -np.log10(pvals[idx])
+            except TypeError:
+                pvals[idx] = -np.float64(pvals[idx].log10())
+    pvals = pvals.astype(np.float64)
     if exclude_mask is not None:
         positions = positions[exclude_mask]
         pvals = pvals[exclude_mask]
@@ -54,6 +65,8 @@ def make_manhattan(
         blue_mask = np.logical_not(red_mask)
         ax.scatter(positions[blue_mask], pvals[blue_mask])
         ax.scatter(positions[red_mask], pvals[red_mask], c="red")
+        if orange_mask is not None:
+            ax.scatter(positions[orange_mask], pvals[orange_mask], c="orange")
     else:
         ax.scatter(positions, pvals)
 
@@ -93,7 +106,7 @@ def condition_on_variable(gts: Genotypes, pt: Phenotypes, covars: Genotypes = No
     "-i",
     "--hap-id",
     type=str,
-    show_default="the first haplotype",
+    show_default="all haplotypes",
     help=(
         "A haplotype ID from the .hap file to plot"
         "(ex: '-i H1')."
@@ -154,19 +167,16 @@ def main(
     1) the haplotype as a covariate
     2) the haplotypes' alleles as (multiple) covariates
     3) each of the haplotypes' alleles as a covariate, where we produce one plot for each allele
+    4) the original manhattan plot without any conditioning
     """
     log = getLogger("plot_conditional_regressions", verbosity)
 
     # load a haplotype and its alleles
     hps = Haplotypes(haplotype, log=log)
     hps.read(haplotypes=(set((hap_id,)) if hap_id is not None else None))
-    # if the user didn't specify a hap ID, just use the first one
-    if hap_id is None:
-        hap_id = next(iter(hps.data.keys()))
-        hps.subset(haplotypes=(hap_id,), inplace=True)
-    hap = hps.data[hap_id]
     # get the variants from the haplotype
-    variants = tuple(var.id for var in hap.variants)
+    # use dict to remove duplicate IDs
+    variants = tuple(dict.fromkeys(var.id for hap in hps.data.values() for var in hap.variants))
 
     # load just the first phenotype
     pts = Phenotypes(phenotype, log=log)
@@ -204,7 +214,7 @@ def main(
     log.info("Creating haplotype plot")
     # first, encode the haplotype as covariate
     make_manhattan(axs[0], positions, condition_on_variable(gts, pts, hap_gt), red_mask)
-    axs[0].set_title("Haplotype")
+    axs[0].set_title("Haplotype"+("s" if len(hap_gt.variants)-1 else ""))
     log.info("Creating haplotype alleles plot")
     # now, encode the haplotypes' alleles as separate covariates
     covars = gts.subset(variants=variants)
@@ -213,7 +223,9 @@ def main(
     for snp in variants:
         exclude[gts._var_idx[snp]] = False
     make_manhattan(axs[1], positions, condition_on_variable(gts, pts, covars), red_mask, exclude)
-    axs[1].set_title("Haplotype's Alleles")
+    # f-string expressions cannot include a backslash
+    f_str_quotation_plural_agh = 's\'' if len(hap_gt.variants)-1 else '\'s'
+    axs[1].set_title(f"Haplotype{f_str_quotation_plural_agh} Alleles")
     # finally, encode each of the alleles as a covariate in a separate plot
     for idx in range(len(variants)):
         log.info(f"Creating plot #{idx+3}")
@@ -224,13 +236,29 @@ def main(
         axs[idx+2].set_title(variants[idx])
     if show_original:
         log.info("Creating original manhattan plot")
-        make_manhattan(axs[-1], positions, condition_on_variable(gts, pts), red_mask)
+        # we're going to have to append the haplotypes to the original SNP genotypes,
+        # so we'll have to extend the red mask to include the haplotypes
+        # and create an orange mask for the haplotypes themselves
+        red_mask = np.append(red_mask, np.zeros(len(hap_gt.variants), dtype=np.bool_))
+        orange_mask = np.zeros(red_mask.shape[0], dtype=np.bool_)
+        orange_mask[-len(hap_gt.variants):] = 1
+        new_gt = Genotypes.merge_variants((gts, hap_gt), fname=None, log=log)
+        # now, let's finally plot everything and append the haps to the gts
+        make_manhattan(
+            axs[-1],
+            new_gt.variants["pos"],
+            condition_on_variable(new_gt, pts),
+            red_mask,
+            exclude_mask=None,
+            orange_mask=orange_mask,
+        )
         axs[-1].set_title("")
 
     # now, tidy up and save the plot
     log.info("Writing out plot")
     fig.supylabel("-log10(pval)")
     fig.supxlabel("Chromosomal Position")
+    fig.suptitle("Manhattan plots when conditioning on...")
     fig.tight_layout()
     fig.savefig(output)
 

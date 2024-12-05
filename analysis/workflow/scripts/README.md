@@ -6,6 +6,12 @@ All python scripts implement the --help argument. For bash, awk, and R scripts, 
 ## [choose_different_ld.py](choose_different_ld.py)
 Choose haplotype alleles such that their SNPs have a range of strengths of LD with the causal haplotype.
 
+## [compute_pgen_ld.py](compute_pgen_ld.py)
+Quickly compute the LD between a single variant and all other variants in a PGEN file.
+
+## [conditional_regression_plots.py](conditional_regression_plots.py)
+Make manhattan plots for a region after conditioning on 1) haplotypes and 2) their alleles together and 3) separately. Also, 4) show the original manhattan plot without any conditioning.
+
 ## [create_hap_file.sh](create_hap_file.sh)
 Create a [.hap file](https://haptools.readthedocs.io/en/stable/formats/haplotypes.html) for use by haptools when simulating causal variables.
 
@@ -32,6 +38,12 @@ Create a manhattan plot to visualize the results of a GWAS.
 
 ## [merge_plink.py](merge_plink.py)
 Merge variants from two PGEN files that have the same set of samples.
+
+## [midway_manhattan_summary.py](midway_manhattan_summary.py)
+Summarize the results of multiple midway manhattan plots via an ROC curve
+
+## [midway_manhattan.bash](midway_manhattan.bash)
+Create a "midway" manhattan plot depicting the p-values on a branch of a tree mid-way through happler's tree-building process.
 
 ## [parameter_plot.py](parameter_plot.py)
 Plot the LD between a causal haplotype and a set of observed haplotypes across a range of hyper-parameters.

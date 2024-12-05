@@ -1,12 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from decimal import Decimal, getcontext
 
 import numpy as np
 from scipy import stats
 import numpy.typing as npt
 import statsmodels.api as sm
-from scipy.stats import t as t_dist
 
 
 # We declare this class to be a dataclass to automatically define __init__ and a few
@@ -92,8 +92,8 @@ class AssocTest(ABC):
 
     Attributes
     ----------
-    pval_thresh : float, optional
-        The threshold of significance
+    with_bic: bool
+        Whether to also output the BIC (Bayesian Information Criteria)
     """
 
     def __init__(self, with_bic: bool = False):
@@ -124,6 +124,43 @@ class AssocTest(ABC):
         standardized[:, zero_elements] = np.zeros((X.shape[0], np.sum(zero_elements)))
         return standardized
 
+    @staticmethod
+    def pval_as_decimal(t_stat: float, df: int, precision: int = 1000) -> Decimal:
+        """
+        Given a t statistic, return the associated p-value as a high precision Decimal
+
+        This can be helpful when a p-value is too small to be represented by the
+        precision in python float64s
+
+        Parameters
+        ----------
+        t_stat : float
+            The t statistic from a simple linear model
+        df : int
+            The degrees of freedom of the associated t distribution
+        precision: int
+            The precision of the returned value
+
+        Raises
+        ------
+        ValueError
+            This function is only valid when the t distribution is approximately
+            equivalent to the normal distribution. Thus, if df < 1000, we raise a
+            ValueError to indicate that the function will not return an accurate value
+
+        Returns
+        -------
+        Decimal
+            An approximate, higher precision p-value for the provided t statistic
+        """
+        if df < 1000:
+            log.warning("You need a larger sample size to approximate this p-value")
+        log10_pval = stats.norm.logsf(np.abs(t_stat)) / np.log(10) + np.log10(2)
+        # set the desired precision
+        getcontext().prec = precision
+        # calculate p-value
+        return Decimal(10) ** Decimal(log10_pval)
+
     @abstractmethod
     def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
@@ -151,7 +188,7 @@ class AssocTestSimple(AssocTest):
         super().__init__(with_bic=with_bic)
         self.return_dtype = [
             ("beta", np.float64),
-            ("pval", np.float64),
+            ("pval", object),
             ("stderr", np.float64),
         ]
         if self.with_bic:
@@ -281,14 +318,20 @@ class AssocTestSimpleSM(AssocTestSimple):
             appended to the end if ``self.with_bic`` is True.
         """
         res = self._get_sm_result(x, y)
-        params = res.params
-        stderr = res.bse
-        pvals = res.pvalues
+        param = res.params[-1]
+        stderr = res.bse[-1]
+        pval = res.pvalues[-1]
         bic = res.bic
+        # handle cases where our p-values are too powerful
+        if pval == 0:
+            # retrieve the pval at a higher precision
+            pval = AssocTestSimpleSM.pval_as_decimal(
+                res.tvalues[-1], res.df_resid, precision=10
+            )
         if self.with_bic:
-            return params[-1], pvals[-1], stderr[-1], bic
+            return param, pval, stderr, bic
         else:
-            return params[-1], pvals[-1], stderr[-1]
+            return param, pval, stderr
 
 
 class AssocTestSimpleCovariates(AssocTestSimpleSM):

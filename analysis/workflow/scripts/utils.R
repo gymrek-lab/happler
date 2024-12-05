@@ -31,7 +31,9 @@ readPVAR_region = function(pfile, region) {
   which(pvar$CHROM == chrom & pvar$POS > start_end[1] & pvar$POS < start_end[2])
 }
 
-readPGEN = function(pfile, region=NULL) {
+# If provided, the samples argument must be the indices of the desired samples. You can
+# retrieve this from the second column of the output of readPSAM()
+readPGEN = function(pfile, region=NULL, samples=NULL) {
   if (endsWith(pfile, ".pgen")) {
     pfile = substr(pfile, 1, nchar(pfile)-5)
   }
@@ -47,19 +49,37 @@ readPGEN = function(pfile, region=NULL) {
   pgenlibr::ClosePgen(pgen)
   pgenlibr::ClosePvar(pvar)
   colnames(X) = names(readPVAR(pfile, region=region))
-  X
+  if (is.null(samples)) {
+    X
+  } else {
+    X[samples,]
+  }
 }
 
-readPSAM = function(pfile) {
+readPSAM = function(pfile, samples=NULL) {
   if (endsWith(pfile, ".pgen")) {
     pfile = substr(pfile, 1, nchar(pfile)-5)
   }
   psam = data.table::fread(paste0(pfile, '.psam'), sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
-  psam[,1]
+  if (is.null(samples)) {
+    idxs = seq(1, nrow(psam))
+  } else {
+    idxs = match(intersect(psam[,1], samples), psam[,1])
+  }
+  data.frame(ids=psam[,1][idxs], idxs)
 }
 
-readPheno = function(pheno) {
-  data.table::fread(pheno, sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
+# If a samples subset is specified, the phenotypes will also be reordered to match
+readPheno = function(pheno, samples=NULL) {
+  pheno = data.table::fread(pheno, sep="\t", header=T, stringsAsFactors = FALSE, check.names=TRUE, data.table=FALSE)
+  if (!is.null(samples)) {
+    idxs = match(intersect(pheno[,1], samples), pheno[,1])
+    pheno = pheno[idxs,]
+    # now, reorder so the ordering matches
+    idxs = match(samples, pheno[,1])
+    pheno = pheno[idxs,]
+  }
+  pheno
 }
 
 save_curr_env = function(env = parent.frame(), filePath = "myenv.RData") {
@@ -76,4 +96,21 @@ save_curr_env = function(env = parent.frame(), filePath = "myenv.RData") {
   # or load(filePath) to inspect the environment.
 
   save(list = ls(all.names = TRUE, envir = env), file = filePath, envir = env)
+}
+
+readHap = function(hapfile) {
+  # Return a data.frame with the start, end, and ID columns of the haplotyp lines
+  # in the .hap file
+  # Parameters:
+  #   hapfile: The path to the .hap file
+  data <- tryCatch(read.table(hapfile, header = FALSE, fill = TRUE, stringsAsFactors = FALSE), error=function(e) data.frame())
+  if (nrow(data) != 0) {
+    # Filter rows that start with "H" and select columns 3 to 5
+    h_data <- data[grep("^H", data$V1), c(3, 4, 5)]
+    # Rename the columns for clarity (optional)
+    colnames(h_data) <- c("start", "end", "id")
+    h_data
+  } else {
+    data
+  }
 }

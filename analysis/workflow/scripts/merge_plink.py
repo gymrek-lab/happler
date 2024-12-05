@@ -1,8 +1,10 @@
 #!/usr/bin/env python
+from pathlib import Path
 
 import click
 import numpy as np
-from pathlib import Path
+
+from haptools.logging import getLogger
 from haptools.data import GenotypesPLINK
 
 
@@ -30,13 +32,22 @@ from haptools.data import GenotypesPLINK
     show_default=True,
     help="Whether to use the variants in file2 to replace those in file1",
 )
+@click.option(
+    "-v",
+    "--verbosity",
+    type=click.Choice(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
+    default="DEBUG",
+    show_default=True,
+    help="The level of verbosity desired",
+)
 def main(
     file1: Path,
     file2: Path,
     output: Path,
     region: str = None,
     maf: float = None,
-    replace: bool = True
+    replace: bool = True,
+    verbosity: str = "DEBUG",
 ):
     """
     Merge variants from two PGEN files that have the same set of samples
@@ -59,22 +70,34 @@ def main(
         You should only set this flag to False if you are confident that file1 and
         file2 have no conflicting variant IDs. Otherwise, you may end up with an
         output fileset that has duplicate IDs!
+    verbosity: str, optional
+        How verbose do we want the log to be?
     """
-    gts1 = GenotypesPLINK(file1)
-    gts2 = GenotypesPLINK(file2)
+    log = getLogger("merge_plink", verbosity)
+
+    log.info("Loading genotypes from both files")
+    gts1 = GenotypesPLINK(fname=file1, log=log)
+    gts2 = GenotypesPLINK(fname=file2, log=log)
 
     gts1.read(region=region)
     gts2.read(region=region)
 
     if maf is not None:
+        log.info("Subsetting by MAF")
         for gts in (gts1, gts2):
             gts.check_missing()
             gts.check_biallelic()
             gts.check_maf(threshold=maf, discard_also=True)
 
-    assert gts1.samples == gts2.samples
+    if gts1.samples != gts2.samples:
+        log.info("Getting intersection of samples in order of file1")
+        samples = frozenset(gts2.samples)
+        samples = tuple(samp for samp in gts1.samples if samp in samples)
+        for gts in (gts1, gts2):
+            gts.subset(samples=samples, inplace=True)
 
     if replace:
+        log.info("Replacing variants with shared IDs")
         # which variants are shared? what are their indices within each file?
         common_ids, idxs_in_1, idxs_in_2 = np.intersect1d(
             gts1.variants["id"],
@@ -88,10 +111,11 @@ def main(
         gts2.variants = np.delete(gts2.variants, idxs_in_2)
         gts2.data = np.delete(gts2.data, idxs_in_2, axis=1)
 
-    # append any variants from file2 to the end of file1
+    log.info("Appending any variants from file2 to the end of file1")
     gts1.variants = np.concatenate((gts1.variants, gts2.variants))
     gts1.data = np.concatenate((gts1.data, gts2.data), axis=1)
 
+    log.info("Writing output")
     gts1.fname = output
     gts1.write()
     

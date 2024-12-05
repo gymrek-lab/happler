@@ -5,6 +5,7 @@ import click
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from decimal import Decimal
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from pandas.api.types import CategoricalDtype
@@ -16,6 +17,18 @@ AXIS_LABELSIZE = 2.5
 LABEL_FONTSIZE = 4
 TICK_FONTSIZE = 4
 POINT_SIZE = 0.75
+
+
+def custom_isinf(x):
+    if isinstance(x, float):
+        return np.isinf(x)
+    elif isinstance(x, Decimal):
+        try:
+            return x.is_infinite()
+        except DecimalException:
+            return False
+    else:
+        return False
 
 
 @click.command()
@@ -149,6 +162,7 @@ def main(
             sep="\t",
             header=0,
             usecols=keep_cols,
+            converters={"P": lambda val: Decimal(val if val != "NA" else 1)},
         ).rename(columns=plink_cols)
         df = df.sort_values("pos")
         pos_range = max(df["pos"]) - min(df["pos"])
@@ -182,7 +196,7 @@ def main(
             v_ids = df[df["id"].isin(red_ids)]['id']
             x_ids = df[df["id"].isin(red_ids)]['pos']
             y_ids = df[df["id"].isin(red_ids)]['-log10(p)']
-            if np.any(np.isinf(y_ids)):
+            if np.any(np.vectorize(custom_isinf)(y_ids)):
                 raise ValueError(f"The p-values for {red_ids} are too powerful!")
             if small:
                 cur_ax.scatter(x_ids, y_ids, color='red', marker='o', s=POINT_SIZE)
@@ -199,7 +213,7 @@ def main(
             v_ids = df[df["id"].isin(orange_ids)]['id']
             x_ids = df[df["id"].isin(orange_ids)]['pos']
             y_ids = df[df["id"].isin(orange_ids)]['-log10(p)']
-            if np.any(np.isinf(y_ids)):
+            if np.any(np.vectorize(custom_isinf)(y_ids)):
                 raise ValueError(f"The p-values for {orange_ids} are too powerful!")
             if small:
                 cur_ax.scatter(x_ids, y_ids, color='orange', marker='o', s=POINT_SIZE)

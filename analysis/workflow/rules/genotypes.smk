@@ -79,16 +79,15 @@ rule phase_gt:
         log=temp(out + "/phased.log"),
     resources:
         # We use a custom formula to determine the time requirements:
-        # This computes the number of seconds from the number of variants and then it
-        # divides by 59 seconds per hour
+        # This computes the number of minutes from the number of variants
         runtime=lambda wildcards: int(
-            (0.11417075326083094 * get_num_variants(wildcards) + 922.265855531002) / 59
+            0.0015600416766108 * get_num_variants(wildcards) + 57.27754932492151
         ),
         # We use a custom formula to determine the memory requirements:
         # This computes the number of GB from the number of variants and then it
-        # multiplies by 1050 MB per GB
+        # multiplies by 1000 MB per GB
         mem_mb=lambda wildcards: int(
-            (0.0004624708472873269 * get_num_variants(wildcards) + 13.369088722181218) * 1050
+            (0.0006264258500361132 * get_num_variants(wildcards) + 13.0220968394949) * 1000
         ),
     threads: 32
     log:
@@ -161,28 +160,6 @@ rule vcf2plink:
     shell:
         "plink2 --vcf {input.vcf} --maf {params.maf} --geno 0 --make-pgen "
         "--threads {threads}{params.samps} --out {params.prefix} &>{log}"
-
-
-rule subset_str:
-    """ subset samples from a STR VCF """
-    input:
-        vcf=lambda wildcards: expand(config["str_panel"], chr=parse_locus(wildcards.locus)[0])[0],
-        vcf_idx=lambda wildcards: expand(config["str_panel"] + ".tbi", chr=parse_locus(wildcards.locus)[0]),
-        samples=rules.keep_samps.output.samples,
-    output:
-        vcf=out+"/strs.bcf",
-        vcf_idx=out+"/strs.bcf.csi",
-    resources:
-        runtime=30,
-    log:
-        logs + "/subset_str",
-    benchmark:
-        bench + "/subset_str",
-    conda:
-        "../envs/default.yml"
-    shell:
-        "bcftools view -S {input.samples} --write-index "
-        "-Ob -o {output.vcf} {input.vcf}"
 
 
 def subset_input():

@@ -51,6 +51,7 @@ def regex(filepattern):
     f.append("$")  # ensure that the match spans the whole file
     return "".join(f)
 
+
 def glob_wildcards(pattern, files=None, followlinks=False):
     """
     Glob the values of the wildcards by matching the given pattern to the filesystem.
@@ -89,3 +90,8 @@ def glob_wildcards(pattern, files=None, followlinks=False):
             for name, value in match.groupdict().items():
                 getattr(wildcards, name).append(value)
     return wildcards
+
+
+def remove_regexes(path: str):
+    """ Note: this function is my own invention """
+    return re.sub(r'{([^,]*),[^}]*}', r'{\1}', path)

@@ -104,6 +104,20 @@ def main():
     help="Do not check that variants are phased. Saves time and memory.",
 )
 @click.option(
+    "--max-signals",
+    type=int,
+    default=1,
+    show_default=True,
+    help="The maximum number of expected causal signals",
+)
+@click.option(
+    "--max-iterations",
+    type=int,
+    default=1,
+    show_default=True,
+    help="The max number of times to repeat the tree building",
+)
+@click.option(
     "-t",
     "--threshold",
     type=float,
@@ -113,11 +127,26 @@ def main():
     help="The alpha threshold used to determine when to terminate tree building",
 )
 @click.option(
+    "--indep-thresh",
+    type=float,
+    default=0.1,
+    show_default=True,
+    hidden=True,
+    help="Threshold used to detect whether SNP and haplotype are independently causal",
+)
+@click.option(
     "--ld-prune-thresh",
     type=float,
     default=0.95,
     show_default=True,
     help="The LD threshold used to prune leaf nodes based on LD with their siblings",
+)
+@click.option(
+    "--out-thresh",
+    type=float,
+    default=5e-8,
+    show_default=True,
+    help="Threshold used to determine whether to output haplotypes (single-SNP)",
 )
 @click.option(
     "--show-tree",
@@ -141,6 +170,13 @@ def main():
         "Correct p-vals via either bonferroni (b), benjamini-hochberg (bh), or "
         "no correction (n)"
     ),
+)
+@click.option(
+    "--remove-SNPs",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Remove haplotypes with only a single variant",
 )
 @click.option(
     "-o",
@@ -171,11 +207,16 @@ def run(
     chunk_size: int = None,
     maf: float = None,
     phased: bool = False,
+    max_signals: int = 1,
+    max_iterations: int = 1,
     threshold: float = 0.05,
+    out_thresh: float = 5e-8,
+    indep_thresh: float = 0.1,
     ld_prune_thresh: float = None,
     show_tree: bool = False,
     covars: Path = None,
     corrector: str = "n",
+    remove_snps: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "INFO",
 ):
@@ -190,6 +231,7 @@ def run(
     Ex: happler run tests/data/simple.vcf tests/data/simple.tsv > simple.hap
     """
     from . import tree
+    import numpy as np
     from haptools import data
     from haptools import logging
 
@@ -255,10 +297,6 @@ def run(
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
 
     # subset to just one phenotype
-    if len(ph.names) > 1:
-        log.warning("Ignoring all but the first trait in the phenotypes file")
-        ph.names = ph.names[:1]
-        ph.data = ph.data[:, :1]
     # also reorder and subset samples in Phenotypes to match those in the Genotypes
     ph.subset(samples=tuple(gt.samples), names=(pheno,), inplace=True)
 
@@ -293,7 +331,9 @@ def run(
         corrector = None
     log.debug(f"Using alpha threshold of {threshold}")
     terminator = tree.terminator.TTestTerminator(
-        thresh=threshold, corrector=corrector, log=log
+        thresh=threshold,
+        corrector=corrector,
+        log=log,
     )
     log.info("Running tree builder")
     hap_tree = tree.TreeBuilder(
@@ -302,11 +342,48 @@ def run(
         maf=maf,
         method=test_method,
         terminator=terminator,
+        indep_thresh=indep_thresh,
         ld_prune_thresh=ld_prune_thresh,
         log=log,
-    ).run()
+    )
+    forest = tree.ForestBuilder(
+        hap_tree,
+        num_bins=max_signals,
+        max_iterations=max_iterations,
+        log=log,
+    )
     log.info("Outputting haplotypes")
-    tree.Haplotypes.from_tree(fname=output, tree=hap_tree, gts=gt, log=log).write()
+    haplotypes = data.Haplotypes(
+        fname=output,
+        haplotype=tree.haplotypes.HapplerHaplotype,
+        variant=tree.haplotypes.HapplerVariant,
+        log=log,
+    )
+    haplotypes.data = {}
+    hap_id = 0
+    # merge the Haplotypes objects
+    # TODO: use a method of the Haplotypes class
+    for haps in forest.run():
+        if haps is None:
+            continue
+        if len(haps.data) == 1:
+            hap = next(iter(haps.data.values()))
+            if hap.pval < -np.log10(out_thresh):
+                log.info(f"Ignoring haplotype with low pval {hap.pval}")
+                continue
+        for hap in haps.data.values():
+            if len(hap.variants) <= 1 and remove_snps:
+                continue
+            hap.id = f"H{hap_id}"
+            haplotypes.data[hap.id] = hap
+            hap_id += 1
+    if haplotypes.data == {}:
+        log.critical("No haplotypes were found")
+        with open(output, "w") as hap_file:
+            pass
+    else:
+        haplotypes.index()
+        haplotypes.write()
     if show_tree:
         dot_output = output
         if Path(output) != Path("/dev/stdout"):
@@ -315,7 +392,7 @@ def run(
             dot_output = dot_output.with_suffix(".dot")
         log.info("Writing tree to dot file")
         with open(dot_output, "w") as dot_file:
-            dot_file.write(hap_tree.dot())
+            dot_file.write(forest.dot(remove_singletons=remove_snps))
 
 
 @main.command(context_settings=CONTEXT_SETTINGS)
@@ -449,10 +526,10 @@ def transform(
         )
     if samples_file:
         with samples_file as samps_file:
-            samples = samps_file.read().splitlines()
+            samples = set(samps_file.read().splitlines())
     elif samples:
-        # needs to be converted from tuple to list
-        samples = list(samples)
+        # needs to be converted from tuple to set
+        samples = set(samples)
     else:
         samples = None
     # load data
@@ -503,6 +580,13 @@ def transform(
     hp_gt.variants = np.delete(gt.variants, hp.node_indices)
     hp_gt.samples = gt.samples
     hp_gt.data = hp.transform(gt, allele)
+
+    # remove variants that no longer pass the MAF threshold
+    num_variants = len(hp_gt.variants)
+    hp_gt.check_maf(threshold=maf, discard_also=True)
+    removed = num_variants - len(hp_gt.variants)
+    if maf is not None:
+        log.info(f"Ignoring {removed} variants with MAF < {maf}")
 
     hp_gt.write()
 

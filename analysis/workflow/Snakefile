@@ -50,7 +50,8 @@ module genotypes:
     config: config
 
 use rule * from genotypes as genotypes_*
-config["gts_str_panel"] = rules.genotypes_subset_str.output.vcf
+if mode == "str":
+    config["gts_str_panel"] = config["str_panel"]
 if check_config("sample_size"):
     sampsize = config["sample_size"]
     config["gts_snp_panel"] = rules.genotypes_subset.output.pgen
@@ -58,6 +59,10 @@ if check_config("sample_size"):
 else:
     config["gts_snp_panel"] = rules.genotypes_subset.input.pgen
 config["random"] = False
+
+if mode == "ld_range" and check_config("num_haps", place=config["modes"][mode]):
+    if isinstance(config["modes"][mode]["num_haps"], int):
+        config["modes"][mode]["num_haps"] = [config["modes"][mode]["num_haps"],]
 
 if mode != "run":
     module simulate:
@@ -90,23 +95,32 @@ if check_config("covar"):
     if "pheno_matrix" in covar_config:
         covar_file = rules.covariates_merge.output.covar
 
-if mode in ("snp", "hap", "ld_range"):
+if mode in ("str", "snp", "hap", "ld_range"):
     happler_config = {
         "pheno": rules.simulate_simphenotype.output.pheno,
         "hap_file": rules.simulate_transform.input.hap,
         "snp_panel": config["gts_snp_panel"],
-        "out": config["out"] + "/happler/"+mode+"/{beta}",
+        "out": config["out"] + "/happler/"+mode+"/beta_{beta}",
         "random": None,
         "covar": covar_file,
         "min_maf": check_config("min_maf", 0),
+        "out_thresh": 1, # artificially set to 1 to avoid filtering
     }
     if mode in ("hap", "ld_range"):
         happler_config["snps"] = []
+        happler_config["causal_gt"] = rules.simulate_transform.output
         if mode == "hap":
             happler_config["snps"] = config["modes"][mode]["alleles"]
-        happler_config["causal_gt"] = rules.simulate_transform.output
-    if mode == "ld_range":
-        happler_config["out"] = config["out"] + "/happler/"+mode+"/ld_{ld}/beta_{beta}/alpha_{alpha}"
+        elif mode == "ld_range":
+            happler_config["out"] = config["out"] + "/happler/"+mode+"/{num_haps}_haps/ld_{ld}/beta_{beta}/alpha_{alpha}"
+    elif mode in ("str", "snp"):
+        # also provide the SNP and STR IDs so that they can be used in the manhattan plot
+        happler_config["snps"] = (config["modes"][mode]["id"],)
+        # TODO: consider uncommenting this to compute LD with causal STR
+        # if mode == "str":
+        #     happler_config["causal_gt"] = config["gts_str_panel"]
+    if check_config("reps", place=config["modes"][mode]):
+        happler_config["out"] = happler_config["out"] + "/rep_{rep}"
 elif mode == "run":
     happler_config = {
         "pheno": config["modes"][mode]["pheno"],
@@ -116,11 +130,10 @@ elif mode == "run":
         "random": None,
         "covar": covar_file,
         "min_maf": check_config("min_maf", 0),
+        "out_thresh": check_config("out_thresh", 5e-8),
     }
     if check_config("SVs", place=config["modes"][mode]):
         happler_config["SVs"] = config["modes"][mode]["SVs"]
-elif "str" == mode:
-    pass
 else:
     raise ValueError("Unsupported operating 'mode' in config")
 
@@ -133,30 +146,11 @@ merged_happler = rules.happler_merge.output.pgen
 if mode == "ld_range" and config["modes"][mode]["random"]:
     happler_config["random"] = rules.simulate_random_transform.output
     happler_config["random_hap"] = rules.simulate_random_transform.input.hap
-    happler_config["out"] = config["out"] + "/happler/"+mode+"/random/ld_{ld}/beta_{beta}/alpha_{alpha}"
+    happler_config["out"] = config["out"] + "/happler/"+mode+"/random/{num_haps}_haps/ld_{ld}/beta_{beta}/alpha_{alpha}/rep_{rep}"
     module happler_random:
         snakefile: "rules/happler.smk"
         config: happler_config
     use rule * from happler_random as happler_random_*
-
-# if mode in ("hap", "str", "ld_range"):
-#     finemappers_config = {
-#         "pheno": rules.simulate_simphenotype.output.pheno,
-#         "out": config["out"] + "/finemappers/"+mode+"/{beta}",
-#         "snp_panel": config["gts_snp_panel"],
-#     }
-#     if mode in ("hap", "ld_range"):
-#         finemappers_config["causal_gt"] = rules.simulate_transform.output.pgen
-#         if mode == "ld_range":
-#             finemappers_config["out"] = config["out"] + "/finemappers/"+mode+"/ld_{ld}/beta_{beta}/alpha_{alpha}"
-#     else:
-#         raise ValueError("Not yet implemented operating mode 'str' in config")
-#     module finemappers:
-#         snakefile: "rules/finemappers.smk"
-#         config: finemappers_config
-#     use rule * from finemappers as finemappers_*
-# else:
-#     raise ValueError(f"Unsupported operating mode '{mode}' in config")
 
 plots_config = {
     "out": config["out"] + "/plots",
@@ -190,7 +184,7 @@ elif mode == "run":
         output:
             hps = orig_out + "/multiline.tsv",
         resources:
-            runtime=3,
+            runtime=10,
         log:
             orig_out + "/logs/multiline",
         benchmark:
@@ -205,10 +199,11 @@ elif mode == "run":
 
     def FINAL_OUTPUT(wildcards):
         files = [
+            rules.happler_pips.output.tsv,
             rules.happler_tree.output.png,
             rules.happler_linreg.output.png,
             rules.happler_heatmap.output.png,
-            rules.happler_manhattan.output.png,
+            # rules.happler_manhattan.output.png,
             rules.happler_cond_linreg.output.png,
             rules.happler_results.output.susie_pdf,
         ]
@@ -230,16 +225,22 @@ elif mode == "run":
 else:
     FINAL_OUTPUT = expand(
         [
+            rules.happler_cond_linreg.output.png,
             rules.happler_tree.output.png,
-            rules.happler_manhattan.output.png,
             # rules.finemappers_results.output.susie_pdf,
             rules.happler_results.output.susie_pdf,
-            rules.plots_params.output.png,
+            # rules.plots_params.output.png,
         ],
         ex=(("in",) if mode == "hap" else ("ex", "in")),
         beta=config["modes"]["hap"]["beta"],
         allow_missing=True,
     )
+    if check_config("reps", place=config["modes"][mode]):
+        FINAL_OUTPUT = expand(
+            FINAL_OUTPUT,
+            rep=range(config["modes"][mode]["reps"]),
+            allow_missing=True,
+        )
 
 # If '--config debug=true' is specified, we won't try to build the entire DAG
 # This can be helpful when you want to play around with a specific target output

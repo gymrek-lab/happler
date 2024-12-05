@@ -1,7 +1,8 @@
 from __future__ import annotations
+import math
+import logging
 from logging import Logger
 
-import logging
 import numpy as np
 import numpy.typing as npt
 from haptools.logging import getLogger
@@ -20,6 +21,7 @@ from .assoc_test import (
     NodeResultsTScore,
     AssocTestSimple,
     AssocTestSimpleSMTScore,
+    AssocTestSimpleCovariates,
 )
 
 
@@ -58,6 +60,7 @@ class TreeBuilder:
         maf: float = None,
         method: AssocTest = AssocTestSimple(),
         terminator: Terminator = TTestTerminator(),
+        indep_thresh: float = 0.1,
         ld_prune_thresh: float = None,
         log: Logger = None,
     ):
@@ -66,6 +69,7 @@ class TreeBuilder:
         self.maf = maf
         self.method = method
         self.terminator = terminator
+        self.indep_thresh = indep_thresh
         self.results_type = method.results_type
         self.tree = None
         self._split_method = self._find_split_rigid
@@ -85,10 +89,6 @@ class TreeBuilder:
         """
         Run the tree builder and create a tree rooted at the provided variant
         """
-        if self.tree is not None:
-            raise AssertionError(
-                "A tree already exists for this TreeBuilder. Please create a new one."
-            )
         # step one: initialize the tree
         self.tree = Tree(log=self.log)
         # step two: create a haplotype
@@ -172,13 +172,13 @@ class TreeBuilder:
             if sib_idx in leaves:
                 sib_p = sibling["results"].pval
                 leaf_p = leaf["results"].pval
-                if sib_p > leaf_p and not np.isclose(sib_p, leaf_p):
+                if sib_p > leaf_p and not math.isclose(sib_p, leaf_p):
                     self.log.debug(
                         f"Left leaf {leaf_var.id} unpruned since it has a better pval"
                     )
                     # keep it if our p-value is better
                     continue
-                elif np.isclose(sib_p, leaf_p) and leaf["results"].beta > 0:
+                elif math.isclose(sib_p, leaf_p) and leaf["results"].beta > 0:
                     self.log.debug(
                         f"Left leaf {leaf_var.id} unpruned since it's beta is positive"
                     )
@@ -199,8 +199,7 @@ class TreeBuilder:
             else:
                 self.log.debug(f"Left leaf {leaf_var.id} (with LD {ld}) unpruned")
         self.log.info(
-            f"Pruned {count} leaves with LD > {self.ld_prune_thresh} with their"
-            " siblings"
+            f"Pruned {count} leaves with LD > {self.ld_prune_thresh} with their siblings"
         )
 
     def maf_mask(
@@ -300,7 +299,33 @@ class TreeBuilder:
             # step 5: retrieve the Variant with the best p-value
             best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
             self.log.debug("Chose variant {}".format(best_variant.id))
-            # step 6: check if this allele is significant and whether we should terminate the branch
+            # step 6: check whether we don't get a stronger effect by treating this variant
+            # as independently causal
+            if parent_res is not None:
+                allele_gts = (self.gens.data[:, best_var_idx] == allele).sum(axis=1)
+                cv_data = np.vstack((parent.data.sum(axis=1), allele_gts)).T
+                hap_indep_effect = (
+                    AssocTestSimpleCovariates(covars=cv_data)
+                    .run(
+                        hap_matrix[:, best_res_idx][:, np.newaxis].sum(axis=1),
+                        self.phens.data[:, 0],
+                    )
+                    .data["pval"][0]
+                )
+                if hap_indep_effect > self.indep_thresh:
+                    self.log.debug(
+                        "Terminating because the haplotype had a pval of"
+                        f" {hap_indep_effect} > {self.indep_thresh} in an additive model"
+                        " with the allele and parent"
+                    )
+                    yield None, allele, node_res
+                    continue
+                self.log.debug(
+                    f"The haplotype had a pval of {hap_indep_effect} <"
+                    f" {self.indep_thresh} in an additive model with the allele and"
+                    " parent"
+                )
+            # step 7: check if this allele is significant and whether we should terminate the branch
             self.log.debug(
                 "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
                     best_variant.id, allele, parent_res, node_res
@@ -387,13 +412,18 @@ class TreeBuilder:
                 best_p_idx, key=lambda a: results[a].data["pval"][best_p_idx[a]]
             )
         best_var_idx = best_p_idx[best_allele]
-        best_res_idx = best_var_idx
+        best_res_idx = {
+            best_allele: best_var_idx,
+            int(not best_allele): np.searchsorted(
+                maf_mask[int(not best_allele)], maf_mask[best_allele][best_var_idx]
+            ),
+        }
         num_tests = len(parent.nodes) + 1
         # step 4: find the index of the best variant within the genotype matrix
         # We need to account for the rare variants that were masked out and indices
         # that we removed when running transform()
-        best_var_idx += maf_mask[best_allele][best_res_idx] - len(
-            maf_mask[best_allele][:best_res_idx]
+        best_var_idx += maf_mask[best_allele][best_res_idx[best_allele]] - len(
+            maf_mask[best_allele][: best_res_idx[best_allele]]
         )
         # There might be a faster way of doing this but for now we're just going to
         # live with it
@@ -405,31 +435,50 @@ class TreeBuilder:
         # step 5: retrieve the Variant with the best p-value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
         self.log.debug("Chose variant {}".format(best_variant.id))
+        # step 6: check the MAFs of the haplotypes we created
+        # if the best variant was filtered out for this allele due to low MAF
+        # searchsorted() will return an index at the end of the array or the
+        # wrong index
+        if best_res_idx[best_allele] >= len(maf_mask[not best_allele]) or (
+            maf_mask[not best_allele][best_res_idx[best_allele]]
+            != maf_mask[best_allele][best_res_idx[best_allele]]
+        ):
+            self.log.debug(
+                f"Ignoring variant {best_variant.id} / allele {int(not best_allele)}, "
+                "since it results in a haplotype with low MAF"
+            )
+            yield None, allele, None
+            del best_res_idx[int(not best_allele)]
         # iterate through all of the alleles of the best variant and check if they're
         # significant
-        for allele in results:
-            if allele == best_allele:
-                best_allele_idx = best_res_idx
-            else:
-                best_allele_idx = np.searchsorted(
-                    maf_mask[allele], maf_mask[best_allele][best_res_idx]
+        for allele in best_res_idx:
+            # step 7: check whether we don't get a stronger effect by treating this variant
+            # as independently causal
+            if parent_res is not None:
+                allele_gts = self.gens.data[:, best_var_idx].sum(axis=1)
+                cv_data = np.vstack((parent.data.sum(axis=1), allele_gts)).T
+                tsfm = parent.transform(self.gens, allele, (best_var_idx,))
+                hap_indep_effect = (
+                    AssocTestSimpleCovariates(covars=cv_data)
+                    .run(tsfm.sum(axis=1), self.phens.data[:, 0])
+                    .data["pval"][0]
                 )
-                # if the best variant was filtered out for this allele due to low MAF
-                # searchsorted() will return an index at the end of the array or the
-                # wrong index
-                if best_allele_idx >= len(maf_mask[allele]) or (
-                    maf_mask[allele][best_allele_idx]
-                    != maf_mask[best_allele][best_res_idx]
-                ):
+                if hap_indep_effect > self.indep_thresh:
                     self.log.debug(
-                        f"Ignoring variant {best_variant.id} / allele {allele} because"
-                        " it results in a haplotype with low MAF"
+                        "Terminating because the haplotype had a pval of"
+                        f" {hap_indep_effect} > {self.indep_thresh} in an additive model with"
+                        f" the allele {allele} and parent"
                     )
                     yield None, allele, None
                     continue
+                self.log.debug(
+                    f"The haplotype had a pval of {hap_indep_effect} < {self.indep_thresh}"
+                    " in an additive model with the allele and parent"
+                )
+            best_allele_idx = best_res_idx[best_allele]
             best_results = results[allele].data[best_allele_idx]
             node_res = self.results_type.from_np(best_results)
-            # step 6: check whether we should terminate the branch
+            # step 8: check whether we should terminate the branch
             self.log.debug(
                 "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
                     best_variant.id, allele, parent_res, node_res
