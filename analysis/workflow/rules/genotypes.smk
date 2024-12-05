@@ -162,28 +162,6 @@ rule vcf2plink:
         "--threads {threads}{params.samps} --out {params.prefix} &>{log}"
 
 
-rule subset_str:
-    """ subset samples from an STR VCF """
-    input:
-        vcf=lambda wildcards: expand(config["str_panel"], chr=parse_locus(wildcards.locus)[0])[0],
-        vcf_idx=lambda wildcards: expand(config["str_panel"] + ".tbi", chr=parse_locus(wildcards.locus)[0]),
-        samples=rules.keep_samps.output.samples,
-    output:
-        vcf=out+"/strs.bcf",
-        vcf_idx=out+"/strs.bcf.csi",
-    resources:
-        runtime=30,
-    log:
-        logs + "/subset_str",
-    benchmark:
-        bench + "/subset_str",
-    conda:
-        "../envs/default.yml"
-    shell:
-        "bcftools view -S {input.samples} --write-index "
-        "-Ob -o {output.vcf} {input.vcf}"
-
-
 def subset_input():
     if check_config("phase_map") or check_config("exclude_samples") or not config["snp_panel"].endswith(".pgen"):
         return {

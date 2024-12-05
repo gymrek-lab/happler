@@ -68,7 +68,7 @@ rule run:
         out_thresh=check_config("out_thresh", 5e-8),
         keep_SNPs="--remove-SNPs " if not ("{rep}" in out) else "",
     output:
-        hap=out + "/happler.hap",
+        hap=ensure(out + "/happler.hap", non_empty=True),
         gz=out + "/happler.hap.gz",
         idx=out + "/happler.hap.gz.tbi",
         dot=out + "/happler.dot",

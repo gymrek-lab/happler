@@ -46,8 +46,10 @@ modes:
   pos: 19:45903859
   id: 19:45903859
   reps: 10
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
  snp:
   pos: 19:45910672 # rs1046282
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
  hap:
   alleles: [rs36046716:G, rs1046282:G] # 45892145, 45910672
   beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
@@ -80,10 +82,7 @@ min_maf: 0.05
 
 # Sample sizes to use
 # sample_size: [777, 800, 1600, 2400, 3200]
-sample_size: 777
-
-# A threshold on the pvalues of the haplotypes
-out_thresh: 5e-3
+sample_size: 3200
 
 # Whether to include the causal variant in the set of genotypes provided to the
 # finemapping methods. Set this to true if you're interested in seeing how the

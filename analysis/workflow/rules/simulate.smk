@@ -24,6 +24,10 @@ def parse_locus(locus):
 
 hap_ld_range_output = out + "/create_ld_range/{num_haps}_haps/ld_{ld}/haplotype.hap"
 
+gts_panel = Path(
+    config["gts_str_panel"] if mode == "str" else config["gts_snp_panel"]
+)
+
 checkpoint create_hap_ld_range:
     """ create a hap file suitable for haptools transform and simphenotype """
     input:
@@ -31,12 +35,12 @@ checkpoint create_hap_ld_range:
         gts_pvar=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
         gts_psam=Path(config["gts_snp_panel"]).with_suffix(".psam"),
     params:
-        min_ld = config["modes"]["ld_range"]["min_ld"],
-        max_ld = config["modes"]["ld_range"]["max_ld"],
-        step = config["modes"]["ld_range"]["step"],
-        min_af = config["modes"]["ld_range"]["min_af"],
-        max_af = config["modes"]["ld_range"]["max_af"],
-        num_haps = "-n " + " -n ".join(map(str, config["modes"]["ld_range"]["num_haps"])),
+        min_ld = lambda wildcards: config["modes"]["ld_range"]["min_ld"],
+        max_ld = lambda wildcards: config["modes"]["ld_range"]["max_ld"],
+        step = lambda wildcards: config["modes"]["ld_range"]["step"],
+        min_af = lambda wildcards: config["modes"]["ld_range"]["min_af"],
+        max_af = lambda wildcards: config["modes"]["ld_range"]["max_af"],
+        num_haps = lambda wildcards: "-n " + " -n ".join(map(str, config["modes"]["ld_range"]["num_haps"])),
         out = lambda wildcards: expand(
             hap_ld_range_output, **wildcards, allow_missing=True,
         ),
@@ -61,13 +65,14 @@ checkpoint create_hap_ld_range:
 rule create_hap:
     """ create a hap file suitable for haptools transform and simphenotype """
     input:
-        gts=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
+        gts=gts_panel.with_suffix(".pvar"),
     params:
         ignore="this", # the first parameter is always ignored for some reason
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
         locus=lambda wildcards: wildcards.locus.split("_")[1].replace('-', '\t'),
         beta=0.99,
-        alleles=lambda wildcards: config["modes"]["hap"]["alleles"],
+        alleles=lambda wildcards: config["modes"]["hap"]["alleles"] if mode == "hap" else [],
+        repeat=lambda wildcards: config["modes"]["str"]["id"] if mode == "str" else 0,
     output:
         hap=out + "/haplotype.hap"
     resources:
@@ -113,13 +118,13 @@ rule simphenotype:
     """ use the hap file to create simulated phenotypes for the haplotype """
     input:
         hap=rules.transform.input.hap,
-        pgen=rules.transform.output.pgen,
-        pvar=rules.transform.output.pvar,
-        psam=rules.transform.output.psam,
+        pgen=rules.transform.output.pgen if mode != "str" else config["gts_str_panel"],
+        pvar=rules.transform.output.pvar if mode != "str" else Path(config["gts_str_panel"]).with_suffix(".pvar"),
+        psam=rules.transform.output.psam if mode != "str" else Path(config["gts_str_panel"]).with_suffix(".psam"),
     params:
         beta=lambda wildcards: wildcards.beta,
         seed = 42,
-        reps = config["modes"]["ld_range"]["reps"],
+        reps = lambda wildcards: config["modes"]["ld_range"]["reps"],
     output:
         pheno=out + "/{beta}.pheno",
     resources:
