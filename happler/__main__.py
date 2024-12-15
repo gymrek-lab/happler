@@ -363,13 +363,17 @@ def run(
     hap_id = 0
     # merge the Haplotypes objects
     # TODO: use a method of the Haplotypes class
+    log_out_thresh = -np.log10(out_thresh)
     for haps in forest.run():
         if haps is None:
             continue
         if len(haps.data) == 1:
             hap = next(iter(haps.data.values()))
-            if hap.pval < -np.log10(out_thresh):
-                log.info(f"Ignoring haplotype with low pval {hap.pval}")
+            if hap.pval < log_out_thresh:
+                log.info(
+                    f"Ignoring haplotype with low log pval {hap.pval} < "
+                    f"{log_out_thresh}"
+                )
                 continue
         for hap in haps.data.values():
             if len(hap.variants) <= 1 and remove_snps:
