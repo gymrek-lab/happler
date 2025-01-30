@@ -119,6 +119,7 @@ class TTestTerminator(Terminator):
         best_idx: int,
         num_samps: int,
         num_tests: int,
+        parent_corr: float = 0,
         short_circuit: bool = True,
     ) -> tuple[float, float]:
         t_stat = None
@@ -133,9 +134,13 @@ class TTestTerminator(Terminator):
                 self.log.debug("Terminated b/c effect size did not improve")
                 return True
             # perform a one tailed, two-sample t-test using the difference of the effect sizes
-            # first, we compute the standard error of the difference of the effect sizes
+            # first, we compute the covariance of the effect sizes
+            cov = 0
+            if parent_corr is not None:
+                cov = parent_corr * parent_res.stderr * results.data["stderr"]
+            # now, we can compute the standard error of the difference of the effect sizes
             std_err = np.sqrt(
-                ((results.data["stderr"] ** 2) + (parent_res.stderr**2)) / 2
+                (((results.data["stderr"] ** 2) + (parent_res.stderr**2)) / 2) - 2*cov
             )
             if std_err[best_idx] == 0:
                 # if we have a standard error of 0, then we already know the result is
@@ -176,6 +181,7 @@ class TTestTerminator(Terminator):
         best_idx: int,
         num_samps: int,
         num_tests: int,
+        parent_corr: float = 0,
     ) -> bool:
         computed_val = self.compute_val(
             parent_res,
@@ -184,6 +190,7 @@ class TTestTerminator(Terminator):
             best_idx,
             num_samps,
             num_tests,
+            parent_corr,
         )
         if isinstance(computed_val, bool):
             return computed_val

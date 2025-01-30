@@ -62,6 +62,7 @@ class TreeBuilder:
         terminator: Terminator = TTestTerminator(),
         indep_thresh: float = 0.1,
         ld_prune_thresh: float = None,
+        covariance_correction: float = True,
         log: Logger = None,
     ):
         self.gens = genotypes
@@ -79,6 +80,7 @@ class TreeBuilder:
         # if self.ld_prune_thresh is not None:
         #     self._split_method = self._find_split_flexible
         #     split_method = "flexible"
+        self.covariance_correction = covariance_correction
         self.log = log or getLogger(self.__class__.__name__)
         self.log.info(f"Using {split_method} branching strategy")
 
@@ -264,20 +266,26 @@ class TreeBuilder:
                 # if there weren't any genotypes left, just return None
                 yield None, allele, None
                 continue
+            hap_mat_sum = hap_matrix.sum(axis=2)
+            parent_corr = None
             # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
                 parent_res is None
             ):
+                if self.covariance_correction:
+                    parent_corr = pearson_corr_ld(hap_mat_sum, parent.data.sum(axis=1))
                 results = self.method.run(
-                    hap_matrix.sum(axis=2),
+                    hap_mat_sum,
                     self.phens.data[:, 0],
                     parent_res=parent_res,
+                    parent_corr=parent_corr,
                 )
                 # step 3: record the best t-score among all the SNPs with this allele
                 best_var_idx = results.data["tscore"].argmax()
+                parent_corr = parent_corr[best_var_idx]
             else:
                 results = self.method.run(
-                    hap_matrix.sum(axis=2),
+                    hap_mat_sum,
                     self.phens.data[:, 0],
                 )
                 # step 3: record the best p-value among all the SNPs with this allele
@@ -331,9 +339,17 @@ class TreeBuilder:
                     best_variant.id, allele, parent_res, node_res
                 )
             )
-            if self.terminator.check(
-                parent_res, node_res, results, best_res_idx, num_samps, num_tests
-            ):
+            args = [
+                parent_res,
+                node_res,
+                results,
+                best_res_idx,
+                num_samps,
+                num_tests
+            ]
+            if isinstance(self.terminator, TTestTerminator):
+                args.append(parent_corr)
+            if self.terminator.check(*args):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res
@@ -366,6 +382,7 @@ class TreeBuilder:
         results = {}
         best_p_idx = {}
         maf_mask = {}
+        parent_corr = {}
         # iterate through the two possible alleles and try all SNPs with that allele
         alleles = (0, 1)
         for allele in alleles:
@@ -381,20 +398,25 @@ class TreeBuilder:
                 # if there weren't any genotypes left, just return None
                 yield None, allele, None
                 continue
+            hap_mat_sum = hap_matrix.sum(axis=2)
+            parent_corr[allele] = None
             # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
                 parent_res is None
             ):
+                if self.covariance_correction:
+                    parent_corr[allele] = pearson_corr_ld(hap_mat_sum, parent.data.sum(axis=1))
                 results[allele] = self.method.run(
-                    hap_matrix.sum(axis=2),
+                    hap_mat_sum,
                     self.phens.data[:, 0],
                     parent_res=parent_res,
+                    parent_corr=parent_corr[allele],
                 )
                 # also, record the best t-score among all the SNPs with this allele
                 best_p_idx[allele] = results[allele].data["tscore"].argmax()
             else:
                 results[allele] = self.method.run(
-                    hap_matrix.sum(axis=2),
+                    hap_mat_sum,
                     self.phens.data[:, 0],
                 )
                 # also, record the best p-value among all the SNPs with this allele
@@ -477,6 +499,9 @@ class TreeBuilder:
                 )
             best_allele_idx = best_res_idx[best_allele]
             best_results = results[allele].data[best_allele_idx]
+            best_parent_corr = parent_corr[allele]
+            if best_parent_corr is not None:
+                best_parent_corr = best_parent_corr[best_allele_idx]
             node_res = self.results_type.from_np(best_results)
             # step 8: check whether we should terminate the branch
             self.log.debug(
@@ -484,14 +509,17 @@ class TreeBuilder:
                     best_variant.id, allele, parent_res, node_res
                 )
             )
-            if self.terminator.check(
+            args = [
                 parent_res,
                 node_res,
                 results[allele],
                 best_allele_idx,
                 num_samps,
                 num_tests,
-            ):
+            ]
+            if isinstance(self.terminator, TTestTerminator):
+                args.append(best_parent_corr)
+            if self.terminator.check(*args):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res

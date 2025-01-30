@@ -179,6 +179,14 @@ def main():
     help="Remove haplotypes with only a single variant",
 )
 @click.option(
+    "--no-covariance-correction",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    hidden=True,
+    help="Do not perform any covariance corrections",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -217,6 +225,7 @@ def run(
     covars: Path = None,
     corrector: str = "n",
     remove_snps: bool = False,
+    no_covariance_correction: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "INFO",
 ):
@@ -344,6 +353,7 @@ def run(
         terminator=terminator,
         indep_thresh=indep_thresh,
         ld_prune_thresh=ld_prune_thresh,
+        covariance_correction=not no_covariance_correction,
         log=log,
     )
     forest = tree.ForestBuilder(
