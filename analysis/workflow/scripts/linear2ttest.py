@@ -131,6 +131,8 @@ def main(
     ]
     df["pval"] = np.array([(val[0] if val != True else 1) for val in vals])
 
+    assert not df["pval"].isna().any()
+
     log.info("Outputting t-test p-values")
     # first, reset column names
     df.rename(columns={v: k for k, v in PLINK_COLS.items()}, inplace=True)

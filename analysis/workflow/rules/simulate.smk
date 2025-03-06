@@ -14,6 +14,10 @@ if mode == "ld_range" and config["random"]:
     out += "/random"
     logs += "/random"
     bench += "/random"
+elif mode == "midway":
+    out += "/sim_{sim_mode}"
+    logs += "/sim_{sim_mode}"
+    bench += "/sim_{sim_mode}"
 
 def parse_locus(locus):
     """parse locus into chrom, start, end"""
@@ -86,15 +90,21 @@ rule create_hap:
     script:
         "../scripts/create_hap_file.sh"
 
+transform_input = rules.create_hap.output.hap
 if mode == "ld_range":
     out += "/pheno/{num_haps}_haps/ld_{ld}"
     logs += "/pheno/{num_haps}_haps/ld_{ld}"
     bench += "/pheno/{num_haps}_haps/ld_{ld}"
+    transform_input = hap_ld_range_output
+elif mode == "midway":
+    transform_input = lambda wildcards: expand(
+        config["modes"][mode]["haps"] + "/{fname}", fname=config["locus_traits"][wildcards.locus],
+    )[0]
 
 rule transform:
     """ use the hap file to create a pgen of the haplotype """
     input:
-        hap=hap_ld_range_output if mode == "ld_range" else rules.create_hap.output.hap,
+        hap=transform_input,
         pgen=config["gts_snp_panel"],
         pvar=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["gts_snp_panel"]).with_suffix(".psam"),
@@ -114,6 +124,9 @@ rule transform:
         "haptools transform -o {output.pgen} {input.pgen} {input.hap} &>{log}"
 
 
+make_midway_hap = lambda sim_mode: "sed '${/^V/ d;}'" if sim_mode == "wo" else "cat"
+
+
 rule simphenotype:
     """ use the hap file to create simulated phenotypes for the haplotype """
     input:
@@ -122,7 +135,12 @@ rule simphenotype:
         pvar=rules.transform.output.pvar if mode != "str" else Path(config["gts_str_panel"]).with_suffix(".pvar"),
         psam=rules.transform.output.psam if mode != "str" else Path(config["gts_str_panel"]).with_suffix(".psam"),
     params:
-        beta=lambda wildcards: wildcards.beta,
+        # if the beta value is 0, we just use the beta of the hap file
+        # otherwise, we change it on the fly
+        hap=lambda wildcards, input: "<(" + make_midway_hap(wildcards.sim_mode) + " " + input.hap + (
+            "" if wildcards.beta == "0" else
+            " | awk -F $'\\t' -v 'OFS=\\t' \'$1 == \"H\" { $6 = " + wildcards.beta + " }1\'"
+        )+")",
         seed = 42,
         reps = lambda wildcards: config["modes"]["ld_range"]["reps"],
     output:
@@ -137,5 +155,4 @@ rule simphenotype:
         "happler"
     shell:
         "haptools simphenotype --seed {params.seed} -o {output.pheno} "
-        "--replications {params.reps} {input.pgen} "
-        "<( sed 's/\\t0.99$/\\t{params.beta}/' {input.hap} ) &>{log}"
+        "--replications {params.reps} {input.pgen} {params.hap} &>{log}"

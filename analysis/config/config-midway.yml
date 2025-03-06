@@ -12,10 +12,6 @@
 # If the VCFs are per-chromosome, replace the contig name in the file name with "{chr}"
 # The VCF(s) must be sorted and indexed (with a .tbi file in the same directory)
 # required!
-# snp_panel: "data/simulations/1000G/19_45401409-46401409.pgen"
-# str_panel: "/tscc/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
-# snp_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.SNPs.pgen"
-# str_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.STRs.pgen"
 snp_panel: data/simulations/midway/1000G/gts.pgen
 
 
@@ -36,12 +32,12 @@ snp_panel: data/simulations/midway/1000G/gts.pgen
 # 3. "hap" - a haplotype
 # 4. "ld_range" - creates random two-SNP haplotypes with a range of LD values between the alleles of each haplotype
 # 5. "run" - execute happler on a locus without simulating anything
+# 6. "midway" - run happler midway-through on simulated data
 # The STR and SNP positions should be contained within the locus.
 # The positions should be provided in the same coordinate system as the reference
 # genome of the reference panel VCFs
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required! and unless otherwise noted, all attributes of each mode are required
-# locus: 19:45401409-46401409 # center: 45901409 (APOe4)
 locus: data/simulations/midway/1000G/loci.bed
 modes:
  str:
@@ -68,7 +64,9 @@ modes:
   random: false # whether to also produce random haplotypes
   num_haps: [1, 2, 3, 4]
  midway:
-  reps: 10
+  # beta: [0.214, 0.285, 0.356]
+  # beta: [0.285]
+  reps: 5
   haps: data/simulations/midway/1000G/haps
  run:
   pheno: data/geuvadis/phenos/{trait}.pheno
@@ -83,7 +81,9 @@ mode: midway
 
 # Discard rare variants with a MAF below this number
 # Defaults to 0 if not specified
-min_maf: 0.05
+# NOTE: This is not necessary for midway manhattan simulations because the input data
+# has already been filtered, so we set this to 0 for now
+min_maf: 0
 
 # Sample sizes to use
 # sample_size: [777, 800, 1600, 2400, 3200]

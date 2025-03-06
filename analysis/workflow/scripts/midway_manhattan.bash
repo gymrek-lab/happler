@@ -6,7 +6,8 @@
 # arg4: output prefix
 # arg5: ID of the target haplotype in the hap file
 # arg6: ID of a "child" SNP in the target haplotype. The parent will include all SNPs of the haplotype up to this one.
-# arg7: 0 or 1 indicating whether to include the parent and child SNPs in the regression as covariates, or 2 if the regular p-values should be converted to t-test p-values. 1 requires that the child SNP be the second node from the root of the tree. (optional - defaults to 0)
+# arg7: MAF threshold for filtering SNPs
+# arg8: 0 or 1 indicating whether to include just the parent (0) or both the parent and child SNPs (1) in the regression as covariates, or 2 if the regular p-values should be converted to t-test p-values. 1 requires that the child SNP be the second node from the root of the tree. (optional - defaults to 0)
 # ex: workflow/scripts/midway_manhattan.bash out/19_55363180-55833573/genotypes/snps.pgen 19_55363180-55833573.indep.pheno 19_55363180-55833573.indep.hap 19_55363180-55833573.indep H0 rs61734259 0.005 1
 
 pgen_file="$1"
@@ -56,6 +57,8 @@ grep -m1 -P "\t"$snp_id"\t" "${pgen_file%.pgen}.pvar" >/dev/null || {
 allele=$(grep "$(grep -m1 -P '^V\t'"$hap_id"'\t.*\t'"$snp_id"'\t' "$hap_file" | cut -f5,6)" "${pgen_file%.pgen}.pvar" | wc -l)
 allele=$(expr 1 - $allele)
 
+# use --mac 1 if maf is 0
+[ "$maf" == "0" ] && maf="0.0000000005"
 
 ############################################## MAIN PROGRAM ########################################
 
@@ -106,7 +109,7 @@ else
     last_arg="-a $(grep -P '^V\t.*\t'"$parent_snp_id"'\t' "$hap_file" | cut -f7)"
 fi
 
-linear_file="$(ls -1 "$out_prefix".*.glm.linear | tail -n1)"
+linear_file="$(ls -1 "$out_prefix".*.glm.linear | grep -v parent | tail -n1)"
 
 if [ "$condition" -eq 2 ]; then
     # first, get the parent haplotype as a PGEN file

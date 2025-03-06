@@ -28,6 +28,7 @@ if mode == "run":
 if Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
     with open(Path(config["locus"])) as f:
         # the fourth column of the bed file must contain the name of the trait
+        # or, if mode == "midway", the name of the hap file
         locus_file = [
             (cols[3], f"{cols[0]}_{float(cols[1]):.0f}-{float(cols[2]):.0f}")
             for cols in (line.strip().split() for line in f)
@@ -64,6 +65,16 @@ if mode == "ld_range" and check_config("num_haps", place=config["modes"][mode]):
     if isinstance(config["modes"][mode]["num_haps"], int):
         config["modes"][mode]["num_haps"] = [config["modes"][mode]["num_haps"],]
 
+if mode == "midway":
+    config["locus_traits"] = dict(zip(locus, locus_traits))
+    if not check_config("beta", place=config["modes"][mode]):
+        # if no beta is specified, then we default to whatever is in the original hap
+        # file (represented by a placeholder of 0)
+        config["modes"][mode]["beta"] = (0,)
+    if not check_config("reps", place=config["modes"][mode]):
+        # if no reps are specified, then we default to just 1
+        config["modes"][mode]["reps"] = 1
+
 if mode != "run":
     module simulate:
         snakefile: "rules/simulate.smk"
@@ -95,7 +106,7 @@ if check_config("covar"):
     if "pheno_matrix" in covar_config:
         covar_file = rules.covariates_merge.output.covar
 
-if mode in ("str", "snp", "hap", "ld_range"):
+if mode in ("str", "snp", "hap", "ld_range", "midway"):
     happler_config = {
         "pheno": rules.simulate_simphenotype.output.pheno,
         "hap_file": rules.simulate_transform.input.hap,
@@ -106,13 +117,15 @@ if mode in ("str", "snp", "hap", "ld_range"):
         "min_maf": check_config("min_maf", 0),
         "out_thresh": 1, # artificially set to 1 to avoid filtering
     }
-    if mode in ("hap", "ld_range"):
+    if mode in ("hap", "ld_range", "midway"):
         happler_config["snps"] = []
         happler_config["causal_gt"] = rules.simulate_transform.output
         if mode == "hap":
             happler_config["snps"] = config["modes"][mode]["alleles"]
         elif mode == "ld_range":
             happler_config["out"] = config["out"] + "/happler/"+mode+"/{num_haps}_haps/ld_{ld}/beta_{beta}/alpha_{alpha}"
+        elif mode == "midway":
+            happler_config["out"] = config["out"] + "/midway/sim_{sim_mode}/beta_{beta}"
     elif mode in ("str", "snp"):
         # also provide the SNP and STR IDs so that they can be used in the manhattan plot
         happler_config["snps"] = (config["modes"][mode]["id"],)
@@ -136,6 +149,12 @@ elif mode == "run":
         happler_config["SVs"] = config["modes"][mode]["SVs"]
 else:
     raise ValueError("Unsupported operating 'mode' in config")
+
+if mode == "midway":
+    module midway:
+        snakefile: "rules/midway.smk"
+        config: happler_config
+    use rule * from midway as midway_*
 
 module happler:
     snakefile: "rules/happler.smk"
@@ -163,6 +182,8 @@ plots_config = {
 }
 if mode == "ld_range":
     plots_config["ld_range_checkpoint"] = checkpoints.simulate_create_hap_ld_range
+elif mode == "midway":
+    plots_config["midway_linear"] = rules.midway_manhattan.output.linear
 
 module plots:
     snakefile: "rules/plots.smk"
@@ -222,6 +243,17 @@ elif mode == "run":
         input:
             FINAL_OUTPUT
         default_target: True
+elif mode == "midway":
+    FINAL_OUTPUT = expand(
+        [
+            rules.midway_manhattan.output.png,
+        ],
+        rep=range(config["modes"][mode]["reps"]),
+        beta=config["modes"][mode]["beta"],
+        switch=("tscore", "interact"),
+        sim_mode=("w", "wo"),
+        allow_missing=True,
+    )
 else:
     FINAL_OUTPUT = expand(
         [
@@ -232,7 +264,7 @@ else:
             # rules.plots_params.output.png,
         ],
         ex=(("in",) if mode == "hap" else ("ex", "in")),
-        beta=config["modes"]["hap"]["beta"],
+        beta=config["modes"][mode]["beta"],
         allow_missing=True,
     )
     if check_config("reps", place=config["modes"][mode]):
