@@ -99,7 +99,7 @@ save_curr_env = function(env = parent.frame(), filePath = "myenv.RData") {
 }
 
 readHap = function(hapfile) {
-  # Return a data.frame with the start, end, and ID columns of the haplotyp lines
+  # Return a data.frame with the start, end, and ID columns of the haplotype lines
   # in the .hap file
   # Parameters:
   #   hapfile: The path to the .hap file

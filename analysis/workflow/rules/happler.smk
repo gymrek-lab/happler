@@ -33,7 +33,7 @@ rule sub_pheno:
     output:
         pheno=out + "/phen.pheno",
     resources:
-        runtime=5,
+        runtime=7,
     threads: 1,
     log:
         logs + "/sub_pheno",

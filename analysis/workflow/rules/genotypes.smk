@@ -184,7 +184,11 @@ rule subset:
     params:
         prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
         out=lambda wildcards, output: Path(output.pgen).with_suffix(""),
-        sampsize=lambda wildcards: wildcards.sampsize,
+        start=lambda wildcards: parse_locus(wildcards.locus)[1],
+        end=lambda wildcards: parse_locus(wildcards.locus)[2],
+        chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
+        sampsize=lambda wildcards: int(wildcards.sampsize)+1,
+        maf="--maf "+str(config["min_maf"]) if config["min_maf"] != 0 else "--mac 1",
     output:
         pgen=out+"/subset/{sampsize}.pgen",
         pvar=out+"/subset/{sampsize}.pvar",
@@ -200,5 +204,7 @@ rule subset:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --keep <(head -n {params.sampsize} {input.psam} | grep -Ev '^#' | cut -f1) "
+        "plink2 --allow-extra-chr --nonfounders --from-bp {params.start} "
+        "--to-bp {params.end} --chr {params.chrom} --max-alleles 2 {params.maf} "
+        "--keep <(head -n {params.sampsize} {input.psam} | grep -Ev '^#' | cut -f1) "
         "--make-pgen --pfile {params.prefix} --out {params.out} &>{log}"
