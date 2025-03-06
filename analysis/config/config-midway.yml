@@ -14,8 +14,9 @@
 # required!
 # snp_panel: "data/simulations/1000G/19_45401409-46401409.pgen"
 # str_panel: "/tscc/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
-snp_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.SNPs.pgen"
-str_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.STRs.pgen"
+# snp_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.SNPs.pgen"
+# str_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.STRs.pgen"
+snp_panel: data/simulations/midway/1000G/gts.pgen
 
 
 # Path to a list of samples to exclude from the analysis
@@ -40,7 +41,8 @@ str_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.STRs.pgen"
 # genome of the reference panel VCFs
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required! and unless otherwise noted, all attributes of each mode are required
-locus: 19:45401409-46401409 # center: 45901409 (APOe4)
+# locus: 19:45401409-46401409 # center: 45901409 (APOe4)
+locus: data/simulations/midway/1000G/loci.bed
 modes:
  str:
   pos: 19:45903859
