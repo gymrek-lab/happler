@@ -66,8 +66,8 @@ modes:
  midway:
   # beta: [0.214, 0.285, 0.356]
   # beta: [0.285]
-  reps: 5
-  haps: data/simulations/midway/1000G/haps
+  # reps: 1
+  haps: data/simulations/midway/1000G/haps/{locus}.hap
  run:
   pheno: data/geuvadis/phenos/{trait}.pheno
   SVs: data/geuvadis/pangenie_hprc_hg38_all-samples_bi_SVs-missing_removed.pgen

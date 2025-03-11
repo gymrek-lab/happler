@@ -48,6 +48,11 @@ def agg_ld_range_causal(wildcards):
             num_haps=config["mode_attrs"]["num_haps"],
             **wildcards,
         )
+    elif mode == "midway":
+        return expand(
+            config["causal_hap"],
+            locus = config["loci"],
+        )
     else:
         return expand(
             config["causal_hap"],
@@ -77,9 +82,33 @@ def agg_ld_range_metrics(wildcards):
             **wildcards,
         )
 
+def agg_midway_linear(wildcards):
+    """ return a list of midway linear files """
+    if wildcards.switch == "interact":
+        sim_modes = ("hap", "indep")
+    elif wildcards.switch == "tscore":
+        sim_modes = ("hap", "parent")
+    else:
+        raise ValueError("switch must be interact or tscore")
+    return expand(
+        config["midway_linear"],
+        locus=config["loci"],
+        rep=range(config["mode_attrs"]["reps"]),
+        sim_mode=sim_modes,
+        beta=config["mode_attrs"]["beta"],
+        **wildcards,
+        allow_missing=True,
+    )
+
 fill_out_globals = lambda wildcards, val: expand(
     val,
     locus=wildcards.locus,
+    sampsize=wildcards.sampsize,
+    allow_missing=True,
+)
+
+fill_out_globals_midway = lambda wildcards, val: expand(
+    val,
     sampsize=wildcards.sampsize,
     allow_missing=True,
 )
@@ -138,3 +167,31 @@ rule metrics:
         "workflow/scripts/parameter_plot.py -o {output.png} -m {params.metrics} "
         "--order num_haps,beta,ld "
         "{input.gts} {params.observed_haps} {params.causal_hap} &> {log}"
+
+
+rule midway:
+    """summarize the results from many midway-manhattan runs"""
+    input:
+        linears=agg_midway_linear,
+        snplists=agg_ld_range_causal,
+    params:
+        case_type="sim_mode",
+        thresh="0.3",
+        pos_type="hap",
+        linears=lambda wildcards: fill_out_globals_midway(wildcards, config["midway_linear"]),
+        causal_hap = lambda wildcards: fill_out_globals_midway(wildcards, config["causal_hap"]),
+    output:
+        png=out + "/midway_summary.{switch}.png",
+    resources:
+        runtime=20,
+    log:
+        logs + "/midway.{switch}",
+    benchmark:
+        bench + "/midway.{switch}",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "workflow/scripts/midway_manhattan_summary.py "
+        "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
+        "--thresh {params.thresh} " # TODO: add -f flag
+        "{params.linears} {params.causal_hap} {params.case_type}"

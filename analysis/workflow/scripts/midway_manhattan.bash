@@ -141,6 +141,9 @@ if [ "$condition" -eq 2 ]; then
     last_arg="-a 0.05"
 fi
 
+# save symlink to linear file for future use
+ln -sfnr "$linear_file" "$out_prefix".linear
+
 # step 3: use manhattan.py to actually create the manhattan plot
 "$SCRIPT_DIR"/manhattan.py \
 -i "$snp_id" \

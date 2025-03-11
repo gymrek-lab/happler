@@ -25,10 +25,11 @@ mode = config["mode"]
 # handle locus
 if mode == "run":
     pheno_set = set(glob_wildcards(Path(config["modes"][mode]["pheno"])).trait)
-if Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
+if mode == "midway":
+    locus = glob_wildcards(config["modes"][mode]["haps"]).locus
+elif Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
     with open(Path(config["locus"])) as f:
         # the fourth column of the bed file must contain the name of the trait
-        # or, if mode == "midway", the name of the hap file
         locus_file = [
             (cols[3], f"{cols[0]}_{float(cols[1]):.0f}-{float(cols[2]):.0f}")
             for cols in (line.strip().split() for line in f)
@@ -66,7 +67,6 @@ if mode == "ld_range" and check_config("num_haps", place=config["modes"][mode]):
         config["modes"][mode]["num_haps"] = [config["modes"][mode]["num_haps"],]
 
 if mode == "midway":
-    config["locus_traits"] = dict(zip(locus, locus_traits))
     if not check_config("beta", place=config["modes"][mode]):
         # if no beta is specified, then we default to whatever is in the original hap
         # file (represented by a placeholder of 0)
@@ -155,12 +155,12 @@ if mode == "midway":
         snakefile: "rules/midway.smk"
         config: happler_config
     use rule * from midway as midway_*
-
-module happler:
-    snakefile: "rules/happler.smk"
-    config: happler_config
-use rule * from happler as happler_*
-merged_happler = rules.happler_merge.output.pgen
+else:
+    module happler:
+        snakefile: "rules/happler.smk"
+        config: happler_config
+    use rule * from happler as happler_*
+    merged_happler = rules.happler_merge.output.pgen
 
 if mode == "ld_range" and config["modes"][mode]["random"]:
     happler_config["random"] = rules.simulate_random_transform.output
@@ -175,15 +175,18 @@ plots_config = {
     "out": config["out"] + "/plots",
     "mode": mode,
     "mode_attrs": config["modes"][mode],
-    "happler_hap": rules.happler_run.output.hap,
     "causal_hap": rules.simulate_transform.input.hap if mode != "run" else [],
     "snp_panel": config["gts_snp_panel"],
-    "happler_metrics": rules.happler_metrics.output.metrics,
 }
 if mode == "ld_range":
     plots_config["ld_range_checkpoint"] = checkpoints.simulate_create_hap_ld_range
 elif mode == "midway":
     plots_config["midway_linear"] = rules.midway_manhattan.output.linear
+    plots_config["loci"] = locus
+    plots_config["out"] = plots_config["out"].replace("/plots", "").replace("{locus}", "plots")
+else:
+    plots_config["happler_metrics"] = rules.happler_metrics.output.metrics
+    plots_config["happler_hap"] = rules.happler_run.output.hap
 
 module plots:
     snakefile: "rules/plots.smk"
@@ -246,13 +249,10 @@ elif mode == "run":
 elif mode == "midway":
     FINAL_OUTPUT = expand(
         [
-            rules.midway_manhattan.output.png,
+            rules.plots_midway.output.png,
         ],
-        rep=range(config["modes"][mode]["reps"]),
-        beta=config["modes"][mode]["beta"],
         switch=("tscore", "interact"),
-        sim_mode=("w", "wo"),
-        allow_missing=True,
+        sampsize=config["sample_size"],
     )
 else:
     FINAL_OUTPUT = expand(

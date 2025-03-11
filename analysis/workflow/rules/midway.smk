@@ -16,6 +16,8 @@ rule sub_pheno:
         rep=lambda wildcards: int(wildcards.rep)+2,
     output:
         pheno=out + "/phen.pheno",
+    wildcard_constraints:
+        rep="\d+"
     resources:
         runtime=7,
     threads: 1,
@@ -42,13 +44,15 @@ rule manhattan:
         pts=pheno,
         hap=config["hap_file"]
     params:
-        out_prefix = lambda wildcards, output: str(Path(output.png).with_suffix("")),
+        out_prefix = lambda wildcards, output: str(output.dir) + "/out",
         maf=config["min_maf"],
         target = "H0",
         tswitch=lambda wildcards: 2 if wildcards.switch == "tscore" else 1,
     output:
-        linear=out + "/{switch}/out.{suffix}.linear", # TODO: if tswitch = interact, suffix should be hap.glm otherwise ttest
-        png=out + "/{switch}/out.png",
+        dir=directory(out + "/{switch}"),
+        linear=out + "/{switch}/out.linear",
+    wildcard_constraints:
+        switch="(tscore|interact)"
     resources:
         runtime=10,
     log:

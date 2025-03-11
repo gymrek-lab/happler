@@ -32,6 +32,8 @@ rule sub_pheno:
         rep=lambda wildcards: int(wildcards.rep)+2,
     output:
         pheno=out + "/phen.pheno",
+    wildcard_constraints:
+        rep="\d+"
     resources:
         runtime=7,
     threads: 1,
