@@ -88,12 +88,21 @@ def get_snp_id(
         The SNP ID from the snplist file
     """
     # load the snp ID from the snplist file
-    with open(snplist) as snplist_file:
-        snp_id = snplist_file.readlines()[-1].split("\t")[0]
+    if snplist.suffix == ".snplist":
+        with open(snplist) as snplist_file:
+            snp_id = snplist_file.readlines()[-1].split("\t")[0]
+    else:
+        # load from a hap file
+        with open(snplist) as hap_file:
+            snp_id = [
+                line.split("\t")[4]
+                for line in hap_file.readlines()
+                if line.startswith("V")
+            ][-1]
     return snp_id
 
 
-def scatter_hist(x, y, ax, ax_histx, ax_histy, colors, zoom=True):
+def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     """
     Adapted from https://matplotlib.org/stable/gallery/lines_bars_and_markers/scatter_hist.html#sphx-glr-gallery-lines-bars-and-markers-scatter-hist-py
     """
@@ -102,7 +111,10 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors, zoom=True):
     ax_histy.tick_params(axis="y", labelleft=False)
 
     # the scatter plot:
-    ax.scatter(x, y, color=colors)
+    if colors is None:
+        ax.scatter(x, y)
+    else:
+        ax.scatter(x, y, color=colors)
 
     # now determine nice limits by hand:
     xmax = np.max(np.abs(x))
@@ -212,6 +224,8 @@ def main(
     files will be matched together:
     {region}.{type}/1/out.{rep}.{name}.glm.linear
     {region}.{type}/2/out.{rep}.{name}.glm.linear
+
+    The snplists files can either be formatted as snplist files or hap files
     """
     log = getLogger("midway_manhattan_summary")
     log.setLevel(verbosity)
@@ -345,11 +359,13 @@ def main(
         ax_roc.legend(loc = 'lower right')
         ax_roc.plot([0, 1], [0, 1], "--", color="orange")
         tpr_thresh = tpr[thresh_idx]
+        if tpr_thresh != 0:
+            ax_roc.axline((0, tpr_thresh), (tpr_thresh, tpr_thresh), color="red", lw=0.9)
         fpr_thresh = fpr[thresh_idx]
-        ax_roc.axline((0, tpr_thresh), (tpr_thresh, tpr_thresh), color="red")
-        ax_roc.axline((fpr_thresh, 0), (fpr_thresh, fpr_thresh), color="red")
-        ax_roc.set_xlim([0, 1])
-        ax_roc.set_ylim([0, 1])
+        if fpr_thresh != 0:
+            ax_roc.axline((fpr_thresh, 0), (fpr_thresh, fpr_thresh), color="red", lw=0.9)
+        ax_roc.set_xlim([-0.005, 1.005])
+        ax_roc.set_ylim([-0.005, 1.005])
         ax_roc.set_ylabel('True Positive Rate')
         ax_roc.set_xlabel('False Positive Rate')
     else:
@@ -364,7 +380,10 @@ def main(
     ax_histx = subfig.add_subplot(gs[0, 0], sharex=ax)
     ax_histy = subfig.add_subplot(gs[1, 1], sharey=ax)
     # Draw the scatter plot and marginals.
-    scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy, colors=colors)
+    if color is None:
+        scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy)
+    else:
+        scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy, colors=colors)
     max_val = vals.max()
     thresh = -np.log10(thresh)
     ax.set_xlabel(case_type + ": " + ax_labs[1])

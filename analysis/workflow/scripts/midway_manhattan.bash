@@ -109,7 +109,7 @@ else
     last_arg="-a $(grep -P '^V\t.*\t'"$parent_snp_id"'\t' "$hap_file" | cut -f7)"
 fi
 
-linear_file="$(ls -1 "$out_prefix".*.glm.linear | grep -v parent | tail -n1)"
+linear_file="$(ls -1 "$out_prefix".*.glm.linear | grep -v 'out\.parent\..*\.glm\.linear' | tail -n1)"
 
 if [ "$condition" -eq 2 ]; then
     # first, get the parent haplotype as a PGEN file

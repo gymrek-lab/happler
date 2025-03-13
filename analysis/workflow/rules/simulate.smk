@@ -106,6 +106,11 @@ rule transform:
         pgen=config["gts_snp_panel"],
         pvar=Path(config["gts_snp_panel"]).with_suffix(".pvar"),
         psam=Path(config["gts_snp_panel"]).with_suffix(".psam"),
+    params:
+        # we remove the last V line (the target SNP) from the hap file if we're simulating a "parent" haplotype
+        hap=lambda wildcards, input: "<(sed '${/^V/ d;}' " + input.hap + ")" if (
+            mode == "midway" and wildcards.sim_mode == "parent"
+        ) else input.hap,
     output:
         pgen=out + "/transform.pgen",
         pvar=out + "/transform.pvar",
@@ -119,7 +124,7 @@ rule transform:
     conda:
         "happler"
     shell:
-        "haptools transform -o {output.pgen} {input.pgen} {input.hap} &>{log}"
+        "haptools transform -o {output.pgen} {input.pgen} {params.hap} &>{log}"
 
 
 rule hap2snplist:
@@ -153,18 +158,13 @@ def simphenotype_input_pgen(wildcards):
         return rules.transform.output.pgen
 
 def simphenotype_params_hap(wildcards, input):
-    input_hap = input.hap
-    if mode == "midway" and wildcards.sim_mode != "hap":
-        if wildcards.sim_mode == "indep":
-            return input_hap
-        # if sim_mode == "parent", we remove the last V line (the target SNP) from the hap file
-        input_hap = "sed '${/^V/ d;}' " + input_hap
-    else:
-        input_hap = "cat " + input_hap
+    if mode == "midway" and wildcards.sim_mode == "indep":
+        # just return the input_hap, which will be a snplist file that has the proper beta
+        return input.hap
     # if the beta value is 0, we just use the beta of the hap file
     # otherwise, we change it on the fly
     # note that we don't need to mess with the beta if we're using a snplist file
-    return "<(" + input.hap + (
+    return "<(cat " + input.hap + (
         "" if float(wildcards.beta) == 0 else
         " | awk -F $'\\t' -v 'OFS=\\t' \'$1 == \"H\" { $6 = " + wildcards.beta + " }1\'"
     )+")"

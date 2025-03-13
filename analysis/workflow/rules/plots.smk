@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 
@@ -82,14 +83,16 @@ def agg_ld_range_metrics(wildcards):
             **wildcards,
         )
 
+
+switch_sim_mode = {
+    "interact": ("hap", "indep"),
+    "tscore": ("hap", "parent"),
+}
+
+
 def agg_midway_linear(wildcards):
     """ return a list of midway linear files """
-    if wildcards.switch == "interact":
-        sim_modes = ("hap", "indep")
-    elif wildcards.switch == "tscore":
-        sim_modes = ("hap", "parent")
-    else:
-        raise ValueError("switch must be interact or tscore")
+    sim_modes = switch_sim_mode[wildcards.switch]
     return expand(
         config["midway_linear"],
         locus=config["loci"],
@@ -110,6 +113,7 @@ fill_out_globals = lambda wildcards, val: expand(
 fill_out_globals_midway = lambda wildcards, val: expand(
     val,
     sampsize=wildcards.sampsize,
+    switch=wildcards.switch,
     allow_missing=True,
 )
 
@@ -169,6 +173,9 @@ rule metrics:
         "{input.gts} {params.observed_haps} {params.causal_hap} &> {log}"
 
 
+create_glob_from_wildcards = lambda path, wildcards: re.sub(r"\{[^}]+\}", "*", expand(path, sim_mode="{"+switch_sim_mode[wildcards.switch].join(",")+"}", allow_missing=True))
+
+
 rule midway:
     """summarize the results from many midway-manhattan runs"""
     input:
@@ -180,6 +187,14 @@ rule midway:
         pos_type="hap",
         linears=lambda wildcards: fill_out_globals_midway(wildcards, config["midway_linear"]),
         causal_hap = lambda wildcards: fill_out_globals_midway(wildcards, config["causal_hap"]),
+        linears_glob = lambda wildcards: expand(
+            re.sub(
+                r"\{(?!sim_mode\})[^}]+\}", "*",
+                fill_out_globals_midway(wildcards, config["midway_linear"])[0],
+            ),
+            sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
+            allow_missing=True,
+        )[0]
     output:
         png=out + "/midway_summary.{switch}.png",
     resources:
@@ -193,5 +208,5 @@ rule midway:
     shell:
         "workflow/scripts/midway_manhattan_summary.py "
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
-        "--thresh {params.thresh} " # TODO: add -f flag
-        "{params.linears} {params.causal_hap} {params.case_type}"
+        "--thresh {params.thresh} -f <(ls -1 {params.linears_glob}) --color locus "
+        "{params.linears} {params.causal_hap} {params.case_type} &>{log}"
