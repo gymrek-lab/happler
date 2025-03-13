@@ -183,7 +183,6 @@ rule midway:
         snplists=agg_ld_range_causal,
     params:
         case_type="sim_mode",
-        thresh="0.3",
         pos_type="hap",
         linears=lambda wildcards: fill_out_globals_midway(wildcards, config["midway_linear"]),
         causal_hap = lambda wildcards: fill_out_globals_midway(wildcards, config["causal_hap"]),
@@ -208,5 +207,5 @@ rule midway:
     shell:
         "workflow/scripts/midway_manhattan_summary.py "
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
-        "--thresh {params.thresh} -f <(ls -1 {params.linears_glob}) --color locus "
+        "-f <(ls -1 {params.linears_glob}) --color locus "
         "{params.linears} {params.causal_hap} {params.case_type} &>{log}"

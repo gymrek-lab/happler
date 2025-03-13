@@ -1,8 +1,8 @@
 #!/usr/bin/env python
+import logging
+import warnings
 from pathlib import Path
-from logging import Logger
 from decimal import Decimal
-from logging import getLogger
 
 import click
 import matplotlib
@@ -14,6 +14,50 @@ import matplotlib.pyplot as plt
 # from sklearn.metrics import roc_curve, auc
 
 from snakemake_io import glob_wildcards, remove_regexes
+
+
+def getLogger(name: str = None, level: str = "ERROR", exact_time=False):
+    """
+    Retrieve a Logger object
+
+    Parameters
+    ----------
+    name : str, optional
+        The name of the logging object
+    level : str, optional
+        The level of verbosity for the logger
+    """
+    if name is None:
+        name = ""
+    else:
+        name = "." + name
+
+    # create logger
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    # create console handler and set level to debug
+    ch = logging.StreamHandler()
+    ch.setLevel(level)
+
+    # create formatter
+    db_time = (
+        ("|%(asctime)s" + (".%(msecs)03d" if exact_time else ""))
+        if level == "DEBUG"
+        else ""
+    )
+    formatter = logging.Formatter(
+        fmt="[%(levelname)8s" + db_time + "] %(message)s (%(filename)s:%(lineno)s)",
+        datefmt="%H:%M:%S",
+    )
+
+    # add formatter to ch
+    ch.setFormatter(formatter)
+
+    # add ch to logger
+    logger.addHandler(ch)
+
+    return logger
 
 
 PLINK_COLS = {
@@ -41,7 +85,7 @@ def load_linear_file(linear_fname: Path):
 def get_pval(
     linear: Path,
     snp_id: str,
-    log: Logger = None
+    log: logging.Logger = None
 ) -> float:
     """
     Extract the p-value from the linear file which corresponds with the last SNP ID in
@@ -53,7 +97,7 @@ def get_pval(
         The path to a PGEN file containing genotypes for all haplotypes and their SNPs
     snp_id: str
         The ID of the target SNP
-    log: Logger, optional
+    log: logging.Logger, optional
         A logging object to write any debugging and error messages
 
     Returns
@@ -70,7 +114,7 @@ def get_pval(
 
 def get_snp_id(
     snplist: Path,
-    log: Logger = None
+    log: logging.Logger = None
 ) -> float:
     """
     Extract the last SNP ID from the snplist file
@@ -79,7 +123,7 @@ def get_snp_id(
     ----------
     snplist: Path
         The path to a .hap file containing a set of haplotypes
-    log: Logger, optional
+    log: logging.Logger, optional
         A logging object to write any debugging and error messages
 
     Returns
@@ -180,8 +224,8 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     "-t",
     "--thresh",
     type=float,
-    default=0.05,
-    show_default=True,
+    default=None,
+    show_default="FDR 0.05",
     help="The significance threshold"
 )
 @click.option(
@@ -209,7 +253,7 @@ def main(
     max_val: float = np.inf,
     color: str = None,
     pos_type: str = None,
-    thresh: float = 0.05,
+    thresh: float = None,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -227,12 +271,12 @@ def main(
 
     The snplists files can either be formatted as snplist files or hap files
     """
-    log = getLogger("midway_manhattan_summary")
-    log.setLevel(verbosity)
+    log = getLogger("midway_manhattan_summary", level=verbosity)
 
     # which files should we originally consider?
     # by default, we just grab as many as we can
     if files is not None:
+        log.debug("Obtaining filtering list")
         with open(files, "r") as files_subset_file:
             files = files_subset_file.read().splitlines()
 
@@ -244,6 +288,7 @@ def main(
     if color is not None:
         assert color in params.keys()
     dtypes = {k: "U30" for k in params.keys()}
+    log.debug(f"Extracted paramter values {tuple(dtypes.keys())}")
     # convert the dictionary to a numpy mixed dtype array
     params = np.array(list(zip(*params.values())), dtype=list(dtypes.items()))
     params.sort()
@@ -252,6 +297,7 @@ def main(
 
     get_fname = lambda path, param_set: Path(str(path).format(**dict(zip(dtypes.keys(), param_set))))
 
+    log.debug(f"Extracting SNP IDs from {len(params)} .snplist files")
     snp_IDs = {
         idx: get_snp_id(
             get_fname(str(snplists), params[idx]),
@@ -260,6 +306,7 @@ def main(
         for idx in range(len(params))
     }
 
+    log.debug("Setting up axes")
     axes_idxs = {
         case_type_val: np.where(params[case_type] == case_type_val)[0]
         for case_type_val in tuple(np.unique(params[case_type]))
@@ -272,6 +319,7 @@ def main(
 
     # color reps the same
     if color is not None:
+        log.debug("Setting up colors")
         color_vals = params[axes_idxs[ax_labs[0]]][color]
         # check that the regions are the same in each
         assert (color_vals == params[axes_idxs[ax_labs[1]]][color]).all()
@@ -298,6 +346,7 @@ def main(
             np.where(np.isin(axes_idxs[case_type_val], exclude_idxs))[0]
             for case_type_val in ax_labs
         ))
+        log.debug(f"Excluding {len(exclude_idxs)} points")
         for ax_lab in ax_labs:
             axes_idxs[ax_lab] = np.delete(axes_idxs[ax_lab], exclude_idxs, 0)
         if color is not None:
@@ -309,6 +358,7 @@ def main(
 
     # compute -log10 pval for the target SNP in each linear file
     # Note: this will return a 2D array where each column corresponds to a plot axis
+    log.debug(f"Extracting pvals from linear files")
     vals = np.array(
         [
             [
@@ -322,6 +372,7 @@ def main(
             for case_type_val in axes_idxs
         ]
     ).T
+    log.debug(f"Found {vals.shape[0]} points")
 
     # remove any vals that were NA (but got converted to 0)
     # and also any vals that were greater than max-val
@@ -332,6 +383,7 @@ def main(
     not_na_rows_idxs = np.sort(np.concatenate(list(not_na_rows_idxs.values())))
     params = params[not_na_rows_idxs]
     vals = vals[~na_rows]
+    log.debug(f"Removed {na_rows.sum()} NA points, resulting in {vals.shape[0]} remaining")
 
     # finally, make the plot
     # Add a gridspec with two rows and two columns and a ratio of 1 to 4 between
@@ -339,12 +391,27 @@ def main(
     # Also adjust the subplot parameters for a square plot.
     # And if requested, compute an ROC curve, as well
     if pos_type is not None:
+        log.debug("Plotting AUROC")
         from sklearn.metrics import roc_curve, auc
         # first, get the roc curve vals
         pos_labs = np.zeros(vals.shape, dtype=np.bool_)
         pos_labs[:,pos_type] = True
         fpr, tpr, threshold = roc_curve(pos_labs.flatten("F"), vals.flatten("F"), drop_intermediate=True)
-        thresh_idx = np.argmax(threshold < -np.log10(thresh))
+        if thresh is None:
+            with warnings.catch_warnings():
+                # safe to ignore runtime warning caused by division of 0 by 0
+                warnings.simplefilter("ignore")
+                # compute FDR for each threshold
+                # note that this computation only works because number of TN == number of TP
+                fdr = fpr / (fpr + tpr)
+                # set nan to 0
+                fdr[np.isnan(fdr)] = 0
+            # find the threshold (last index) where FDR <= 0.05
+            thresh_idx = np.where(fdr <= 0.05)[0][-1]
+            thresh = 10**(-threshold[thresh_idx])
+            print(f"Threshold: {thresh}")
+        else:
+            thresh_idx = np.argmax(threshold < -np.log10(thresh))
         roc_auc = auc(fpr, tpr)
         # now, make the fig
         fig = plt.figure(figsize=(11, 6), layout='constrained')
@@ -380,11 +447,13 @@ def main(
     ax_histx = subfig.add_subplot(gs[0, 0], sharex=ax)
     ax_histy = subfig.add_subplot(gs[1, 1], sharey=ax)
     # Draw the scatter plot and marginals.
+    log.debug("Creating scatter plot")
     if color is None:
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy)
     else:
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy, colors=colors)
     max_val = vals.max()
+    fig.text(0.98, 0.98, f'Threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
     thresh = -np.log10(thresh)
     ax.set_xlabel(case_type + ": " + ax_labs[1])
     ax.set_ylabel(case_type + ": " + ax_labs[0])
