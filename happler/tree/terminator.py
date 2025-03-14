@@ -140,7 +140,7 @@ class TTestTerminator(Terminator):
                 cov = parent_corr * parent_res.stderr * results.data["stderr"]
             # now, we can compute the standard error of the difference of the effect sizes
             std_err = np.sqrt(
-                (((results.data["stderr"] ** 2) + (parent_res.stderr**2)) / 2) - 2*cov
+                (((results.data["stderr"] ** 2) + (parent_res.stderr**2)) / 2) + 2*cov
             )
             if std_err[best_idx] == 0:
                 # if we have a standard error of 0, then we already know the result is
