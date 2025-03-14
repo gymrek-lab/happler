@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from haptools import data
 from haptools.logging import getLogger
+from haptools.ld import pearson_corr_ld
 
 from happler.tree.assoc_test import NodeResults
 from happler.tree.terminator import TTestTerminator
@@ -55,6 +56,14 @@ def load_linear_file(linear_fname: Path):
     ),
 )
 @click.option(
+    "-c",
+    "--covariance",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Use the covariance correction",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -76,6 +85,7 @@ def main(
     linear_gts: Path,
     parent_gts: Path,
     hap_id: str = None,
+    covariance: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -94,18 +104,29 @@ def main(
     parent_df = parent_df.iloc[0]
 
     log.info("Loading genotypes")
-    linear_gts = data.GenotypesPLINK.load(linear_gts)
-    linear_gts.subset(variants=tuple(df["id"]), inplace=True)
-    linear_stds = linear_gts.data.sum(axis=2).std(axis=0)
     parent_gts = data.GenotypesPLINK.load(parent_gts)
+    # reorder to match
     parent_gts.subset(variants=(parent_df["id"],), inplace=True)
     parent_stds = parent_gts.data.sum(axis=2).std(axis=0)
+    linear_gts = data.GenotypesPLINK.load(linear_gts)
+    # reorder to match
+    linear_gts.subset(variants=tuple(df["id"]), inplace=True)
+    linear_stds = linear_gts.data.sum(axis=2).std(axis=0)
 
     log.info("Adjusting betas and stderrs")
     df["beta"] = df["beta"] * linear_stds
     df["stderr"] = df["stderr"] * linear_stds
     parent_df["beta"] = parent_df["beta"] * parent_stds
     parent_df["stderr"] = parent_df["stderr"] * parent_stds
+
+    if covariance:
+        log.info("Computing correlations")
+        parent_corr = pearson_corr_ld(
+            linear_gts.data.sum(axis=2),
+            parent_gts.data.sum(axis=2),
+        )[:,0]
+    else:
+        parent_corr = 0
 
     log.info("Computing t-test p-values")
     num_tests = 1
@@ -126,6 +147,7 @@ def main(
             idx,
             num_samps,
             num_tests,
+            parent_corr=parent_corr,
             short_circuit=False,
         ) for idx, val in df.iterrows()
     ]

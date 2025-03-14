@@ -413,6 +413,7 @@ def main(
         else:
             thresh_idx = np.argmax(threshold < -np.log10(thresh))
         roc_auc = auc(fpr, tpr)
+        print(f"AUROC: {roc_auc}")
         # now, make the fig
         fig = plt.figure(figsize=(11, 6), layout='constrained')
         subfigs = fig.subfigures(1, 2, wspace=0, width_ratios=(6, 5))

@@ -132,6 +132,7 @@ if [ "$condition" -eq 2 ]; then
     # now, convert the plink2 --glm results into t-test p-values
     "$SCRIPT_DIR"/linear2ttest.py \
     -i "$hap_id" \
+    --covariance \
     --verbosity DEBUG \
     -o "$out_prefix".ttest.linear \
     "$linear_file" "$out_prefix".parent.*.glm.linear \
