@@ -50,7 +50,7 @@ def find_haps(
                 Variant(start=vr["pos"], end=vr["pos"]+1, id=vr['id'], allele=al)
                 for vr, al in zip(snp_vars, allele_combo)
             )
-            combo_ld = np.abs(pearson_corr_ld(*tuple(sum_gts[:, snp_id] for snp_id in combo_id)))
+            combo_ld = pearson_corr_ld(*tuple(sum_gts[:, snp_id] for snp_id in combo_id))**2
             # which bin does this LD value fall in?
             bin_idx = np.argmax(combo_ld < intervals)
             if len(ld_bins[bin_idx]) < num_haps:

@@ -192,8 +192,8 @@ class TreeBuilder:
                 self.gens.data[:, sibling["variant"].idx, :] == sibling["allele"]
             )
             # step 4: check whether the leaf node is in strong LD with its sibling
-            ld = pearson_corr_ld(leaf_gts.sum(axis=1), sibling_gts.sum(axis=1))
-            if np.abs(ld) > self.ld_prune_thresh:
+            ld = pearson_corr_ld(leaf_gts.sum(axis=1), sibling_gts.sum(axis=1))**2
+            if ld > self.ld_prune_thresh:
                 self.log.debug(f"Pruning {leaf_var.id} with LD {ld}")
                 count += 1
                 # step 5: if it is, remove it

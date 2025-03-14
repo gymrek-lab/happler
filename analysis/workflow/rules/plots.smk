@@ -197,7 +197,7 @@ rule midway:
     output:
         png=out + "/midway_summary.{switch}.png",
     resources:
-        runtime=20,
+        runtime=7,
     log:
         logs + "/midway.{switch}",
     benchmark:
