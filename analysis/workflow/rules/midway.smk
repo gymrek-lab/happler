@@ -48,6 +48,7 @@ rule manhattan:
         maf=config["min_maf"],
         target = "H0",
         tswitch=lambda wildcards: 2 if wildcards.switch == "tscore" else 1,
+        just_target_snp=1,
     output:
         dir=directory(out + "/{switch}"),
         linear=out + "/{switch}/out.linear",
@@ -68,4 +69,4 @@ rule manhattan:
         "rsid=\"$(grep -E '^V' {input.hap} | cut -f5 | tail -n1)\" && "
         "workflow/scripts/midway_manhattan.bash {input.gts} {input.pts} {input.hap} "
         "{params.out_prefix} {params.target} \"$rsid\" {params.maf} {params.tswitch} "
-        "&> {log}"
+        "{params.just_target_snp} &> {log}"

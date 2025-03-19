@@ -8,6 +8,7 @@
 # arg6: ID of a "child" SNP in the target haplotype. The parent will include all SNPs of the haplotype up to this one.
 # arg7: MAF threshold for filtering SNPs
 # arg8: 0 or 1 indicating whether to include just the parent (0) or both the parent and child SNPs (1) in the regression as covariates, or 2 if the regular p-values should be converted to t-test p-values. 1 requires that the child SNP be the second node from the root of the tree. (optional - defaults to 0)
+# arg9: 0 or 1 indicating whether to compute p-values for just the target SNP or all SNPs.  (optional - defaults to 0)
 # ex: workflow/scripts/midway_manhattan.bash out/19_55363180-55833573/genotypes/snps.pgen 19_55363180-55833573.indep.pheno 19_55363180-55833573.indep.hap 19_55363180-55833573.indep H0 rs61734259 0.005 1
 
 pgen_file="$1"
@@ -18,6 +19,7 @@ hap_id="$5"
 snp_id="$6"
 maf="$7"
 condition="${8:-0}"
+just_target="${9:-0}"
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -60,6 +62,13 @@ allele=$(expr 1 - $allele)
 # use --mac 1 if maf is 0
 [ "$maf" == "0" ] && maf="0.0000000005"
 
+# set up just_target to contain the proper parameter
+if [ "$just_target" == "1" ]; then
+    just_target="--var-id $snp_id"
+else
+    just_target=""
+fi
+
 ############################################## MAIN PROGRAM ########################################
 
 # step 1: use happler transform to retrieve the genotypes of the parent haplotype extended by each SNP in the PGEN file
@@ -69,6 +78,7 @@ happler transform \
 --verbosity DEBUG \
 -o "$out_prefix".pgen \
 -S <(cut -f1 "$pheno_file" | tail -n+2) \
+$just_target \
 "$pgen_file" <(
     grep -E '^#' "$hap_file"
     echo "$hap"
@@ -154,9 +164,11 @@ fi
 # save symlink to linear file for future use
 ln -sfnr "$linear_file" "$out_prefix".linear
 
-# step 3: use manhattan.py to actually create the manhattan plot
-"$SCRIPT_DIR"/manhattan.py \
--i "$snp_id" \
--o "$out_prefix".png \
--l "$linear_file" \
-$last_arg
+if [ "$just_target" == "" ]; then
+    # step 3: use manhattan.py to actually create the manhattan plot
+    "$SCRIPT_DIR"/manhattan.py \
+    -i "$snp_id" \
+    -o "$out_prefix".png \
+    -l "$linear_file" \
+    $last_arg
+fi
