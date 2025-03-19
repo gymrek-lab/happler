@@ -27,6 +27,14 @@ if mode == "run":
     pheno_set = set(glob_wildcards(Path(config["modes"][mode]["pheno"])).trait)
 if mode == "midway":
     locus = glob_wildcards(config["modes"][mode]["haps"]).locus
+    if Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
+        with open(Path(config["locus"])) as f:
+            # filter out loci that are not in the BED file
+            regions = set(
+                "\t".join(line.strip().split("\t")[:3]).replace("\t", "_", 1).replace("\t", "-", 1)
+                for line in f
+            )
+            locus = [l for l in locus if l in regions]
 elif Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
     with open(Path(config["locus"])) as f:
         # the fourth column of the bed file must contain the name of the trait

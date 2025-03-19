@@ -49,7 +49,7 @@ parent_snp_id="$(echo "$hap" | tail -n1 | cut -f5)"
 
 # finally, check that the child SNP appears in the PVAR file
 grep -m1 -P "\t"$snp_id"\t" "${pgen_file%.pgen}.pvar" >/dev/null || {
-    echo "Failed to find at least one parent SNP for $hap_id:$snp_id in $hap_file" 1>&2
+    echo "Failed to find $hap_id:$snp_id in ${pgen_file%.pgen}.pvar" 1>&2
     exit
 }
 
@@ -74,6 +74,12 @@ happler transform \
     echo "$hap"
 )
 
+# check that the child SNP is in the transformed output
+grep -m1 -P "\t"$snp_id"\t" "$out_prefix".pvar >/dev/null || {
+    echo -e "Failed to find $hap_id:$snp_id in $out_prefix.pvar\nCheck the haplotype's MAF" 1>&2
+    exit
+}
+
 # step 2: use plink2 to obtain p-values for a manhattan plot
 if [ "$condition" -eq 1 ]; then
     # output the parent and child nodes to a covariate file
@@ -93,6 +99,7 @@ if [ "$condition" -eq 1 ]; then
     --out "$out_prefix" \
     --pfile "$out_prefix" \
     --variance-standardize \
+    --no-input-missing-phenotype \
     --pheno iid-only "$pheno_file" \
     --covar 'iid-only' "$out_prefix".covar
 
@@ -103,6 +110,7 @@ else
     --out "$out_prefix" \
     --pfile "$out_prefix" \
     --variance-standardize \
+    --no-input-missing-phenotype \
     --pheno iid-only "$pheno_file" \
     --glm no-x-sex allow-no-covars
 
@@ -124,9 +132,10 @@ if [ "$condition" -eq 2 ]; then
     # get summary statistics for the parent haplotype
     plink2 \
     --maf $maf \
+    --variance-standardize \
     --out "$out_prefix".parent \
     --pfile "$out_prefix".parent \
-    --variance-standardize \
+    --no-input-missing-phenotype \
     --pheno iid-only "$pheno_file" \
     --glm no-x-sex allow-no-covars
     # now, convert the plink2 --glm results into t-test p-values

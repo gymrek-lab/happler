@@ -51,6 +51,9 @@ rule manhattan:
     output:
         dir=directory(out + "/{switch}"),
         linear=out + "/{switch}/out.linear",
+        transform_pgen=temp(out + "/{switch}/out.pgen"),
+        transform_pvar=temp(out + "/{switch}/out.pvar"),
+        transform_psam=temp(out + "/{switch}/out.psam"),
     wildcard_constraints:
         switch="(tscore|interact)"
     resources:

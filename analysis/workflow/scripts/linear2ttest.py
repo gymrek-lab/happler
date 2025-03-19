@@ -128,7 +128,7 @@ def main(
     else:
         parent_corr = 0
 
-    log.info("Computing t-test p-values")
+    log.info("Setting up t-tests")
     num_tests = 1
     num_samps = int(parent_df.samples)
     parent_res = NodeResults.from_np(parent_df.loc[["beta", "pval", "stderr"]])
@@ -139,6 +139,8 @@ def main(
         )
     )
     terminator = TTestTerminator(corrector=None)
+
+    log.info("Computing t-test p-values")
     vals = [
         terminator.compute_val(
             parent_res,
@@ -153,7 +155,8 @@ def main(
     ]
     df["pval"] = np.array([(val[0] if val != True else 1) for val in vals])
 
-    assert not df["pval"].isna().any()
+    if df["pval"].isna().any():
+        raise ValueError("Some pvals were NA")
 
     log.info("Outputting t-test p-values")
     # first, reset column names

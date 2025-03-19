@@ -65,7 +65,7 @@ modes:
   num_haps: [1, 2, 3, 4]
  midway:
   # beta: [0.214, 0.285, 0.356]
-  # beta: [0.1, 0.2, 0.3]
+  beta: [0.1, 0.2, 0.3]
   reps: 5
   haps: data/simulations/midway/1000G/haps/{locus}.hap
  run:

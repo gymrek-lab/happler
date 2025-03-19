@@ -16,10 +16,13 @@ from haptools.data import Genotypes, GenotypesPLINK, Haplotypes, Variant
 def find_haps(
     gts: Genotypes,
     log: Logger,
+    min_af: float,
+    max_af: float,
     min_ld: float,
     max_ld: float,
     num_haps: int = 1,
     step: float = 0.1,
+    ignore_ld: bool = False,
     seed: np.random.Generator = np.random.default_rng(None),
 ):
     log.info(f"Using min_ld {min_ld}, max_ld {max_ld}, num_haps {num_haps}, and step {step}")
@@ -28,6 +31,10 @@ def find_haps(
     chrom = np.unique(gts.variants["chrom"])
     assert len(chrom) == 1
     chrom = chrom[0]
+
+    if ignore_ld:
+        step = max_ld - min_ld
+        log.info(f"Ignoring LD and setting step to {step}")
 
     intervals = np.arange(max(0, min_ld), min(1, max_ld), step) + step
     # we return lists of haplotypes: one list for each bin
@@ -50,11 +57,13 @@ def find_haps(
                 Variant(start=vr["pos"], end=vr["pos"]+1, id=vr['id'], allele=al)
                 for vr, al in zip(snp_vars, allele_combo)
             )
+            hp_maf = hp.transform(gts).sum() / (2 * len(gts.samples))
+            hp_maf = min(hp_maf, 1 - hp_maf)
             combo_ld = pearson_corr_ld(*tuple(sum_gts[:, snp_id] for snp_id in combo_id))**2
             # which bin does this LD value fall in?
             bin_idx = np.argmax(combo_ld < intervals)
-            if len(ld_bins[bin_idx]) < num_haps:
-                log.info(f"Adding {hp_id} with LD {combo_ld} to bin {intervals[bin_idx]}")
+            if (ignore_ld or len(ld_bins[bin_idx]) < num_haps) and (hp_maf > min_af and hp_maf < max_af):
+                log.info(f"Adding {hp_id} with LD {combo_ld:.4f} and MAF {hp_maf:.4f} to bin {intervals[bin_idx]}")
                 ld_bins[bin_idx].append((combo_ld, hp))
                 if len(ld_bins[bin_idx]) == num_haps:
                     yield ld_bins[bin_idx]
@@ -67,6 +76,16 @@ def find_haps(
 @click.command()
 @click.argument("gts", type=click.Path(exists=True, path_type=Path))
 @click.argument("output", type=click.Path(path_type=Path))
+@click.option(
+    "-r",
+    "--region",
+    type=str,
+    default=None,
+    show_default="all genotypes",
+    help="""
+    The region from which to extract genotypes; ex: 'chr1:1234-34566' or 'chr7'\n
+    For this to work, the seqnames must match!""",
+)
 @click.option(
     "--min-ld",
     type=float,
@@ -89,18 +108,25 @@ def find_haps(
     help="The step size between each LD bin",
 )
 @click.option(
+    "--ignore-ld",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Should we produce haplotypes with a specific LD between the alleles or just ignore the LD info?",
+)
+@click.option(
     "--min-af",
     type=float,
     default=0.25,
     show_default=True,
-    help="The minimum LD value to allow",
+    help="The minimum AF value to allow",
 )
 @click.option(
     "--max-af",
     type=float,
     default=0.75,
     show_default=True,
-    help="The maximum LD value to allow",
+    help="The maximum AF value to allow",
 )
 @click.option(
     "-n",
@@ -132,9 +158,11 @@ def find_haps(
 def main(
     gts: Path,
     output: Path,
+    region: str = None,
     min_ld: float = 0,
     max_ld: float = 1,
     step: float = 0.1,
+    ignore_ld: bool = False,
     min_af: float = 0.25,
     max_af: float = 0.75,
     num_haps: Tuple[int] = (1,),
@@ -151,7 +179,7 @@ def main(
     log = getLogger("choose", verbosity)
 
     gts = GenotypesPLINK(fname=gts, log=log)
-    gts.read()
+    gts.read(region=region)
     gts.check_missing()
     gts.check_biallelic()
     gts.check_phase()
@@ -171,10 +199,13 @@ def main(
     for haps in find_haps(
         gts,
         log,
+        min_af=min_af,
+        max_af=max_af,
         min_ld=min_ld,
         max_ld=max_ld,
         num_haps=max(num_haps),
         step=step,
+        ignore_ld=ignore_ld,
         seed=seed,
     ):
         avg_combo_ld = np.mean([combo_ld for combo_ld, hp in haps])
