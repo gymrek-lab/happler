@@ -195,7 +195,8 @@ rule midway:
             allow_missing=True,
         )[0]
     output:
-        png=out + "/midway_summary.{switch}.png",
+        png=out + "/midway_summary.{switch}.pdf",
+        metrics=out+"/midway_summary_metrics.{switch}.tsv",
     resources:
         runtime=7,
     log:
@@ -208,4 +209,4 @@ rule midway:
         "workflow/scripts/midway_manhattan_summary.py "
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.linears_glob}) --color locus "
-        "{params.linears} {params.causal_hap} {params.case_type} &>{log}"
+        "{params.linears} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"

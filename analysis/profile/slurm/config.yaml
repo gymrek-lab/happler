@@ -1,6 +1,7 @@
 latency-wait: 60
 use-conda: true
 conda-frontend: conda
+printshellcmds: true
 
 executor: slurm
 default-resources:

@@ -11,7 +11,7 @@ import pandas as pd
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 # this gets imported later down only if --pos-type is specified
-# from sklearn.metrics import roc_curve, auc
+# from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score, precision_recall_fscore_support
 
 from snakemake_io import glob_wildcards, remove_regexes
 
@@ -272,6 +272,7 @@ def main(
     The snplists files can either be formatted as snplist files or hap files
     """
     log = getLogger("midway_manhattan_summary", level=verbosity)
+    final_metrics={}
 
     # which files should we originally consider?
     # by default, we just grab as many as we can
@@ -391,12 +392,15 @@ def main(
     # Also adjust the subplot parameters for a square plot.
     # And if requested, compute an ROC curve, as well
     if pos_type is not None:
-        log.debug("Plotting AUROC")
-        from sklearn.metrics import roc_curve, auc
+        log.debug("Plotting ROC and PRC")
+        from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score, precision_recall_fscore_support
         # first, get the roc curve vals
         pos_labs = np.zeros(vals.shape, dtype=np.bool_)
         pos_labs[:,pos_type] = True
-        fpr, tpr, threshold = roc_curve(pos_labs.flatten("F"), vals.flatten("F"), drop_intermediate=True)
+        y_true = pos_labs.flatten("F")
+        y_score = vals.flatten("F")
+        fpr, tpr, roc_threshold = roc_curve(y_true, y_score, drop_intermediate=True)
+        precision, recall, prc_threshold = precision_recall_curve(y_true, y_score, drop_intermediate=True)
         if thresh is None:
             with warnings.catch_warnings():
                 # safe to ignore runtime warning caused by division of 0 by 0
@@ -408,17 +412,24 @@ def main(
                 fdr[np.isnan(fdr)] = 0
             # find the threshold (last index) where FDR <= 0.05
             thresh_idx = np.where(fdr <= 0.05)[0][-1]
-            thresh = 10**(-threshold[thresh_idx])
-            print(f"Threshold: {thresh}")
+            thresh = 10**(-roc_threshold[thresh_idx])
+            final_metrics["Significance Threshold"] = thresh
         else:
-            thresh_idx = np.argmax(threshold < -np.log10(thresh))
+            thresh_idx = np.argmax(roc_threshold < -np.log10(thresh))
         roc_auc = auc(fpr, tpr)
-        print(f"AUROC: {roc_auc}")
+        prc_ap = average_precision_score(y_true, y_score)
+        # Find the index where thresholds > log_thresh b/c prc_threshold increases from 0 to inf
+        prc_thresh_idx = np.argmax(prc_threshold > -np.log10(thresh))
+        # Ensure index is within bounds (prc_threshold is shorter with precision/recall than roc)
+        if prc_thresh_idx >= len(precision):
+            prc_thresh_idx = len(precision) - 1
+        final_metrics["AUROC"] = roc_auc
+        final_metrics["Average Precision"] = roc_auc
         # now, make the fig
-        fig = plt.figure(figsize=(11, 6), layout='constrained')
-        subfigs = fig.subfigures(1, 2, wspace=0, width_ratios=(6, 5))
-        subfig = subfigs[0]
+        fig = plt.figure(figsize=(16, 6), layout='constrained')
+        subfigs = fig.subfigures(1, 3, wspace=0, width_ratios=(6, 5, 5))
         # make the roc plot
+        subfig = subfigs[0]
         ax_roc_gs = subfigs[1].add_gridspec(
             2, 1, height_ratios=(1, 5), wspace=0.01, hspace=0.01,
         )
@@ -436,6 +447,30 @@ def main(
         ax_roc.set_ylim([-0.005, 1.005])
         ax_roc.set_ylabel('True Positive Rate')
         ax_roc.set_xlabel('False Positive Rate')
+        # now, make the prc plot
+        ax_prc_gs = subfigs[2].add_gridspec(
+            2, 1, height_ratios=(1, 5), wspace=0.01, hspace=0.01,
+        )
+        ax_prc = subfigs[2].add_subplot(ax_prc_gs[1, 0])
+        ax_prc.plot(recall, precision, 'b', label = 'AP = %0.2f' % prc_ap)
+        ax_prc.legend(loc = 'lower right')
+        ax_prc.plot([0, 1], [0, 1], "--", color="orange")
+        precision_thresh = precision[prc_thresh_idx]
+        if precision_thresh != 0:
+            ax_prc.axline((0, precision_thresh), (precision_thresh, precision_thresh), color="red", lw=0.9)
+        recall_thresh = recall[prc_thresh_idx]
+        if recall_thresh != 0:
+            ax_prc.axline((recall_thresh, 0), (recall_thresh, recall_thresh), color="red", lw=0.9)
+        ax_prc.set_xlim([-0.005, 1.005])
+        ax_prc.set_ylim([-0.005, 1.005])
+        ax_prc.set_ylabel('Precision')
+        ax_prc.set_xlabel('Recall')
+        # compute final metrics
+        precision, recall, fscore, support = precision_recall_fscore_support(y_true, y_score > -np.log10(thresh), pos_label=1)
+        final_metrics["Precision"] = precision[1]
+        final_metrics["Recall"] = recall[1]
+        final_metrics["Fscore"] = fscore[1]
+        final_metrics["Support"] = support[1]
     else:
         # just make the fig
         fig = plt.figure(figsize=(6, 6), layout='constrained')
@@ -468,6 +503,9 @@ def main(
     ax_histy.spines['right'].set_visible(False)
     ax_histx.spines['right'].set_visible(False)
     plt.savefig(output)
+    # print the final metrics to stdout
+    print("\t".join(final_metrics.keys()))
+    print("\t".join(map(str, final_metrics.values())))
 
 
 if __name__ == "__main__":
