@@ -114,6 +114,7 @@ def get_pval(
 
 def get_snp_id(
     snplist: Path,
+    get_causal: bool = False,
     log: logging.Logger = None
 ) -> float:
     """
@@ -123,26 +124,35 @@ def get_snp_id(
     ----------
     snplist: Path
         The path to a .hap file containing a set of haplotypes
+    get_causal: bool, optional
+        If True, also check whether the file has "# not.causal" in it
     log: logging.Logger, optional
         A logging object to write any debugging and error messages
 
     Returns
     -------
-    str
-        The SNP ID from the snplist file
+    str|bool
+        The SNP ID from the snplist file if get_causal is False. Otherwise, a bool
+        indicating whether the file has "# not.causal" in it
     """
     # load the snp ID from the snplist file
     if snplist.suffix == ".snplist":
         with open(snplist) as snplist_file:
-            snp_id = snplist_file.readlines()[-1].split("\t")[0]
+            if get_causal:
+                snp_id = ("# not.causal" in snplist_file.read().splitlines())
+            else:
+                snp_id = snplist_file.readlines()[-1].split("\t")[0]
     else:
         # load from a hap file
         with open(snplist) as hap_file:
-            snp_id = [
-                line.split("\t")[4]
-                for line in hap_file.readlines()
-                if line.startswith("V")
-            ][-1]
+            if get_causal:
+                snp_id = ("# not.causal" in hap_file.read().splitlines())
+            else:
+                snp_id = [
+                    line.split("\t")[4]
+                    for line in hap_file.readlines()
+                    if line.startswith("V")
+                ][-1]
     return snp_id
 
 
@@ -210,7 +220,10 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     type=str,
     default=None,
     show_default=True,
-    help="Values originating from files with this wildcard will be colored the same",
+    help=(
+        "Values originating from files with this wildcard will be colored the same. Or"
+        " if 'not.causal', then snplist/hap files with '# not.causal' in them will be colored."
+    ),
 )
 @click.option(
     "-p",
@@ -226,7 +239,7 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     type=float,
     default=None,
     show_default="FDR 0.05",
-    help="The significance threshold"
+    help="The significance threshold. Inferred at an FDR of 0.05 if not specified"
 )
 @click.option(
     "-o",
@@ -286,7 +299,7 @@ def main(
     params = dict(glob_wildcards(linears, files=files)._asdict())
     # check that case_type and color are wildcards
     assert case_type in params.keys()
-    if color is not None:
+    if color is not None and color != "not.causal":
         assert color in params.keys()
     dtypes = {k: "U30" for k in params.keys()}
     log.debug(f"Extracted paramter values {tuple(dtypes.keys())}")
@@ -318,9 +331,22 @@ def main(
         assert pos_type in ax_labs
         pos_type = ax_labs.index(pos_type)
 
-    # color reps the same
-    if color is not None:
-        log.debug("Setting up colors")
+    # color by specific wildcard the same
+    log.debug(f"Setting up colors variable for color: {color}")
+    if color == "not.causal":
+        causal_haps = {
+            idx: get_snp_id(
+                get_fname(str(snplists), params[idx]),
+                get_causal=(color == "not.causal"),
+                log=log
+            )
+            for idx in range(len(params))
+        }
+        color_vals = axes_idxs[ax_labs[0]]
+        # orange = causal and blue = non-causal
+        cmap = ("blue", "orange")
+        colors = np.array([cmap[causal_haps[i]] for i in color_vals])
+    elif color is not None:
         color_vals = params[axes_idxs[ax_labs[0]]][color]
         # check that the regions are the same in each
         assert (color_vals == params[axes_idxs[ax_labs[1]]][color]).all()
@@ -350,7 +376,7 @@ def main(
         log.debug(f"Excluding {len(exclude_idxs)} points")
         for ax_lab in ax_labs:
             axes_idxs[ax_lab] = np.delete(axes_idxs[ax_lab], exclude_idxs, 0)
-        if color is not None:
+        if color is not None and color != "not.causal":
             colors = np.delete(colors, exclude_idxs, 0)
 
     # check that everything is still kosher wrt to the rep field
