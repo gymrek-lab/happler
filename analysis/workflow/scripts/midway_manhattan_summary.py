@@ -251,7 +251,7 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     "--bic",
     is_flag=True,
     show_default=True,
-    default=True,
+    default=False,
     help="Use the difference in BIC values rather than the pval from the t-test",
 )
 @click.option(
@@ -280,7 +280,7 @@ def main(
     color: str = None,
     pos_type: str = None,
     thresh: float = None,
-    bic: bool = True,
+    bic: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -502,6 +502,8 @@ def main(
         ax_roc.set_ylim([-0.005, 1.005])
         ax_roc.set_ylabel('True Positive Rate')
         ax_roc.set_xlabel('False Positive Rate')
+        final_metrics["FPR"] = fpr_thresh
+        final_metrics["TPR"] = tpr_thresh
         # now, make the prc plot
         ax_prc_gs = subfigs[2].add_gridspec(
             2, 1, height_ratios=(1, 5), wspace=0.01, hspace=0.01,
