@@ -11,9 +11,9 @@ from haptools import data
 from haptools.logging import getLogger
 from haptools.ld import pearson_corr_ld
 
-from happler.tree.assoc_test import NodeResults
-from happler.tree.terminator import TTestTerminator
-from happler.tree.assoc_test import AssocResults, AssocTestSimple
+from happler.tree.assoc_test import NodeResults, NodeResultsExtra
+from happler.tree.terminator import TTestTerminator, BICTerminator
+from happler.tree.assoc_test import AssocResults, AssocTestSimple, AssocTestSimpleSM
 
 
 PLINK_COLS = {
@@ -45,6 +45,7 @@ def load_linear_file(linear_fname: Path):
 @click.argument("parent", type=click.Path(exists=True, path_type=Path))
 @click.argument("linear_gts", type=click.Path(exists=True, path_type=Path))
 @click.argument("parent_gts", type=click.Path(exists=True, path_type=Path))
+@click.argument("phenotype", type=click.Path(exists=True, path_type=Path))
 @click.option(
     "-i",
     "--id",
@@ -62,6 +63,13 @@ def load_linear_file(linear_fname: Path):
     show_default=True,
     default=False,
     help="Use the covariance correction",
+)
+@click.option(
+    "--bic",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Report the difference in BIC values rather than the pval from the t-test",
 )
 @click.option(
     "-o",
@@ -84,8 +92,10 @@ def main(
     parent: Path,
     linear_gts: Path,
     parent_gts: Path,
+    phenotype: Path,
     hap_id: str = None,
     covariance: bool = False,
+    bic: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -131,29 +141,45 @@ def main(
     log.info("Setting up t-tests")
     num_tests = 1
     num_samps = int(parent_df.samples)
-    parent_res = NodeResults.from_np(parent_df.loc[["beta", "pval", "stderr"]])
-    results = AssocResults(
-        np.array(
-            list(df[["beta", "pval", "stderr"]].itertuples(index=False)),
-            dtype=AssocTestSimple().return_dtype,
+    if bic:
+        phen = data.Phenotypes.load(phenotype)
+        parent_res = NodeResultsExtra.from_np(
+                AssocTestSimpleSM(with_bic=True).run(
+                parent_gts.data.sum(axis=2),
+                phen.data[:, 0],
+            ).data[0]
         )
-    )
-    terminator = TTestTerminator(corrector=None)
+        results = AssocTestSimpleSM(with_bic=True).run(
+            linear_gts.data.sum(axis=2),
+            phen.data[:, 0],
+        )
+        node_res = NodeResultsExtra
+        terminator = BICTerminator()
+    else:
+        parent_res = NodeResults.from_np(parent_df.loc[["beta", "pval", "stderr"]])
+        results = AssocResults(
+            np.array(
+                list(df[["beta", "pval", "stderr"]].itertuples(index=False)),
+                dtype=AssocTestSimple().return_dtype,
+            )
+        )
+        node_res = NodeResults
+        terminator = TTestTerminator(corrector=None)
 
     log.info("Computing t-test p-values")
     vals = [
         terminator.compute_val(
             parent_res,
-            NodeResults.from_np(val[["beta", "pval", "stderr"]]),
+            node_res.from_np(val),
             results,
             idx,
             num_samps,
             num_tests,
             parent_corr=parent_corr,
             short_circuit=False,
-        ) for idx, val in df.iterrows()
+        ) for idx, val in enumerate(results.data)
     ]
-    df["pval"] = np.array([(val[0] if val != True else 1) for val in vals])
+    df["pval"] = np.array([(val[int(bic)] if val != True else 1) for val in vals])
 
     if df["pval"].isna().any():
         raise ValueError("Some pvals were NA")

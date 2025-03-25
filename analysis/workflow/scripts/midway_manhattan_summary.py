@@ -85,6 +85,7 @@ def load_linear_file(linear_fname: Path):
 def get_pval(
     linear: Path,
     snp_id: str,
+    bic: bool = False,
     log: logging.Logger = None
 ) -> float:
     """
@@ -97,6 +98,8 @@ def get_pval(
         The path to a PGEN file containing genotypes for all haplotypes and their SNPs
     snp_id: str
         The ID of the target SNP
+    bic: bool, optional
+        Whether to treat the pval as a delta BIC value, instead
     log: logging.Logger, optional
         A logging object to write any debugging and error messages
 
@@ -108,8 +111,9 @@ def get_pval(
     # load the linear file
     df = load_linear_file(linear)
     pval = df[df.id == snp_id].iloc[0]["pval"]
-    pval = np.float64(-np.log10(pval))
-    return pval
+    if not bic:
+        pval = -np.log10(pval)
+    return np.float64(pval)
 
 
 def get_snp_id(
@@ -171,18 +175,20 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
         ax.scatter(x, y, color=colors)
 
     # now determine nice limits by hand:
-    xmax = np.max(np.abs(x))
-    ymax = np.max(np.abs(y))
-    xbinwidth = (xmax/25)/4
-    ybinwidth = (ymax/25)/4
+    xmin = np.min(x)
+    ymin = np.min(y)
+    xmax = np.max(x)
+    ymax = np.max(y)
+    xbinwidth = ((xmax-xmin)/25)/4
+    ybinwidth = ((ymax-ymin)/25)/4
     padding = 50
     if zoom:
-        ax.set_xlim(0-(xmax/padding), xmax+(xmax/padding))
-        ax.set_ylim(0-(ymax/padding), ymax+(ymax/padding))
+        ax.set_xlim(xmin-(xmax/padding), xmax+(xmax/padding))
+        ax.set_ylim(ymin-(ymax/padding), ymax+(ymax/padding))
     xlim = (int(xmax/xbinwidth) + 1) * xbinwidth
     ylim = (int(ymax/ybinwidth) + 1) * ybinwidth
-    xbins = np.arange(0, xlim + xbinwidth, xbinwidth)
-    ybins = np.arange(0, ylim + ybinwidth, ybinwidth)
+    xbins = np.arange(xmin, xlim + xbinwidth, xbinwidth)
+    ybins = np.arange(ymin, ylim + ybinwidth, ybinwidth)
     ax_histx.hist(x, bins=xbins)
     ax_histy.hist(y, bins=ybins, orientation='horizontal')
 
@@ -242,6 +248,13 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     help="The significance threshold. Inferred at an FDR of 0.05 if not specified"
 )
 @click.option(
+    "--bic",
+    is_flag=True,
+    show_default=True,
+    default=True,
+    help="Use the difference in BIC values rather than the pval from the t-test",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -267,6 +280,7 @@ def main(
     color: str = None,
     pos_type: str = None,
     thresh: float = None,
+    bic: bool = True,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -286,6 +300,12 @@ def main(
     """
     log = getLogger("midway_manhattan_summary", level=verbosity)
     final_metrics={}
+
+    # if this is a pval, take the -log10 of it
+    if not bic:
+        tsfm_pval = lambda pval: -np.log10(pval)
+    else:
+        tsfm_pval = lambda val: val
 
     # which files should we originally consider?
     # by default, we just grab as many as we can
@@ -392,6 +412,7 @@ def main(
                 get_pval(
                     get_fname(linears_wo_regexes, params[idx]),
                     snp_IDs[idx],
+                    bic=bic,
                     log=log
                 )
                 for idx in axes_idxs[case_type_val]
@@ -425,6 +446,8 @@ def main(
         pos_labs[:,pos_type] = True
         y_true = pos_labs.flatten("F")
         y_score = vals.flatten("F")
+        if bic:
+            y_score = -y_score
         fpr, tpr, roc_threshold = roc_curve(y_true, y_score, drop_intermediate=True)
         precision, recall, prc_threshold = precision_recall_curve(y_true, y_score, drop_intermediate=True)
         if thresh is None:
@@ -438,14 +461,20 @@ def main(
                 fdr[np.isnan(fdr)] = 0
             # find the threshold (last index) where FDR <= 0.05
             thresh_idx = np.where(fdr <= 0.05)[0][-1]
-            thresh = 10**(-roc_threshold[thresh_idx])
-            final_metrics["Significance Threshold"] = thresh
+            if bic:
+                thresh = roc_threshold[thresh_idx]
+                # flip the thresh back around b/c we had made y_score negative, before
+                final_metrics["Significance Threshold"] = -thresh
+            else:
+                thresh = 10**(-roc_threshold[thresh_idx])
+                final_metrics["Significance Threshold"] = thresh
         else:
-            thresh_idx = np.argmax(roc_threshold < -np.log10(thresh))
+            thresh_idx = np.argmax(roc_threshold < tsfm_pval(thresh))
+            final_metrics["Significance Threshold"] = thresh
         roc_auc = auc(fpr, tpr)
         prc_ap = average_precision_score(y_true, y_score)
         # Find the index where thresholds > log_thresh b/c prc_threshold increases from 0 to inf
-        prc_thresh_idx = np.argmax(prc_threshold > -np.log10(thresh))
+        prc_thresh_idx = np.argmax(prc_threshold > tsfm_pval(thresh))
         # Ensure index is within bounds (prc_threshold is shorter with precision/recall than roc)
         if prc_thresh_idx >= len(precision):
             prc_thresh_idx = len(precision) - 1
@@ -492,7 +521,7 @@ def main(
         ax_prc.set_ylabel('Precision')
         ax_prc.set_xlabel('Recall')
         # compute final metrics
-        precision, recall, fscore, support = precision_recall_fscore_support(y_true, y_score > -np.log10(thresh), pos_label=1)
+        precision, recall, fscore, support = precision_recall_fscore_support(y_true, y_score > tsfm_pval(thresh), pos_label=1)
         final_metrics["Precision"] = precision[1]
         final_metrics["Recall"] = recall[1]
         final_metrics["Fscore"] = fscore[1]
@@ -515,8 +544,9 @@ def main(
     else:
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy, colors=colors)
     max_val = vals.max()
-    fig.text(0.98, 0.98, f'Threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
-    thresh = -np.log10(thresh)
+    curr_thresh = final_metrics["Significance Threshold"]
+    fig.text(0.98, 0.98, f'Threshold: {curr_thresh:.2f}', ha='right', va='top', fontsize=15)
+    curr_thresh = tsfm_pval(curr_thresh)
     ax.set_xlabel(case_type + ": " + ax_labs[1])
     ax.set_ylabel(case_type + ": " + ax_labs[0])
     ax.axline((0,0), (max_val, max_val), linestyle="--", color="orange")

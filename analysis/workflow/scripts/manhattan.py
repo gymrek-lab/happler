@@ -112,6 +112,13 @@ def custom_isinf(x):
     help="Which titles should be given to each plot?",
 )
 @click.option(
+    "--bic",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Report the difference in BIC values rather than the pval from the t-test",
+)
+@click.option(
     "-a",
     "--alpha",
     type=float,
@@ -129,6 +136,7 @@ def main(
     label=True,
     small=False,
     titles=tuple(),
+    bic=False,
     alpha=None,
 ):
     """
@@ -169,7 +177,10 @@ def main(
         label_distance = pos_range/17
         # replace NaN with inf
         df["pval"] = df["pval"].fillna(np.inf)
-        df['-log10(p)'] = -np.log10(df["pval"])
+        if bic:
+            df['-log10(p)'] = df["pval"]
+        else:
+            df['-log10(p)'] = -np.log10(df["pval"])
         # replace -infinity values with 0
         df['-log10(p)'].replace([-np.inf], 0, inplace=True)
         df.chromosome = df.chromosome.astype('category')

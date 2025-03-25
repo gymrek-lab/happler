@@ -224,6 +224,7 @@ class BICTerminator(Terminator):
         best_idx: int,
         num_samps: int,
         num_tests: int,
+        parent_corr: float = 0,
         short_circuit: bool = True,
     ) -> tuple[float, float]:
         stat = None
@@ -239,10 +240,7 @@ class BICTerminator(Terminator):
                 self.log.debug("Terminated b/c effect size did not improve")
                 return True
             stat = results.data["bic"] - parent_res.bic
-            # just choose an arbitrary threshold
-            if stat[best_idx] < self.thresh:
-                self.log.debug("Terminated with delta BIC {}".format(stat))
-                return True
+            stat = stat[best_idx]
         else:
             # parent_res = None when the parent node is the root node
             pval = results.data["pval"]
@@ -252,9 +250,6 @@ class BICTerminator(Terminator):
                 pval = self.corrector.correct(None, pval, num_samps, len(pval))[best_idx]
             else:
                 pval = pval[best_idx]
-            if pval >= self.thresh:
-                self.log.debug("Terminated with p-value {}".format(pval))
-                return True
         return pval, stat
 
     def check(
@@ -278,8 +273,19 @@ class BICTerminator(Terminator):
             return computed_val
         else:
             pval, stat = computed_val
+        if stat is None:
+            if pval >= self.thresh:
+                self.log.debug(
+                    f"Terminated with delta BIC {stat} and p-value {pval} >= {self.thresh}"
+                )
+                return True            
+        else:
+            if stat < self.thresh:
+                self.log.debug(
+                    f"Terminated with delta BIC {stat} and p-value {pval} >= {self.thresh}"
+                )
+                return True
         self.log.debug(
-            "Significant with "
-            + ("delta BIC {}".format(stat) if parent_res else "pval {}".format(pval))
+            f"Significant with delta BIC {stat} and p-value {pval} < {self.thresh}"
         )
         return False

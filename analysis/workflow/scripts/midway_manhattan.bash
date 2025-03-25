@@ -150,12 +150,13 @@ if [ "$condition" -eq 2 ]; then
     --glm no-x-sex allow-no-covars
     # now, convert the plink2 --glm results into t-test p-values
     "$SCRIPT_DIR"/linear2ttest.py \
+    --bic \
     -i "$hap_id" \
-    --covariance \
     --verbosity DEBUG \
     -o "$out_prefix".ttest.linear \
     "$linear_file" "$out_prefix".parent.*.glm.linear \
-    "$out_prefix".pgen "$out_prefix".parent.pgen
+    "$out_prefix".pgen "$out_prefix".parent.pgen \
+    "$pheno_file"
     # rename the linear file
     linear_file="$out_prefix".ttest.linear
     last_arg="-a 0.05"
@@ -167,6 +168,7 @@ ln -sfnr "$linear_file" "$out_prefix".linear
 if [ "$just_target" == "" ]; then
     # step 3: use manhattan.py to actually create the manhattan plot
     "$SCRIPT_DIR"/manhattan.py \
+    --bic \
     -i "$snp_id" \
     -o "$out_prefix".png \
     -l "$linear_file" \
