@@ -206,5 +206,7 @@ rule subset:
     shell:
         "plink2 --allow-extra-chr --nonfounders --from-bp {params.start} "
         "--to-bp {params.end} --chr {params.chrom} --max-alleles 2 {params.maf} "
-        "--keep <(head -n {params.sampsize} {input.psam} | grep -Ev '^#' | cut -f1) "
+        "--keep <(shuf --random-source <("
+        "openssl enc -aes-256-ctr -pass pass:42 -nosalt < /dev/zero 2>/dev/null"
+        ") -n {params.sampsize} {input.psam} | grep -Ev '^#' | cut -f1) "
         "--make-pgen --pfile {params.prefix} --out {params.out} &>{log}"
