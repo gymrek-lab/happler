@@ -293,8 +293,8 @@ def main(
     will infer the wildcards and match them between cases. Wildcards will be expanded
     across all inputs. So, for example, if the case_type is "tswitch", then these two
     files will be matched together:
-    {region}.{type}/1/out.{rep}.{name}.glm.linear
-    {region}.{type}/2/out.{rep}.{name}.glm.linear
+    {region}.{type}/1/out.{rep}.{name}.linear
+    {region}.{type}/2/out.{rep}.{name}.linear
 
     The snplists files can either be formatted as snplist files or hap files
     """

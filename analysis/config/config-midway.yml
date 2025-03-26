@@ -66,7 +66,7 @@ modes:
  midway:
   # beta: [0.214, 0.285, 0.356]
   beta: [0.1, 0.2, 0.3]
-  reps: 5
+  reps: 3
   haps: data/simulations/midway/1000G/haps/{locus}.hap
  run:
   pheno: data/geuvadis/phenos/{trait}.pheno
@@ -86,8 +86,8 @@ mode: midway
 min_maf: 0
 
 # Sample sizes to use
-# sample_size: [777, 800, 1600, 2400, 3200]
-sample_size: 3200
+sample_size: [800, 1600, 2400, 3200]
+# sample_size: 3200
 
 # Whether to include the causal variant in the set of genotypes provided to the
 # finemapping methods. Set this to true if you're interested in seeing how the

@@ -185,6 +185,7 @@ plots_config = {
     "mode_attrs": config["modes"][mode],
     "causal_hap": rules.simulate_transform.input.hap if mode != "run" else [],
     "snp_panel": config["gts_snp_panel"],
+    "sample_size": config["sample_size"],
 }
 if mode == "ld_range":
     plots_config["ld_range_checkpoint"] = checkpoints.simulate_create_hap_ld_range
@@ -258,6 +259,7 @@ elif mode == "midway":
     FINAL_OUTPUT = expand(
         [
             rules.plots_midway.output.png,
+            rules.plots_midway_metrics.output.png,
         ],
         switch=("tscore", "interact"),
         sampsize=config["sample_size"],
@@ -283,7 +285,7 @@ else:
         )
 
 # If '--config debug=true' is specified, we won't try to build the entire DAG
-# This can be helpful when you want to play around with a specific target output
+# This can be faster when you want to play around with a specific target output
 if not check_config("debug", False) and mode != "run":
     rule all:
         input:

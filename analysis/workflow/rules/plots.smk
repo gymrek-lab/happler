@@ -1,6 +1,7 @@
 import re
 import sys
 from pathlib import Path
+from functools import partial
 
 out = config["out"]
 logs = out + "/logs"
@@ -90,15 +91,19 @@ switch_sim_mode = {
 }
 
 
-def agg_midway_linear(wildcards):
+def agg_midway_linear(wildcards, beta: bool = False):
     """ return a list of midway linear files """
     sim_modes = switch_sim_mode[wildcards.switch]
-    return expand(
+    expand_partial = expand
+    if beta:
+        expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
+    else:
+        expand_partial = partial(expand_partial, beta=wildcards.beta)
+    return expand_partial(
         config["midway_linear"],
         locus=config["loci"],
         rep=range(config["mode_attrs"]["reps"]),
         sim_mode=sim_modes,
-        beta=config["mode_attrs"]["beta"],
         **wildcards,
         allow_missing=True,
     )
@@ -114,6 +119,12 @@ fill_out_globals_midway = lambda wildcards, val: expand(
     val,
     sampsize=wildcards.sampsize,
     switch=wildcards.switch,
+    allow_missing=True,
+)
+
+fill_out_globals_midway_beta = lambda wildcards, val: expand(
+    fill_out_globals_midway(wildcards, val),
+    beta=wildcards.beta,
     allow_missing=True,
 )
 
@@ -179,7 +190,7 @@ create_glob_from_wildcards = lambda path, wildcards: re.sub(r"\{[^}]+\}", "*", e
 rule midway:
     """summarize the results from many midway-manhattan runs"""
     input:
-        linears=agg_midway_linear,
+        linears=partial(agg_midway_linear, beta=True),
         snplists=agg_ld_range_causal,
     params:
         case_type="sim_mode",
@@ -206,7 +217,73 @@ rule midway:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py "
+        "workflow/scripts/midway_manhattan_summary.py --bic "
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.linears_glob}) --color locus "
         "{params.linears} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
+
+
+rule midway_beta:
+    """summarize the results from many midway-manhattan runs for a specific value of beta"""
+    input:
+        linears=agg_midway_linear,
+        snplists=agg_ld_range_causal,
+    params:
+        case_type="sim_mode",
+        pos_type="hap",
+        linears=lambda wildcards: fill_out_globals_midway_beta(wildcards, config["midway_linear"]),
+        causal_hap = lambda wildcards: fill_out_globals_midway_beta(wildcards, config["causal_hap"]),
+        linears_glob = lambda wildcards: expand(
+            re.sub(
+                r"\{(?!sim_mode\})[^}]+\}", "*",
+                fill_out_globals_midway_beta(wildcards, config["midway_linear"])[0],
+            ),
+            sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
+            allow_missing=True,
+        )[0]
+    output:
+        png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
+        metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
+    resources:
+        runtime=7,
+    log:
+        logs + "/beta_{beta}/midway.{switch}",
+    benchmark:
+        bench + "/beta_{beta}/midway.{switch}",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "workflow/scripts/midway_manhattan_summary.py --bic "
+        "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
+        "-f <(ls -1 {params.linears_glob}) --color locus "
+        "{params.linears} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
+
+
+out = out.replace("{sampsize}samples/", "")
+logs = logs.replace("{sampsize}samples/", "")
+bench = bench.replace("{sampsize}samples/", "")
+
+
+rule midway_metrics:
+    """summarize metrics from many executions of midway_beta"""
+    input:
+        metrics = expand(
+            rules.midway_beta.output.metrics,
+            beta=config["mode_attrs"]["beta"],
+            sampsize=config["sample_size"],
+            allow_missing=True
+        ),
+    params:
+        metrics = lambda wildcards: expand(rules.midway_beta.output.metrics, switch=wildcards.switch, allow_missing=True),
+    output:
+        png=out + "/midway_summary_metrics.{switch}.pdf",
+    resources:
+        runtime=7,
+    log:
+        logs + "/midway_metrics.{switch}",
+    benchmark:
+        bench + "/midway_metrics.{switch}",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/midway_summary_metrics.py -o {output.png} {params.metrics}"
