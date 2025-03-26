@@ -187,7 +187,7 @@ rule subset:
         start=lambda wildcards: parse_locus(wildcards.locus)[1],
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
-        sampsize=lambda wildcards: int(wildcards.sampsize)+1,
+        sampsize=lambda wildcards: int(wildcards.sampsize),
         maf="--maf "+str(config["min_maf"]) if config["min_maf"] != 0 else "--mac 1",
     output:
         pgen=out+"/subset/{sampsize}.pgen",
@@ -206,7 +206,6 @@ rule subset:
     shell:
         "plink2 --allow-extra-chr --nonfounders --from-bp {params.start} "
         "--to-bp {params.end} --chr {params.chrom} --max-alleles 2 {params.maf} "
-        "--keep <(shuf --random-source <("
+        "--keep <(grep -Ev '^#' {input.psam} | cut -f1 | shuf --random-source <("
         "openssl enc -aes-256-ctr -pass pass:42 -nosalt < /dev/zero 2>/dev/null"
-        ") -n {params.sampsize} {input.psam} | grep -Ev '^#' | cut -f1) "
-        "--make-pgen --pfile {params.prefix} --out {params.out} &>{log}"
+        ") -n {params.sampsize}) --make-pgen --pfile {params.prefix} --out {params.out} &>{log}"
