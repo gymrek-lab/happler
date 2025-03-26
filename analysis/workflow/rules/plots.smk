@@ -286,4 +286,4 @@ rule midway_metrics:
     conda:
         "happler"
     shell:
-        "workflow/scripts/midway_summary_metrics.py -o {output.png} {params.metrics}"
+        "workflow/scripts/midway_summary_metrics.py -o {output.png} {params.metrics} &>{log}"

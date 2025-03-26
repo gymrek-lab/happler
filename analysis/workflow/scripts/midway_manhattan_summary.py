@@ -328,7 +328,6 @@ def main(
     params.sort()
 
     linears_wo_regexes = remove_regexes(str(linears))
-
     get_fname = lambda path, param_set: Path(str(path).format(**dict(zip(dtypes.keys(), param_set))))
 
     log.debug(f"Extracting SNP IDs from {len(params)} .snplist files")
