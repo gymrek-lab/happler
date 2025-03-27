@@ -111,8 +111,9 @@ rule transform:
         hap=lambda wildcards, input: "<(sed '${/^V/ d;}' " + input.hap + ")" if (
             mode == "midway" and wildcards.sim_mode == "parent"
         ) else input.hap,
+        maf=(config["min_maf"] if "min_maf" in config else 0) or 0.00000001,
     output:
-        pgen=out + "/transform.pgen",
+        pgen=ensure(out + "/transform.pgen", non_empty=True),
         pvar=out + "/transform.pvar",
         psam=out + "/transform.psam",
     resources:
@@ -124,7 +125,7 @@ rule transform:
     conda:
         "happler"
     shell:
-        "haptools transform -o {output.pgen} {input.pgen} {params.hap} &>{log}"
+        "haptools transform --maf {params.maf} -o {output.pgen} {input.pgen} {params.hap} &>{log}"
 
 
 rule hap2snplist:
