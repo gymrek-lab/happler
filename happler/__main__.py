@@ -4,7 +4,6 @@ import click
 from pathlib import Path
 from typing import Tuple
 
-
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 

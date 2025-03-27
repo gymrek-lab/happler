@@ -192,7 +192,7 @@ class TreeBuilder:
                 self.gens.data[:, sibling["variant"].idx, :] == sibling["allele"]
             )
             # step 4: check whether the leaf node is in strong LD with its sibling
-            ld = pearson_corr_ld(leaf_gts.sum(axis=1), sibling_gts.sum(axis=1))**2
+            ld = pearson_corr_ld(leaf_gts.sum(axis=1), sibling_gts.sum(axis=1)) ** 2
             if ld > self.ld_prune_thresh:
                 self.log.debug(f"Pruning {leaf_var.id} with LD {ld}")
                 count += 1
@@ -339,14 +339,7 @@ class TreeBuilder:
                     best_variant.id, allele, parent_res, node_res
                 )
             )
-            args = [
-                parent_res,
-                node_res,
-                results,
-                best_res_idx,
-                num_samps,
-                num_tests
-            ]
+            args = [parent_res, node_res, results, best_res_idx, num_samps, num_tests]
             if isinstance(self.terminator, TTestTerminator):
                 args.append(parent_corr)
             if self.terminator.check(*args):
@@ -405,7 +398,9 @@ class TreeBuilder:
                 parent_res is None
             ):
                 if self.covariance_correction:
-                    parent_corr[allele] = pearson_corr_ld(hap_mat_sum, parent.data.sum(axis=1))
+                    parent_corr[allele] = pearson_corr_ld(
+                        hap_mat_sum, parent.data.sum(axis=1)
+                    )
                 results[allele] = self.method.run(
                     hap_mat_sum,
                     self.phens.data[:, 0],

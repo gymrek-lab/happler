@@ -405,7 +405,7 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
             t_score = 0
         else:
             cov = parent_corr * parent_res.stderr * stderr
-            std_err = np.sqrt((((stderr**2) + (parent_res.stderr**2)) / 2) - 2*cov)
+            std_err = np.sqrt((((stderr**2) + (parent_res.stderr**2)) / 2) - 2 * cov)
             t_score = (np.abs(beta) - np.abs(parent_res.beta)) / std_err
         if self.with_bic:
             return beta, pval, stderr, bic, t_score
@@ -445,9 +445,7 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
         return AssocResults(
             np.array(
                 [
-                    self.perform_test(
-                        X[:, variant_idx], y, parent_res, corr(variant_idx)
-                    )
+                    self.perform_test(X[:, variant_idx], y, parent_res, corr(variant_idx))
                     for variant_idx in range(X.shape[1])
                 ],
                 dtype=self.return_dtype,

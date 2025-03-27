@@ -18,7 +18,6 @@ from happler.tree import (
     NodeResultsExtra,
 )
 
-
 DATADIR = Path(__file__).parent.joinpath("data")
 
 

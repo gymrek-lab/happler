@@ -139,13 +139,13 @@ class TTestTerminator(Terminator):
             if parent_corr is not None:
                 cov = parent_corr * parent_res.stderr * results.data["stderr"]
             # now, we can compute the standard error of the difference of the effect sizes
-            std_err = ((results.data["stderr"]**2) + (parent_res.stderr**2)) - 2*cov
+            std_err = ((results.data["stderr"] ** 2) + (parent_res.stderr**2)) - 2 * cov
             if std_err[best_idx] == 0:
                 # if we have a standard error less than 0, then we already know the result is
                 # significant! It doesn't matter what the effect sizes are b/c t_stat
                 # will be inf
                 return (0, np.inf)
-            std_err = np.sqrt(std_err/2)
+            std_err = np.sqrt(std_err / 2)
             # then, we compute the test statistic
             # use np.abs to account for the directions that the effect size may take
             t_stat = (np.abs(results.data["beta"]) - np.abs(parent_res.beta)) / std_err
@@ -278,7 +278,7 @@ class BICTerminator(Terminator):
                 self.log.debug(
                     f"Terminated with delta BIC {stat} and p-value {pval} >= {self.thresh}"
                 )
-                return True            
+                return True
         else:
             if stat < self.thresh:
                 self.log.debug(
