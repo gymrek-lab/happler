@@ -84,10 +84,17 @@ def main(
     # params will be a dictionary mapping parameter names to lists of values
     params = dict(glob_wildcards(metrics_files)._asdict())
     dtypes = {k: "U30" for k in params.keys()}
+    # ensure ints and floats are intepreted appropriately so that sorting works later
+    if "sampsize" in dtypes:
+        dtypes["sampsize"] = np.int64
+    if "beta" in dtypes:
+        dtypes["beta"] = np.float16
     log.info(f"Extracted paramter values {tuple(dtypes.keys())}")
     # convert the dictionary to a numpy mixed dtype array
     params = np.array(list(zip(*params.values())), dtype=list(dtypes.items()))
     params.sort()
+    # convert back to U30 so that file matching works
+    params = params.astype([(k, "U30") for k in dtypes.keys()])
 
     metrics_files_wo_regexes = remove_regexes(str(metrics_files))
     get_fname = lambda path, param_set: Path(str(path).format(**dict(zip(dtypes.keys(), param_set))))
