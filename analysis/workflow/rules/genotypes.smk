@@ -204,8 +204,8 @@ rule subset:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --allow-extra-chr --nonfounders --from-bp {params.start} "
+        "plink2 --allow-extra-chr --nonfounders --from-bp {params.start} --out {params.out} "
         "--to-bp {params.end} --chr {params.chrom} --max-alleles 2 {params.maf} "
         "--keep <(grep -Ev '^#' {input.psam} | cut -f1 | shuf --random-source <("
         "openssl enc -aes-256-ctr -pass pass:42 -nosalt < /dev/zero 2>/dev/null"
-        ") -n {params.sampsize}) --make-pgen --pfile {params.prefix} --out {params.out} &>{log}"
+        ") | head -n {params.sampsize}) --make-pgen --pfile {params.prefix} &>{log}"
