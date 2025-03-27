@@ -38,18 +38,7 @@ def docs(session: Session) -> None:
 def lint(session: Session) -> None:
     """Lint our code."""
     session.install("black")
-    session.run("black", "--verbose", "--check", ".")
-
-
-def install_handle_python_numpy(session):
-    """
-    handle incompatibilities with python and numpy versions
-    see https://github.com/cjolowicz/nox-poetry/issues/1116
-    """
-    if session._session.python in ["3.11", "3.12", "3.13"]:
-        session._session.install(".")
-    else:
-        session.install(".")
+    session.run("black", "--diff", "--verbose", "--check", ".")
 
 
 # detect whether conda/mamba is installed
@@ -65,10 +54,9 @@ if os.getenv("CONDA_EXE"):
         session.conda_install(
             "coverage[toml]",
             "pytest",
-            "numpy>=1.20.0",
             channel="conda-forge",
         )
-        install_handle_python_numpy(session)
+        session.install(".")
         try:
             session.run("coverage", "run", "--parallel", "-m", "pytest", *session.posargs)
         finally:
@@ -81,7 +69,7 @@ else:
     def tests(session: Session) -> None:
         """Run the test suite."""
         session.install("coverage[toml]", "pytest")
-        install_handle_python_numpy(session)
+        session.install(".")
         try:
             session.run("coverage", "run", "--parallel", "-m", "pytest", *session.posargs)
         finally:
