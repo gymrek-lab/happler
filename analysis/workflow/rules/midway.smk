@@ -34,6 +34,13 @@ rule sub_pheno:
 
 pheno = rules.sub_pheno.output.pheno if "{rep}" in out else config["pheno"]
 
+tswitch = {
+    "interact": 1,
+    "tscore" : 2,
+    "covariance": 3,
+    "bic": 4,
+}
+
 
 rule manhattan:
     """ run happler midway-through via a plink2 GWAS """
@@ -47,7 +54,7 @@ rule manhattan:
         out_prefix = lambda wildcards, output: str(output.dir) + "/out",
         maf=config["min_maf"],
         target = "H0",
-        tswitch=lambda wildcards: 2 if wildcards.switch == "tscore" else 1,
+        tswitch=lambda wildcards: tswitch[wildcards.switch],
         just_target_snp=1,
     output:
         dir=directory(out + "/{switch}"),
@@ -56,9 +63,9 @@ rule manhattan:
         transform_pvar=temp(out + "/{switch}/out.pvar"),
         transform_psam=temp(out + "/{switch}/out.psam"),
     wildcard_constraints:
-        switch="(tscore|interact)"
+        switch="(interact|tscore|covariance|bic)"
     resources:
-        runtime=10,
+        runtime=5,
     log:
         logs + "/{switch}/manhattan",
     benchmark:

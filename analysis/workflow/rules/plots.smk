@@ -88,6 +88,8 @@ def agg_ld_range_metrics(wildcards):
 switch_sim_mode = {
     "interact": ("hap", "indep"),
     "tscore": ("hap", "parent"),
+    "covariance": ("hap", "parent"),
+    "bic": ("hap", "parent"),
 }
 
 

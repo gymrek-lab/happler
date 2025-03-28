@@ -7,7 +7,7 @@
 # arg5: ID of the target haplotype in the hap file
 # arg6: ID of a "child" SNP in the target haplotype. The parent will include all SNPs of the haplotype up to this one.
 # arg7: MAF threshold for filtering SNPs
-# arg8: 0 or 1 indicating whether to include just the parent (0) or both the parent and child SNPs (1) in the regression as covariates, or 2 if the regular p-values should be converted to t-test p-values. 1 requires that the child SNP be the second node from the root of the tree. (optional - defaults to 0)
+# arg8: 0 or 1 indicating whether to include just the parent (0) or both the parent and child SNPs (1) in the regression as covariates, or 2 if the regular p-values should be converted to t-test p-values. 1 requires that the child SNP be the second node from the root of the tree. Additionally, the value 3 indicates that t-test p-values should be computed with a covariance correction and the value 4 indicates that delta BIC values should be generated in place of p-values. (optional - defaults to 0)
 # arg9: 0 or 1 indicating whether to compute p-values for just the target SNP or all SNPs.  (optional - defaults to 0)
 # ex: workflow/scripts/midway_manhattan.bash out/19_55363180-55833573/genotypes/snps.pgen 19_55363180-55833573.indep.pheno 19_55363180-55833573.indep.hap 19_55363180-55833573.indep H0 rs61734259 0.005 1
 
@@ -129,7 +129,7 @@ fi
 
 linear_file="$(ls -1 "$out_prefix".*.glm.linear | grep -v 'out\.parent\..*\.glm\.linear' | tail -n1)"
 
-if [ "$condition" -eq 2 ]; then
+if [ "$condition" -eq 2 ] || [ "$condition" -eq 3 ] || [ "$condition" -eq 4 ]; then
     # first, get the parent haplotype as a PGEN file
     haptools transform \
     --verbosity DEBUG \
@@ -148,6 +148,13 @@ if [ "$condition" -eq 2 ]; then
     --no-input-missing-phenotype \
     --pheno iid-only "$pheno_file" \
     --glm no-x-sex allow-no-covars
+    # set up the --bic or --covariance flag, if needed
+    extra_flag=""
+    if [ "$condition" -eq 3 ]; then
+        extra_flag="--covariance"
+    elif [ "$condition" -eq 4 ]; then
+        extra_flag="--bic"
+    fi
     # now, convert the plink2 --glm results into t-test p-values
     "$SCRIPT_DIR"/linear2ttest.py \
     --bic \
