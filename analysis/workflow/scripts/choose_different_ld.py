@@ -36,7 +36,10 @@ def find_haps(
         step = max_ld - min_ld
         log.info(f"Ignoring LD and setting step to {step}")
 
-    intervals = np.arange(max(0, min_ld), min(1, max_ld), step) + step
+    min_ld = max(0, min_ld)
+    max_ld = min(1, max_ld)
+    num_intervals = int((max_ld - min_ld)/step)
+    intervals = np.linspace(min_ld, max_ld, num=num_intervals) + step
     # we return lists of haplotypes: one list for each bin
     ld_bins = {idx: [] for idx in range(len(intervals))}
     count = len(intervals) * num_haps
