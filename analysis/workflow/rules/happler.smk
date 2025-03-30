@@ -538,7 +538,7 @@ rule gwas:
         "../envs/default.yml"
     shell:
         "plink2 --glm {params.covar} --variance-standardize --maf {params.maf} "
-        "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
+        "--nonfounders --pheno iid-only {input.pts} --pfile {params.in_prefix} "
         # "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} " # unnecessary b/c merge subsets by region already
         "--out {params.out_prefix} --threads {threads} &>{log}"
 

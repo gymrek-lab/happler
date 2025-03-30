@@ -95,6 +95,7 @@ if [ "$condition" -eq 1 ]; then
     # output the parent and child nodes to a covariate file
     plink2 \
     --maf $maf \
+    --nonfounders \
     --out "$out_prefix" \
     --export A ref-first \
     --pfile "${pgen_file%.pgen}" \
@@ -103,6 +104,7 @@ if [ "$condition" -eq 1 ]; then
     # incorporate the parent and child nodes as covariates in the model
     plink2 \
     --maf $maf \
+    --nonfounders \
     --vif 10000000000 \
     --max-corr 0.9999999999 \
     --glm no-x-sex hide-covar \
@@ -117,6 +119,7 @@ if [ "$condition" -eq 1 ]; then
 else
     plink2 \
     --maf $maf \
+    --nonfounders \
     --out "$out_prefix" \
     --pfile "$out_prefix" \
     --variance-standardize \
@@ -142,6 +145,7 @@ if [ "$condition" -eq 2 ] || [ "$condition" -eq 3 ] || [ "$condition" -eq 4 ]; t
     # get summary statistics for the parent haplotype
     plink2 \
     --maf $maf \
+    --nonfounders \
     --variance-standardize \
     --out "$out_prefix".parent \
     --pfile "$out_prefix".parent \

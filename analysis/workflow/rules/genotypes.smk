@@ -158,7 +158,7 @@ rule vcf2plink:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --vcf {input.vcf} --maf {params.maf} --geno 0 --make-pgen "
+        "plink2 --nonfounders --vcf {input.vcf} --maf {params.maf} --geno 0 --make-pgen "
         "--threads {threads}{params.samps} --out {params.prefix} &>{log}"
 
 
