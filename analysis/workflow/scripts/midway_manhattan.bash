@@ -161,7 +161,7 @@ if [ "$condition" -eq 2 ] || [ "$condition" -eq 3 ] || [ "$condition" -eq 4 ]; t
     fi
     # now, convert the plink2 --glm results into t-test p-values
     "$SCRIPT_DIR"/linear2ttest.py \
-    --bic \
+    $extra_flag \
     -i "$hap_id" \
     --verbosity DEBUG \
     -o "$out_prefix".ttest.linear \

@@ -206,7 +206,8 @@ rule midway:
             ),
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
-        )[0]
+        )[0],
+        bic=lambda wildcards: "--bic " if wildcards.switch == "bic" else "",
     output:
         png=out + "/midway_summary.{switch}.pdf",
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
@@ -219,7 +220,7 @@ rule midway:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py --bic "
+        "workflow/scripts/midway_manhattan_summary.py {params.bic}"
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.linears_glob}) --color locus "
         "{params.linears} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
@@ -242,7 +243,8 @@ rule midway_beta:
             ),
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
-        )[0]
+        )[0],
+        bic=lambda wildcards: "--bic " if wildcards.switch == "bic" else "",
     output:
         png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
         metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
@@ -255,7 +257,7 @@ rule midway_beta:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py --bic "
+        "workflow/scripts/midway_manhattan_summary.py {params.bic}"
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.linears_glob}) --color locus "
         "{params.linears} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
