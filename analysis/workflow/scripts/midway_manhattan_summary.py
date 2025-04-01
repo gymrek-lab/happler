@@ -423,7 +423,7 @@ def main(
 
     # remove any vals that were NA (but got converted to 0)
     # and also any vals that were greater than max-val
-    na_rows = (vals == 0).any(axis=1) | (vals > max_val).any(axis=1)
+    na_rows = (vals == 0).any(axis=1) | (vals >= max_val).any(axis=1)
     not_na_rows_idxs = {k: v[~na_rows] for k,v in axes_idxs.items()}
     if color is not None:
         colors = colors[~na_rows]
