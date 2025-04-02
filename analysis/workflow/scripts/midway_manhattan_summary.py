@@ -303,7 +303,7 @@ def main(
 
     # if this is a pval, take the -log10 of it
     if not bic:
-        tsfm_pval = lambda pval: -np.log10(pval)
+        tsfm_pval = lambda pval: -np.log10(pval) if pval != 0 else np.inf
     else:
         tsfm_pval = lambda val: val
 
@@ -422,7 +422,7 @@ def main(
     log.debug(f"Found {vals.shape[0]} points")
 
     # remove any vals that were NA (but got converted to 0)
-    # and also any vals that were greater than max-val
+    # and also any vals that were greater than max-val (which defaults to inf)
     na_rows = (vals == 0).any(axis=1) | (vals >= max_val).any(axis=1)
     not_na_rows_idxs = {k: v[~na_rows] for k,v in axes_idxs.items()}
     if color is not None:
@@ -551,10 +551,11 @@ def main(
     ax.set_xlabel(case_type + ": " + ax_labs[1])
     ax.set_ylabel(case_type + ": " + ax_labs[0])
     ax.axline((0,0), (max_val, max_val), linestyle="--", color="orange")
-    ax.axline((0,thresh), (thresh, thresh), color="red")
-    ax_histx.axline((thresh,0), (thresh, thresh), color="red")
-    ax.axline((thresh,0), (thresh, thresh), color="red")
-    ax_histy.axline((0,thresh), (thresh, thresh), color="red")
+    if thresh != 0:
+        ax.axline((0,thresh), (thresh, thresh), color="red")
+        ax_histx.axline((thresh,0), (thresh, thresh), color="red")
+        ax.axline((thresh,0), (thresh, thresh), color="red")
+        ax_histy.axline((0,thresh), (thresh, thresh), color="red")
     ax_histy.spines['top'].set_visible(False)
     ax_histx.spines['top'].set_visible(False)
     ax_histy.spines['right'].set_visible(False)
