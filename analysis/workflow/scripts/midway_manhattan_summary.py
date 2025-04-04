@@ -545,18 +545,17 @@ def main(
     else:
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy, colors=colors)
     max_val = vals.max()
-    curr_thresh = final_metrics["Significance Threshold"]
     threshold_type = "Bayes Factor" if bic else "P-value"
-    fig.text(0.98, 0.98, f'{threshold_type} Threshold: {curr_thresh:.2f}', ha='right', va='top', fontsize=15)
-    curr_thresh = tsfm_pval(curr_thresh)
+    fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
+    thresh = tsfm_pval(thresh)
     ax.set_xlabel(case_type + ": " + ax_labs[1])
     ax.set_ylabel(case_type + ": " + ax_labs[0])
     ax.axline((0,0), (max_val, max_val), linestyle="--", color="orange")
-    if curr_thresh != 0:
-        ax.axline((0,curr_thresh), (curr_thresh, curr_thresh), color="red")
-        ax_histx.axline((curr_thresh,0), (curr_thresh, curr_thresh), color="red")
-        ax.axline((curr_thresh,0), (curr_thresh, curr_thresh), color="red")
-        ax_histy.axline((0,curr_thresh), (curr_thresh, curr_thresh), color="red")
+    if thresh != 0:
+        ax.axline((0,thresh), (thresh, thresh), color="red")
+        ax_histx.axline((thresh,0), (thresh, thresh), color="red")
+        ax.axline((thresh,0), (thresh, thresh), color="red")
+        ax_histy.axline((0,thresh), (thresh, thresh), color="red")
     ax_histy.spines['top'].set_visible(False)
     ax_histx.spines['top'].set_visible(False)
     ax_histy.spines['right'].set_visible(False)

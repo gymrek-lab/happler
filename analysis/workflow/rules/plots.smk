@@ -208,6 +208,7 @@ rule midway:
             allow_missing=True,
         )[0],
         bic=lambda wildcards: "--bic " if wildcards.switch == "bic" else "",
+        thresh=lambda wildcards: "--thresh 3" if wildcards.switch == "bic" else "--thresh 0.05",
     output:
         png=out + "/midway_summary.{switch}.pdf",
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
@@ -245,6 +246,7 @@ rule midway_beta:
             allow_missing=True,
         )[0],
         bic=lambda wildcards: "--bic " if wildcards.switch == "bic" else "",
+        thresh=lambda wildcards: "--thresh 3" if wildcards.switch == "bic" else "--thresh 0.05",
     output:
         png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
         metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
