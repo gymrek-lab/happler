@@ -211,7 +211,7 @@ class TTestTerminator(Terminator):
 
 
 class BICTerminator(Terminator):
-    def __init__(self, thresh: float = 10, log: Logger = None):
+    def __init__(self, thresh: float = 3, log: Logger = None):
         super().__init__()
         self.thresh = thresh
         self.log = log or getLogger(self.__class__.__name__)
@@ -239,7 +239,10 @@ class BICTerminator(Terminator):
                 # terminate if the effect sizes have gone in the opposite direction
                 self.log.debug("Terminated b/c effect size did not improve")
                 return True
-            stat = results.data["bic"] - parent_res.bic
+            stat = parent_res.bic - results.data["bic"]
+            # compute the bayes factor approximation from the delta BIC:
+            # A practical solution to the pervasive problems of p values
+            stat = np.exp(stat/2)
             stat = stat[best_idx]
         else:
             # parent_res = None when the parent node is the root node
@@ -274,6 +277,7 @@ class BICTerminator(Terminator):
         else:
             pval, stat = computed_val
         if stat is None:
+            # TODO: handle this case by using delta BIC to rank, instead?
             if pval >= self.thresh:
                 self.log.debug(
                     f"Terminated with delta BIC {stat} and p-value {pval} >= {self.thresh}"
