@@ -284,12 +284,12 @@ class BICTerminator(Terminator):
                 )
                 return True
         else:
-            if stat < self.thresh:
+            if stat <= self.thresh:
                 self.log.debug(
-                    f"Terminated with delta BIC {stat} and p-value {pval} >= {self.thresh}"
+                    f"Terminated with delta BIC {stat} and p-value {pval} <= {self.thresh}"
                 )
                 return True
         self.log.debug(
-            f"Significant with delta BIC {stat} and p-value {pval} < {self.thresh}"
+            f"Significant with delta BIC {stat} > {self.thresh}"
         )
         return False

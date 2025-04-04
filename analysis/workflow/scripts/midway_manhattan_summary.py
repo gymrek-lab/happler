@@ -445,40 +445,40 @@ def main(
         pos_labs[:,pos_type] = True
         y_true = pos_labs.flatten("F")
         y_score = vals.flatten("F")
-        if bic:
-            y_score = -y_score
         fpr, tpr, roc_threshold = roc_curve(y_true, y_score, drop_intermediate=True)
         precision, recall, prc_threshold = precision_recall_curve(y_true, y_score, drop_intermediate=True)
-        if thresh is None:
-            with warnings.catch_warnings():
-                # safe to ignore runtime warning caused by division of 0 by 0
-                warnings.simplefilter("ignore")
-                # compute FDR for each threshold
-                # note that this computation only works because number of TN == number of TP
-                fdr = fpr / (fpr + tpr)
-                # set nan to 0
-                fdr[np.isnan(fdr)] = 0
-            # find the threshold (last index) where FDR <= 0.05
-            thresh_idx = np.where(fdr <= 0.05)[0][-1]
-            if bic:
-                thresh = roc_threshold[thresh_idx]
-                # flip the thresh back around b/c we had made y_score negative, before
-                final_metrics["Significance Threshold"] = -thresh
-            else:
-                thresh = 10**(-roc_threshold[thresh_idx])
-                final_metrics["Significance Threshold"] = thresh
+
+        # now, try to get the optimal threshold
+        with warnings.catch_warnings():
+            # safe to ignore runtime warning caused by division of 0 by 0
+            warnings.simplefilter("ignore")
+            # compute FDR for each threshold
+            # note that this computation only works because number of TN == number of TP
+            fdr = fpr / (fpr + tpr)
+            # set nan to 0
+            fdr[np.isnan(fdr)] = 0
+        # find the threshold (last index) where FDR <= 0.05
+        thresh_idx = np.where(fdr <= 0.05)[0][-1]
+        if bic:
+            optimal_thresh = roc_threshold[thresh_idx]
         else:
+            optimal_thresh = 10**(-roc_threshold[thresh_idx])
+        final_metrics["Significance Threshold"] = optimal_thresh
+        if thresh is not None:
             thresh_idx = np.argmax(roc_threshold < tsfm_pval(thresh))
-            final_metrics["Significance Threshold"] = thresh
+        else:
+            thresh = optimal_thresh
         roc_auc = auc(fpr, tpr)
         prc_ap = average_precision_score(y_true, y_score)
         # Find the index where thresholds > log_thresh b/c prc_threshold increases from 0 to inf
         prc_thresh_idx = np.argmax(prc_threshold > tsfm_pval(thresh))
+
         # Ensure index is within bounds (prc_threshold is shorter with precision/recall than roc)
         if prc_thresh_idx >= len(precision):
             prc_thresh_idx = len(precision) - 1
         final_metrics["AUROC"] = roc_auc
         final_metrics["Average Precision"] = roc_auc
+
         # now, make the fig
         fig = plt.figure(figsize=(16, 6), layout='constrained')
         subfigs = fig.subfigures(1, 3, wspace=0, width_ratios=(6, 5, 5))
@@ -546,16 +546,17 @@ def main(
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy, colors=colors)
     max_val = vals.max()
     curr_thresh = final_metrics["Significance Threshold"]
-    fig.text(0.98, 0.98, f'Threshold: {curr_thresh:.2f}', ha='right', va='top', fontsize=15)
+    threshold_type = "Bayes Factor" if bic else "P-value"
+    fig.text(0.98, 0.98, f'{threshold_type} Threshold: {curr_thresh:.2f}', ha='right', va='top', fontsize=15)
     curr_thresh = tsfm_pval(curr_thresh)
     ax.set_xlabel(case_type + ": " + ax_labs[1])
     ax.set_ylabel(case_type + ": " + ax_labs[0])
     ax.axline((0,0), (max_val, max_val), linestyle="--", color="orange")
-    if thresh != 0:
-        ax.axline((0,thresh), (thresh, thresh), color="red")
-        ax_histx.axline((thresh,0), (thresh, thresh), color="red")
-        ax.axline((thresh,0), (thresh, thresh), color="red")
-        ax_histy.axline((0,thresh), (thresh, thresh), color="red")
+    if curr_thresh != 0:
+        ax.axline((0,curr_thresh), (curr_thresh, curr_thresh), color="red")
+        ax_histx.axline((curr_thresh,0), (curr_thresh, curr_thresh), color="red")
+        ax.axline((curr_thresh,0), (curr_thresh, curr_thresh), color="red")
+        ax_histy.axline((0,curr_thresh), (curr_thresh, curr_thresh), color="red")
     ax_histy.spines['top'].set_visible(False)
     ax_histx.spines['top'].set_visible(False)
     ax_histy.spines['right'].set_visible(False)
