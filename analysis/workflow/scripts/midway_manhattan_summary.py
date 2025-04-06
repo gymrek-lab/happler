@@ -75,10 +75,9 @@ def load_linear_file(linear_fname: Path):
         sep="\t",
         header=0,
         usecols=keep_cols,
-        converters={"P": lambda val: Decimal(val if val != "NA" else 1)},
+        converters={"P": lambda val: Decimal(val) if val != "NA" else np.nan},
     ).rename(columns=PLINK_COLS)
-    df = df.sort_values("pos")
-    df["pval"] = df["pval"].fillna(np.inf)
+    # there should only be NA values if VIF is infinite or something like that
     return df
 
 
@@ -421,9 +420,8 @@ def main(
     ).T
     log.debug(f"Found {vals.shape[0]} points")
 
-    # remove any vals that were NA (but got converted to 0)
-    # and also any vals that were greater than max-val (which defaults to inf)
-    na_rows = (vals == 0).any(axis=1) | (vals >= max_val).any(axis=1)
+    # remove any rows that were nan or greater than max-val (which defaults to inf)
+    na_rows = np.isnan(vals).any(axis=1) | (vals >= max_val).any(axis=1)
     not_na_rows_idxs = {k: v[~na_rows] for k,v in axes_idxs.items()}
     if color is not None:
         colors = colors[~na_rows]
