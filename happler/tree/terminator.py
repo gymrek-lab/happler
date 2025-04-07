@@ -211,9 +211,10 @@ class TTestTerminator(Terminator):
 
 
 class BICTerminator(Terminator):
-    def __init__(self, thresh: float = 3, log: Logger = None):
+    def __init__(self, thresh: float = 0.05, bic_thresh: float = 3, log: Logger = None):
         super().__init__()
         self.thresh = thresh
+        self.bic_thresh = bic_thresh
         self.log = log or getLogger(self.__class__.__name__)
 
     def compute_val(
@@ -241,8 +242,8 @@ class BICTerminator(Terminator):
                 return True
             stat = parent_res.bic - results.data["bic"]
             # compute the bayes factor approximation from the delta BIC:
-            # A practical solution to the pervasive problems of p values
-            stat = np.exp(stat/2)
+            # https://easystats.github.io/bayestestR/reference/bic_to_bf.html
+            stat = np.exp(stat / 2)
             stat = stat[best_idx]
         else:
             # parent_res = None when the parent node is the root node
@@ -284,12 +285,10 @@ class BICTerminator(Terminator):
                 )
                 return True
         else:
-            if stat <= self.thresh:
+            if stat < self.bic_thresh:
                 self.log.debug(
-                    f"Terminated with delta BIC {stat} and p-value {pval} <= {self.thresh}"
+                    f"Terminated with delta BIC {stat} < {self.thresh} and p-value {pval}"
                 )
                 return True
-        self.log.debug(
-            f"Significant with delta BIC {stat} > {self.thresh}"
-        )
+        self.log.debug(f"Significant with delta BIC {stat} > {self.thresh}")
         return False

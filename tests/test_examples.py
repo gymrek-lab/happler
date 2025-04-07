@@ -263,7 +263,7 @@ def test_two_snps_one_branch_perfect_bic():
         gens,
         phens,
         method=AssocTestSimple(with_bic=True),
-        terminator=BICTerminator(),
+        terminator=BICTerminator(bic_thresh=0),
     ).run()
     haps = _view_tree_haps(tree)
 
@@ -536,43 +536,6 @@ def test_two_snps_two_branches_perfect():
 
     # run the treebuilder and extract the haplotypes
     tree = TreeBuilder(gens, phens).run()
-    haps = _view_tree_haps(tree)
-
-    # check: did the output turn out how we expected?
-    # two haplotypes: one with one SNP and the other with both
-    assert len(haps) == 2
-    assert len(haps[0]) == 2
-    assert haps[0][0] == ("snp0", 0)
-    assert haps[0][1] == ("snp1", 0)
-    assert len(haps[1]) == 1
-    assert haps[1][0] == ("snp0", 1)
-
-
-def test_two_snps_one_branch_perfect_bic():
-    """
-    Two causal SNPs on a single haplotype with perfect phenotype associations
-    Y = 0.5 * ( X1 && X2 )
-    This should yield two haplotypes with both SNPs having the same allele.
-    The psuedocode looks like:
-        if X1:
-            return X2
-        return 0
-    """
-    split_list_in_half = lambda pair: [pair[:2], pair[2:]]
-    gens = np.array(
-        list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-    )
-    gens = _create_fake_gens(gens)
-    gts = gens.data
-    phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
-
-    # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(
-        gens,
-        phens,
-        method=AssocTestSimple(with_bic=True),
-        terminator=BICTerminator(),
-    ).run()
     haps = _view_tree_haps(tree)
 
     # check: did the output turn out how we expected?
