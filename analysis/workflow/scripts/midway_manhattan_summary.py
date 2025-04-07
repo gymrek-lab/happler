@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import math
 import logging
 import warnings
 from pathlib import Path
@@ -110,7 +111,9 @@ def get_pval(
     # load the linear file
     df = load_linear_file(linear)
     pval = df[df.id == snp_id].iloc[0]["pval"]
-    if not bic:
+    if bic:
+        pval = math.log(pval)
+    else:
         pval = -np.log10(pval)
     return np.float64(pval)
 
@@ -300,11 +303,11 @@ def main(
     log = getLogger("midway_manhattan_summary", level=verbosity)
     final_metrics={}
 
-    # if this is a pval, take the -log10 of it
+    # if this is a pval, take the -log10 of it, otherwise take the ln of it
     if not bic:
         tsfm_pval = lambda pval: -np.log10(pval) if pval != 0 else np.inf
     else:
-        tsfm_pval = lambda val: val
+        tsfm_pval = lambda val: np.log(val) if val != 0 else -np.inf
 
     # which files should we originally consider?
     # by default, we just grab as many as we can
