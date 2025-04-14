@@ -181,8 +181,8 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     ymin = np.min(y)
     xmax = np.max(x)
     ymax = np.max(y)
-    xbinwidth = ((xmax-xmin)/25)/4
-    ybinwidth = ((ymax-ymin)/25)/4
+    xbinwidth = ((xmax-xmin)/25)/2
+    ybinwidth = ((ymax-ymin)/25)/2
     padding = 50
     if zoom:
         ax.set_xlim(xmin-(xmax/padding), xmax+(xmax/padding))
@@ -257,6 +257,13 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     help="Use the difference in BIC values rather than the pval from the t-test",
 )
 @click.option(
+    "--no-log10",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Do not show points on the -log10 scale but on the normal scale instead",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -283,6 +290,7 @@ def main(
     pos_type: str = None,
     thresh: float = None,
     bic: bool = False,
+    no_log10: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -306,8 +314,10 @@ def main(
     # if this is a pval, take the -log10 of it, otherwise take the ln of it
     if not bic:
         tsfm_pval = lambda pval: -np.log10(pval) if pval != 0 else np.inf
+        rvrs_tsfm = lambda pval: np.power(10, -pval)
     else:
         tsfm_pval = lambda val: np.log(val) if val != 0 else -np.inf
+        rvrs_tsfm = lambda pval: np.power(10, pval)
 
     # which files should we originally consider?
     # by default, we just grab as many as we can
@@ -424,7 +434,13 @@ def main(
     log.debug(f"Found {vals.shape[0]} points")
 
     # remove any rows that were nan or greater than max-val (which defaults to inf)
-    na_rows = np.isnan(vals).any(axis=1) | (vals >= max_val).any(axis=1)
+    if no_log10:
+        if max_val == float("inf"):
+            if not bic:
+                max_val = 1
+        na_rows = np.isnan(vals).any(axis=1) | (rvrs_tsfm(vals) >= max_val).any(axis=1)
+    else:
+        na_rows = np.isnan(vals).any(axis=1) | (vals >= max_val).any(axis=1)
     not_na_rows_idxs = {k: v[~na_rows] for k,v in axes_idxs.items()}
     if color is not None:
         colors = colors[~na_rows]
@@ -539,19 +555,22 @@ def main(
     ax = subfig.add_subplot(gs[1, 0])
     ax_histx = subfig.add_subplot(gs[0, 0], sharex=ax)
     ax_histy = subfig.add_subplot(gs[1, 1], sharey=ax)
+    # if --no-log10, then we should reverse the values back from the log scale
+    if no_log10:
+        vals = rvrs_tsfm(vals)
     # Draw the scatter plot and marginals.
     log.debug("Creating scatter plot")
     if color is None:
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy)
     else:
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy, colors=colors)
-    max_val = vals.max()
-    threshold_type = "Bayes Factor" if bic else "P-value"
+    threshold_type = "Bayes factor" if bic else "P-value"
     fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
-    thresh = tsfm_pval(thresh)
+    if not no_log10:
+        thresh = tsfm_pval(thresh)
     ax.set_xlabel(case_type + ": " + ax_labs[1])
     ax.set_ylabel(case_type + ": " + ax_labs[0])
-    ax.axline((0,0), (max_val, max_val), linestyle="--", color="orange")
+    ax.axline((0,0), (vals.max(), vals.max()), linestyle="--", color="orange")
     if thresh != 0:
         ax.axline((0,thresh), (thresh, thresh), color="red")
         ax_histx.axline((thresh,0), (thresh, thresh), color="red")

@@ -47,6 +47,16 @@ def get_metrics(
 @click.command()
 @click.argument("metrics_files", type=click.Path(path_type=Path))
 @click.option(
+    "--use-flex-axes-limits",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help=(
+        "Allow for flexible axes limits. Makes it harder to compare across plots but"
+        "ensures that all points are visible"
+    ),
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -64,6 +74,7 @@ def get_metrics(
 )
 def main(
     metrics_files: Path,
+    use_flex_axes_limits: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -123,29 +134,34 @@ def main(
         metrics_beta = metrics[params["beta"] == beta]
 
         axs[0].plot(params_beta["sampsize"], metrics_beta["FPR"], "o", label=beta)
-        axs[0].set_ylim((-0.001, 0.051))
+        if not use_flex_axes_limits:
+            axs[0].set_ylim((-0.001, 0.051))
         axs[0].set_ylabel("False positive rate")
 
         axs[1].plot(params_beta["sampsize"], metrics_beta["Recall"], "o")
-        axs[1].set_ylim((-0.001, 1.001))
+        if not use_flex_axes_limits:
+            axs[1].set_ylim((-0.001, 1.001))
         axs[1].set_ylabel("Recall")
 
         axs[2].plot(params_beta["sampsize"], metrics_beta["Significance Threshold"], "o")
         max_alpha = max(metrics_beta["Significance Threshold"])
-        if max_alpha > 1:
-            axs[2].set_ylim((-2.001, 10.001))
-        elif max_alpha < 0.25:
-            axs[2].set_ylim((-0.001, 0.251))
-        else:
-            axs[2].set_ylim((-0.001, 1.001))
+        if not use_flex_axes_limits:
+            if max_alpha > 1:
+                axs[2].set_ylim((-2.005, 10.005))
+            elif max_alpha < 0.25:
+                axs[2].set_ylim((-0.005, 0.255))
+            else:
+                axs[2].set_ylim((-0.005, 1.005))
         axs[2].set_ylabel("Significance threshold")
 
         axs[3].plot(params_beta["sampsize"], metrics_beta["AUROC"], "o")
-        axs[3].set_ylim((0.495, 1.001))
+        if not use_flex_axes_limits:
+            axs[3].set_ylim((0.895, 1.005))
         axs[3].set_ylabel("AUROC")
 
         axs[4].plot(params_beta["sampsize"], metrics_beta["Average Precision"], "o")
-        axs[4].set_ylim((0.495, 1.001))
+        if not use_flex_axes_limits:
+            axs[4].set_ylim((0.895, 1.005))
         axs[4].set_ylabel("Average Precision")
 
     log.info("Writing figure")

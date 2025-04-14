@@ -281,6 +281,7 @@ rule midway_metrics:
         ),
     params:
         metrics = lambda wildcards: expand(rules.midway_beta.output.metrics, switch=wildcards.switch, allow_missing=True),
+        use_flex_axes = lambda wildcards: "--use-flex-axes-limits " if wildcards.switch == "interact" else "",
     output:
         png=out + "/midway_summary_metrics.{switch}.pdf",
     resources:
@@ -292,4 +293,4 @@ rule midway_metrics:
     conda:
         "happler"
     shell:
-        "workflow/scripts/midway_summary_metrics.py -o {output.png} {params.metrics} &>{log}"
+        "workflow/scripts/midway_summary_metrics.py {params.use_flex_axes}-o {output.png} {params.metrics} &>{log}"
