@@ -39,6 +39,7 @@ tswitch = {
     "tscore" : 2,
     "covariance": 3,
     "bic": 4,
+    "interact-bic": 5,
 }
 
 
@@ -63,7 +64,7 @@ rule manhattan:
         transform_pvar=temp(out + "/{switch}/out.pvar"),
         transform_psam=temp(out + "/{switch}/out.psam"),
     wildcard_constraints:
-        switch="(interact|tscore|covariance|bic)"
+        switch="(interact|tscore|covariance|bic|interact-bic)"
     resources:
         runtime=5,
     log:

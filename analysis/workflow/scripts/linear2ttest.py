@@ -59,8 +59,8 @@ def load_linear_file(linear_fname: Path):
 @click.option(
     "-m",
     "--mode",
-    type=click.Choice("tscore", "covariance", "bic"),
-    defualt="tscore",
+    type=click.Choice(["tscore", "covariance", "bic"]),
+    default="tscore",
     show_default=True,
     help="The type of values to compute",
 )
@@ -171,7 +171,8 @@ def main(
             short_circuit=False,
         ) for idx, val in enumerate(results.data)
     ]
-    df["pval"] = np.array([(val[int(bic)] if val != True else 1) for val in vals])
+    bic = int(mode == "bic")
+    df["pval"] = np.array([(val[bic] if val != True else 1) for val in vals])
 
     if df["pval"].isna().any():
         raise ValueError("Some pvals were NA")

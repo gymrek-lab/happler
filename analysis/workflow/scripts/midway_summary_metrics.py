@@ -152,7 +152,7 @@ def main(
                 axs[2].set_ylim((-0.005, 0.255))
             else:
                 axs[2].set_ylim((-0.005, 1.005))
-        axs[2].set_ylabel("Significance threshold")
+        axs[2].set_ylabel("Best Threshold")
 
         axs[3].plot(params_beta["sampsize"], metrics_beta["AUROC"], "o")
         if not use_flex_axes_limits:

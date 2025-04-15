@@ -90,6 +90,7 @@ switch_sim_mode = {
     "tscore": ("hap", "parent"),
     "covariance": ("hap", "parent"),
     "bic": ("hap", "parent"),
+    "interact-bic": ("hap", "indep"),
 }
 
 

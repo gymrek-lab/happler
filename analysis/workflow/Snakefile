@@ -261,7 +261,7 @@ elif mode == "midway":
             rules.plots_midway.output.png,
             rules.plots_midway_metrics.output.png,
         ],
-        switch=("tscore", "interact", "bic", "covariance"),
+        switch=("tscore", "interact", "bic", "covariance", "interact-bic"),
         sampsize=config["sample_size"],
     )
 else:
