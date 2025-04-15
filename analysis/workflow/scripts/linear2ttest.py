@@ -57,19 +57,12 @@ def load_linear_file(linear_fname: Path):
     ),
 )
 @click.option(
-    "-c",
-    "--covariance",
-    is_flag=True,
+    "-m",
+    "--mode",
+    type=click.Choice("tscore", "covariance", "bic"),
+    defualt="tscore",
     show_default=True,
-    default=False,
-    help="Use the covariance correction",
-)
-@click.option(
-    "--bic",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Report the difference in BIC values rather than the pval from the t-test",
+    help="The type of values to compute",
 )
 @click.option(
     "-o",
@@ -94,8 +87,7 @@ def main(
     parent_gts: Path,
     phenotype: Path,
     hap_id: str = None,
-    covariance: bool = False,
-    bic: bool = False,
+    mode: str = "tscore",
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -129,7 +121,7 @@ def main(
     parent_df["beta"] = parent_df["beta"] * parent_stds
     parent_df["stderr"] = parent_df["stderr"] * parent_stds
 
-    if covariance:
+    if mode == "covariance":
         log.info("Computing correlations")
         parent_corr = pearson_corr_ld(
             linear_gts.data.sum(axis=2),
@@ -141,7 +133,7 @@ def main(
     log.info("Setting up t-tests")
     num_tests = 1
     num_samps = int(parent_df.samples)
-    if bic:
+    if mode == "bic":
         phen = data.Phenotypes.load(phenotype)
         parent_res = NodeResultsExtra.from_np(
                 AssocTestSimpleSM(with_bic=True).run(

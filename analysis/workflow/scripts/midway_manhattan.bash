@@ -155,9 +155,9 @@ if [ "$condition" -eq 2 ] || [ "$condition" -eq 3 ] || [ "$condition" -eq 4 ]; t
     # set up the --bic or --covariance flag, if needed
     extra_flag=""
     if [ "$condition" -eq 3 ]; then
-        extra_flag="--covariance"
-    elif [ "$condition" -eq 4 ]; then
-        extra_flag="--bic"
+        extra_flag="--mode covariance"
+    elif [ "$condition" -eq 4 ] || [ "$condition" -eq 5 ]; then
+        extra_flag="--mode bic"
     fi
     # now, convert the plink2 --glm results into t-test p-values
     "$SCRIPT_DIR"/linear2ttest.py \
