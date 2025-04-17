@@ -17,6 +17,7 @@ obs_hap = args[2]
 source("workflow/scripts/utils.R")
 
 write("Parsing observed hap file", stderr())
+# TODO: also handle case where it's a snplist file instead
 happler_hap = readHap(obs_hap)
 
 write("Parsing SuSiE results", stderr())
@@ -45,6 +46,8 @@ for (happler_hap_file_idx in 1:nrow(happler_hap)) {
     # TODO: fix this so that it also excludes other haplotypes besides obs_pip
     best_variant_pip = max(susie_pip[names(susie_pip) != names(obs_pip)])
     credible_set = NULL
+    # iterate through each of the credible sets to find the one with the hap in it
+    # TODO: also output boolean indicating whether the hap's credible set was the only pure credible set?
     for (cs in names(fitted$sets$cs)) {
         if (happler_hap_idx %in% fitted$sets$cs[cs]) {
             credible_set = cs

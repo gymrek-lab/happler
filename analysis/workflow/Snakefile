@@ -124,6 +124,7 @@ if mode in ("str", "snp", "hap", "ld_range", "midway"):
         "covar": covar_file,
         "min_maf": check_config("min_maf", 0),
         "out_thresh": 1, # artificially set to 1 to avoid filtering
+        "mode": mode,
     }
     if mode in ("hap", "ld_range", "midway"):
         happler_config["snps"] = []
@@ -152,23 +153,24 @@ elif mode == "run":
         "covar": covar_file,
         "min_maf": check_config("min_maf", 0),
         "out_thresh": check_config("out_thresh", 5e-8),
+        "mode": mode,
     }
     if check_config("SVs", place=config["modes"][mode]):
         happler_config["SVs"] = config["modes"][mode]["SVs"]
 else:
     raise ValueError("Unsupported operating 'mode' in config")
 
+module happler:
+    snakefile: "rules/happler.smk"
+    config: happler_config
+use rule * from happler as happler_*
+
 if mode == "midway":
+    happler_config["pheno"] = rules.happler_run.input.pts
     module midway:
         snakefile: "rules/midway.smk"
         config: happler_config
-    use rule * from midway as midway_*
-else:
-    module happler:
-        snakefile: "rules/happler.smk"
-        config: happler_config
-    use rule * from happler as happler_*
-    merged_happler = rules.happler_merge.output.pgen
+    use rule manhattan from midway as midway_manhattan
 
 if mode == "ld_range" and config["modes"][mode]["random"]:
     happler_config["random"] = rules.simulate_random_transform.output

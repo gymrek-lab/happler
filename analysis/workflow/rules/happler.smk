@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 out = config["out"]
+mode = config["mode"]
 logs = out + "/logs"
 bench = out + "/bench"
 
@@ -25,7 +26,9 @@ def parse_locus(locus):
 
 
 rule sub_pheno:
-    """subset the phenotype file to include only the desired replicate"""
+    """
+    subset the phenotype file to include only the desired replicate
+    """
     input:
         pheno=config["pheno"],
     params:
@@ -307,16 +310,25 @@ rule sv_ld:
 
 
 def merge_hps_input(wildcards):
-    if config["random"] is None:
-        # include the hap that happler found
-        return rules.transform.output
-    else:
-        if exclude_obs[wildcards.ex]:
-            # exclude the random hap (and use the causal hap, instead)
-            return config["causal_gt"]
+    if mode == "happler":
+        if config["random"] is None:
+            # include the hap that happler found
+            return rules.transform.output
         else:
-            # include the random hap
-            return config["random"]
+            if exclude_obs[wildcards.ex]:
+                # exclude the random hap (and use the causal hap, instead)
+                return config["causal_gt"]
+            else:
+                # include the random hap
+                return config["random"]
+    elif mode == "midway":
+        return config["causal_gt"]
+    else:
+        raise ValueError("Unsupported mode: {}".format(mode))
+
+
+if mode == "midway":
+    out += "/pip"
 
 
 rule merge:
@@ -349,7 +361,12 @@ rule merge:
         "--verbosity DEBUG {input.gts} {input.hps} {output.pgen} &> {log}"
 
 
-finemapper_input = lambda wildcards: rules.transform.input if (exclude_obs[wildcards.ex] and config["random"] is None) else rules.merge.output
+def finemapper_input(wildcards):
+    if (exclude_obs[wildcards.ex] and config["random"] is None):
+        # include the hap that happler found
+        return rules.transform.input
+    else:
+        return rules.merge.output
 
 
 def get_num_haplotypes(hap_file):
@@ -415,7 +432,7 @@ rule metrics:
     """ compute summary metrics from the output of the finemapper """
     input:
         finemap=expand(rules.finemapper.output.susie, ex="in", allow_missing=True),
-        obs_hap=rules.run.output.hap,
+        obs_hap=config["hap_file"] if mode == "midway" else rules.run.output.hap,
         # caus_hap=config["hap_file"],
     output:
         metrics=out + "/susie_metrics.tsv",

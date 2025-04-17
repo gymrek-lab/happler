@@ -5,35 +5,10 @@ logs = out + "/logs"
 bench = out + "/bench"
 
 
-rule sub_pheno:
-    """
-    subset the phenotype file to include only the desired replicate
-    This rule is copied from happler.smk
-    """
-    input:
-        pheno=config["pheno"],
-    params:
-        rep=lambda wildcards: int(wildcards.rep)+2,
-    output:
-        pheno=out + "/phen.pheno",
-    wildcard_constraints:
-        rep="\d+"
-    resources:
-        runtime=7,
-    threads: 1,
-    log:
-        logs + "/sub_pheno",
-    benchmark:
-        bench + "/sub_pheno",
-    conda:
-        "../envs/default.yml"
-    shell:
-        "cut -f 1,{params.rep} {input.pheno} | "
-        "(echo -e \"#IID\\thap\" && tail -n+2) >{output.pheno} 2>{log}"
+wildcard_constraints:
+    switch="(interact|tscore|covariance|bic|interact-bic)"
 
-
-pheno = rules.sub_pheno.output.pheno if "{rep}" in out else config["pheno"]
-
+# mapping from switch wildcard to integer for bash script
 tswitch = {
     "interact": 1,
     "tscore" : 2,
@@ -49,7 +24,7 @@ rule manhattan:
         gts=config["snp_panel"],
         gts_pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         gts_psam=Path(config["snp_panel"]).with_suffix(".psam"),
-        pts=pheno,
+        pts=config["pheno"],
         hap=config["hap_file"]
     params:
         out_prefix = lambda wildcards, output: str(output.dir) + "/out",
@@ -63,8 +38,6 @@ rule manhattan:
         transform_pgen=temp(out + "/{switch}/out.pgen"),
         transform_pvar=temp(out + "/{switch}/out.pvar"),
         transform_psam=temp(out + "/{switch}/out.psam"),
-    wildcard_constraints:
-        switch="(interact|tscore|covariance|bic|interact-bic)"
     resources:
         runtime=5,
     log:
