@@ -130,39 +130,48 @@ def main(
     log.info("Writing to axes")
     betas = np.unique(params["beta"])
     for beta in betas:
+        # get the data
         params_beta = params[params["beta"] == beta]
         metrics_beta = metrics[params["beta"] == beta]
-
+        # now, actually plot the data
         axs[0].plot(params_beta["sampsize"], metrics_beta["FPR"], "o", label=beta)
-        if not use_flex_axes_limits:
-            axs[0].set_ylim((-0.001, 0.051))
-        axs[0].set_ylabel("False positive rate")
-
         axs[1].plot(params_beta["sampsize"], metrics_beta["Recall"], "o")
-        if not use_flex_axes_limits:
-            axs[1].set_ylim((-0.001, 1.001))
-        axs[1].set_ylabel("Recall")
-
         axs[2].plot(params_beta["sampsize"], metrics_beta["Significance Threshold"], "o")
-        max_alpha = max(metrics_beta["Significance Threshold"])
-        if not use_flex_axes_limits:
-            if max_alpha > 1:
-                axs[2].set_ylim((-2.005, 10.005))
-            elif max_alpha < 0.25:
-                axs[2].set_ylim((-0.005, 0.255))
-            else:
-                axs[2].set_ylim((-0.005, 1.005))
-        axs[2].set_ylabel("Best Threshold")
-
         axs[3].plot(params_beta["sampsize"], metrics_beta["AUROC"], "o")
-        if not use_flex_axes_limits:
-            axs[3].set_ylim((0.895, 1.005))
-        axs[3].set_ylabel("AUROC")
-
         axs[4].plot(params_beta["sampsize"], metrics_beta["Average Precision"], "o")
-        if not use_flex_axes_limits:
+
+    log.info("Setting axes limits appropriately")
+    max_alpha = max(metrics["Significance Threshold"])
+    min_auroc = min(metrics["AUROC"])
+    min_ap = min(metrics["Average Precision"])
+    if not use_flex_axes_limits:
+        axs[0].set_ylim((-0.001, 0.051))
+        axs[1].set_ylim((-0.001, 1.001))
+        if max_alpha > 1:
+            axs[2].set_ylim((-2.005, 10.005))
+        elif max_alpha < 0.25:
+            axs[2].set_ylim((-0.005, 0.255))
+        else:
+            axs[2].set_ylim((-0.005, 1.005))
+        if min_auroc < 0.5:
+            axs[3].set_ylim((0.295, 1.005))
+        elif min_auroc < 0.9:
+            axs[3].set_ylim((0.495, 1.005))
+        else:
+            axs[3].set_ylim((0.895, 1.005))
+        if min_ap < 0.5:
+            axs[4].set_ylim((0.295, 1.005))
+        elif min_ap < 0.9:
+            axs[4].set_ylim((0.495, 1.005))
+        else:
             axs[4].set_ylim((0.895, 1.005))
-        axs[4].set_ylabel("Average Precision")
+
+    log.info("Labeling axes")
+    axs[0].set_ylabel("False positive rate")
+    axs[1].set_ylabel("Recall")
+    axs[2].set_ylabel("Best Threshold")
+    axs[3].set_ylabel("AUROC")
+    axs[4].set_ylabel("Average Precision")
 
     log.info("Writing figure")
     fig.supxlabel("Sample size")
