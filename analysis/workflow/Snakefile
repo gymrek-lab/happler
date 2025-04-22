@@ -134,6 +134,7 @@ if mode in ("str", "snp", "hap", "ld_range", "midway"):
         elif mode == "ld_range":
             happler_config["out"] = config["out"] + "/happler/"+mode+"/{num_haps}_haps/ld_{ld}/beta_{beta}/alpha_{alpha}"
         elif mode == "midway":
+            happler_config["hap_file"] = rules.simulate_simphenotype.input.hap
             happler_config["out"] = config["out"] + "/midway/sim_{sim_mode}/beta_{beta}"
     elif mode in ("str", "snp"):
         # also provide the SNP and STR IDs so that they can be used in the manhattan plot
@@ -193,6 +194,7 @@ if mode == "ld_range":
     plots_config["ld_range_checkpoint"] = checkpoints.simulate_create_hap_ld_range
 elif mode == "midway":
     plots_config["midway_linear"] = rules.midway_manhattan.output.linear
+    plots_config["finemap_metrics"] = rules.happler_metrics.output.metrics
     plots_config["loci"] = locus
     plots_config["out"] = plots_config["out"].replace("/plots", "").replace("{locus}", "plots")
 else:
@@ -259,11 +261,27 @@ elif mode == "run":
         default_target: True
 elif mode == "midway":
     FINAL_OUTPUT = expand(
-        [
-            rules.plots_midway.output.png,
-            rules.plots_midway_metrics.output.png,
-        ],
-        switch=("tscore", "interact", "bic", "covariance", "interact-bic"),
+        expand(
+            [
+                rules.plots_midway.output.png,
+                rules.plots_midway_metrics.output.png,
+            ],
+            switch=("tscore", "interact", "bic", "covariance", "interact-bic"),
+            allow_missing=True,
+        ) + expand(
+            [
+                rules.plots_finemap.output.png,
+                rules.plots_finemap_metrics.output.png,
+            ],
+            switch=("pip-parent", "pip-interact"),
+            allow_missing=True,
+        ) + expand(
+            [
+                rules.plots_finemap_cs_length.output.png,
+            ],
+            switch=("pip-parent"),
+            allow_missing=True,
+        ),
         sampsize=config["sample_size"],
     )
 else:

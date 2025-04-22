@@ -4,6 +4,7 @@ import logging
 import warnings
 from pathlib import Path
 from decimal import Decimal
+from functools import partial
 
 import click
 import matplotlib
@@ -82,6 +83,61 @@ def load_linear_file(linear_fname: Path):
     return df
 
 
+def get_finemap_metrics(
+    metrics_path: Path,
+    keep_hap_ids: bool = False,
+    log: logging.Logger = None
+):
+    """
+    Parse data from a TSV containing metrics from fine-mapping
+
+    Parameters
+    ----------
+    metrics: Path
+        The path to a metrics.tsv file
+    keep_hap_ids: bool, optional
+        If True, do not remove the hap IDs in the first column
+    log: Logger, optional
+        A logging module to pass to haptools
+    """
+    # The metrics are:
+    # 1) What is the ID of the hap?
+    # 2) What is the PIP of the hap?
+    # 3) Does the observed/causal hap get the highest PIP?
+    # 4) What is the next best PIP in the credible set, excluding the hap?
+    # 5) Is the observed/causal hap in a credible set? If so, what is it's index?
+    # 6) How many credible sets are there?
+    # 7) What is the purity of the credible set with the observed/causal hap?
+    # 8) What is the length of the credible set with the observed/causal hap?
+    # If you add or remove any metrics here, make sure to also change the
+    # "num_expected_vals" in get_metrics_mean_std so it knows the number of metrics
+    dtype = [
+        ("hap_id", "S30"),
+        ("pip", np.float64),
+        ("has_highest_pip", np.bool_),
+        ("best_variant_pip", np.float64),
+        ("in_credible_set", np.bool_),
+        ("num_credible_sets", np.uint8),
+        ("cs_purity", np.float64),
+        ("cs_length", np.float64)
+    ]
+    null_val = np.array([
+        (np.nan, np.nan, False, np.nan, False, 0, np.nan, 0),
+    ], dtype=dtype)
+    # if there are no observed haplotypes, then we can't compute LD
+    if not metrics_path.exists():
+        return null_val
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always", UserWarning)
+        metrics = np.atleast_1d(np.loadtxt(fname=metrics_path, delimiter=" ", dtype=dtype))
+    if not metrics.shape[0]:
+        return null_val
+    if not keep_hap_ids:
+        # Remove the 'hap_id' column (index 0)
+        metrics = np.delete(metrics, 0, axis=1)
+    return metrics
+
+
 def get_pval(
     linear: Path,
     snp_id: str,
@@ -95,7 +151,7 @@ def get_pval(
     Parameters
     ----------
     linear: Path
-        The path to a PGEN file containing genotypes for all haplotypes and their SNPs
+        The path to a .linear file containing p-values for a bunch of SNPs
     snp_id: str
         The ID of the target SNP
     bic: bool, optional
@@ -106,7 +162,7 @@ def get_pval(
     Returns
     -------
     float
-        The -log10 p-value (from the linear file) of the last SNP in the snplist file
+        The -log10 p-value (from the linear file) of the target SNP
     """
     # load the linear file
     df = load_linear_file(linear)
@@ -118,9 +174,52 @@ def get_pval(
     return np.float64(pval)
 
 
+def get_pip(
+    metrics_file: Path,
+    hap_id: str,
+    target_metric: str = "pip",
+    log: logging.Logger = None,
+) -> float:
+    """
+    Extract the PIP from the finemapping metrics file which corresponds with the hap ID
+
+    Parameters
+    ----------
+    metrics_file: Path
+        The path to a susie_metrics.tsv file containing fine-mapping metrics
+    hap_id: str
+        The ID of the target hap
+    target_metric: str, optional
+        The name of the metric that we want to load
+    log: logging.Logger, optional
+        A logging object to write any debugging and error messages
+
+    Returns
+    -------
+    float
+        The PIP of the target hap
+    """
+    # load the metrics file
+    metrics = get_finemap_metrics(metrics_file, keep_hap_ids=True, log=log)
+    # check: were there any credible sets?
+    if len(metrics) == 1 and not metrics["num_credible_sets"][0]:
+        # if there weren't any, just output the default value
+        return metrics[target_metric][0]
+    else:
+        pip = metrics[["hap_id", target_metric]]
+        hap_idxs = pip["hap_id"] == hap_id
+        # could we find the hap in the metrics file?
+        # if we can't find the hap, it's because it wasn't included in the input dataset
+        if (sum(hap_idxs) != 0):
+            pip = pip[hap_idxs]
+        # there should only be one value but we use np.mean in case it couldn't find the hap
+        return np.mean(pip[target_metric])
+
+
 def get_snp_id(
     snplist: Path,
     get_causal: bool = False,
+    hap_id: bool = False,
     log: logging.Logger = None
 ) -> float:
     """
@@ -132,6 +231,8 @@ def get_snp_id(
         The path to a .hap file containing a set of haplotypes
     get_causal: bool, optional
         If True, also check whether the file has "# not.causal" in it
+    hap_id: bool, optional
+        If True and the file is a hap file, return the hap ID instead of the variant ID
     log: logging.Logger, optional
         A logging object to write any debugging and error messages
 
@@ -157,7 +258,7 @@ def get_snp_id(
                 snp_id = [
                     line.split("\t")[4]
                     for line in hap_file.readlines()
-                    if line.startswith("V")
+                    if line.startswith("H" if hap_id else "V")
                 ][-1]
     return snp_id
 
@@ -264,6 +365,20 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     help="Do not show points on the -log10 scale but on the normal scale instead",
 )
 @click.option(
+    "--pips",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Load finemapping PIPs from susie_metrics.tsv files instead"
+)
+@click.option(
+    "--cs-len",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Load finemapping PIPs from susie_metrics.tsv files instead"
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -291,6 +406,8 @@ def main(
     thresh: float = None,
     bic: bool = False,
     no_log10: bool = False,
+    pips: bool = False,
+    cs_len: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -346,6 +463,7 @@ def main(
     snp_IDs = {
         idx: get_snp_id(
             get_fname(str(snplists), params[idx]),
+            hap_id=pips or cs_len,
             log=log
         )
         for idx in range(len(params))
@@ -417,13 +535,16 @@ def main(
     # compute -log10 pval for the target SNP in each linear file
     # Note: this will return a 2D array where each column corresponds to a plot axis
     log.debug(f"Extracting pvals from linear files")
+    if pips or cs_len:
+        get_val_method = partial(get_pip, target_metric="cs_length" if cs_len else "pip")
+    else:
+        get_val_method = partial(get_pval, bic=bic)
     vals = np.array(
         [
             [
-                get_pval(
+                get_val_method(
                     get_fname(linears_wo_regexes, params[idx]),
                     snp_IDs[idx],
-                    bic=bic,
                     log=log
                 )
                 for idx in axes_idxs[case_type_val]
@@ -564,14 +685,19 @@ def main(
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy)
     else:
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy, colors=colors)
-    threshold_type = "Bayes factor" if bic else "P-value"
-    fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
-    if not no_log10:
-        thresh = tsfm_pval(thresh)
+    threshold_type = "P-value"
+    if bic:
+        threshold_type = "Bayes factor"
+    elif pips:
+        threshold_type = "PIP"
+    if thresh is not None:
+        fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
+        if not no_log10:
+            thresh = tsfm_pval(thresh)
     ax.set_xlabel(case_type + ": " + ax_labs[1])
     ax.set_ylabel(case_type + ": " + ax_labs[0])
     ax.axline((0,0), (vals.max(), vals.max()), linestyle="--", color="orange")
-    if thresh != 0:
+    if thresh is not None and thresh != 0:
         ax.axline((0,thresh), (thresh, thresh), color="red")
         ax_histx.axline((thresh,0), (thresh, thresh), color="red")
         ax.axline((thresh,0), (thresh, thresh), color="red")

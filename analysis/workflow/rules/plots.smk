@@ -91,6 +91,8 @@ switch_sim_mode = {
     "covariance": ("hap", "parent"),
     "bic": ("hap", "parent"),
     "interact-bic": ("hap", "indep"),
+    "pip-parent": ("hap", "parent"),
+    "pip-interact": ("hap", "indep"),
 }
 
 
@@ -111,6 +113,37 @@ def agg_midway_linear(wildcards, beta: bool = False):
         allow_missing=True,
     )
 
+
+def agg_finemap(wildcards, beta: bool = False, also_exclude = False):
+    """ return a list of finemap files """
+    sim_modes = switch_sim_mode[wildcards.switch]
+    expand_partial = expand
+    if beta:
+        expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
+    else:
+        expand_partial = partial(expand_partial, beta=wildcards.beta)
+    if also_exclude:
+        return expand_partial(
+            config["finemap_metrics"],
+            locus=config["loci"],
+            rep=range(config["mode_attrs"]["reps"]),
+            sim_mode=("hap",),
+            ex=("ex","in",),
+            **wildcards,
+            allow_missing=True,
+        )
+    else:
+        return expand_partial(
+            config["finemap_metrics"],
+            locus=config["loci"],
+            rep=range(config["mode_attrs"]["reps"]),
+            sim_mode=sim_modes,
+            ex=("in",),
+            **wildcards,
+            allow_missing=True,
+        )
+
+
 fill_out_globals = lambda wildcards, val: expand(
     val,
     locus=wildcards.locus,
@@ -122,6 +155,28 @@ fill_out_globals_midway = lambda wildcards, val: expand(
     val,
     sampsize=wildcards.sampsize,
     switch=wildcards.switch,
+    allow_missing=True,
+)
+
+fill_out_globals_finemap = lambda wildcards, val: expand(
+    val,
+    sampsize=wildcards.sampsize,
+    switch=wildcards.switch,
+    ex=("in",),
+    allow_missing=True,
+)
+
+fill_out_globals_finemap_beta = lambda wildcards, val: expand(
+    fill_out_globals_finemap(wildcards, val),
+    beta=wildcards.beta,
+    allow_missing=True,
+)
+
+fill_out_globals_finemap_cs_len = lambda wildcards, val: expand(
+    val,
+    sampsize=wildcards.sampsize,
+    switch=wildcards.switch,
+    sim_mode=("hap",),
     allow_missing=True,
 )
 
@@ -215,6 +270,8 @@ rule midway:
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
     resources:
         runtime=7,
+    wildcard_constraints:
+        switch="(interact|tscore|covariance|bic|interact-bic)"
     log:
         logs + "/midway.{switch}",
     benchmark:
@@ -253,6 +310,8 @@ rule midway_beta:
         metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
     resources:
         runtime=7,
+    wildcard_constraints:
+        switch="(interact|tscore|covariance|bic|interact-bic)"
     log:
         logs + "/beta_{beta}/midway.{switch}",
     benchmark:
@@ -264,6 +323,119 @@ rule midway_beta:
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.linears_glob}) --color locus {params.thresh}"
         "{params.linears} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
+
+
+rule finemap:
+    """summarize the results from many finemapping runs"""
+    input:
+        finemaps=partial(agg_finemap, beta=True),
+        haps=agg_ld_range_causal,
+    params:
+        case_type="sim_mode",
+        pos_type="hap",
+        finemaps=lambda wildcards: fill_out_globals_finemap(wildcards, config["finemap_metrics"]),
+        causal_hap = lambda wildcards: fill_out_globals_midway(wildcards, config["causal_hap"]),
+        finemaps_glob = lambda wildcards: expand(
+            re.sub(
+                r"\{(?!sim_mode\})[^}]+\}", "*",
+                fill_out_globals_finemap(wildcards, config["finemap_metrics"])[0],
+            ),
+            sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
+            allow_missing=True,
+        )[0],
+    output:
+        png=out + "/midway_summary.{switch}.pdf",
+        metrics=out+"/midway_summary_metrics.{switch}.tsv",
+    resources:
+        runtime=7,
+    wildcard_constraints:
+        switch="(pip-parent|pip-interact)"
+    log:
+        logs + "/midway.{switch}",
+    benchmark:
+        bench + "/midway.{switch}",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "workflow/scripts/midway_manhattan_summary.py --pips "
+        "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
+        "-f <(ls -1 {params.finemaps_glob}) --color locus "
+        "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
+
+
+rule finemap_beta:
+    """summarize the results from many finemapping runs for a specific value of beta"""
+    input:
+        finemaps=partial(agg_finemap),
+        haps=agg_ld_range_causal,
+    params:
+        case_type="sim_mode",
+        pos_type="hap",
+        finemaps=lambda wildcards: fill_out_globals_finemap_beta(wildcards, config["finemap_metrics"]),
+        causal_hap = lambda wildcards: fill_out_globals_midway_beta(wildcards, config["causal_hap"]),
+        finemaps_glob = lambda wildcards: expand(
+            re.sub(
+                r"\{(?!sim_mode\})[^}]+\}", "*",
+                fill_out_globals_finemap_beta(wildcards, config["finemap_metrics"])[0],
+            ),
+            sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
+            allow_missing=True,
+        )[0],
+    output:
+        png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
+        metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
+    resources:
+        runtime=7,
+    wildcard_constraints:
+        switch="(pip-parent|pip-interact)"
+    log:
+        logs + "/beta_{beta}/midway.{switch}",
+    benchmark:
+        bench + "/beta_{beta}/midway.{switch}",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "workflow/scripts/midway_manhattan_summary.py --pips "
+        "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
+        "-f <(ls -1 {params.finemaps_glob}) --color locus "
+        "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
+
+
+rule finemap_cs_length:
+    """summarize the results from many finemapping runs. Show CS length instead of PIPs"""
+    input:
+        finemaps=partial(agg_finemap, beta=True, also_exclude=True),
+        haps=agg_ld_range_causal,
+    params:
+        case_type="ex",
+        finemaps=lambda wildcards: fill_out_globals_finemap_cs_len(wildcards, config["finemap_metrics"]),
+        causal_hap = lambda wildcards: fill_out_globals_midway(wildcards, config["causal_hap"]),
+        finemaps_glob = lambda wildcards: expand(
+            re.sub(
+                r"\{(?!ex\})[^}]+\}", "*",
+                fill_out_globals_finemap_cs_len(wildcards, config["finemap_metrics"])[0],
+            ),
+            ex="{"+",".join(("ex", "in"))+"}",
+            allow_missing=True,
+        )[0],
+    output:
+        png=out + "/cs_len_summary.{switch}.pdf",
+        metrics=out+"/cs_len_summary_metrics.{switch}.tsv",
+    resources:
+        runtime=7,
+    wildcard_constraints:
+        switch="pip-parent"
+    log:
+        logs + "/cs_len.{switch}",
+    benchmark:
+        bench + "/cs_len.{switch}",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "workflow/scripts/midway_manhattan_summary.py --cs-len "
+        "-o {output.png} --verbosity DEBUG "
+        "-f <(ls -1 {params.finemaps_glob}) --color locus "
+        "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
 
 
 out = out.replace("{sampsize}samples/", "")
@@ -291,6 +463,32 @@ rule midway_metrics:
         logs + "/midway_metrics.{switch}",
     benchmark:
         bench + "/midway_metrics.{switch}",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/midway_summary_metrics.py {params.use_flex_axes}-o {output.png} {params.metrics} &>{log}"
+
+
+rule finemap_metrics:
+    """summarize metrics from many executions of finemap_beta"""
+    input:
+        metrics = expand(
+            rules.finemap_beta.output.metrics,
+            beta=config["mode_attrs"]["beta"],
+            sampsize=config["sample_size"],
+            allow_missing=True
+        ),
+    params:
+        metrics = lambda wildcards: expand(rules.finemap_beta.output.metrics, switch=wildcards.switch, allow_missing=True),
+        use_flex_axes = lambda wildcards: "--use-flex-axes-limits " if wildcards.switch == "interact" else "",
+    output:
+        png=out + "/finemap_summary_metrics.{switch}.pdf",
+    resources:
+        runtime=7,
+    log:
+        logs + "/finemap_metrics.{switch}",
+    benchmark:
+        bench + "/finemap_metrics.{switch}",
     conda:
         "happler"
     shell:
