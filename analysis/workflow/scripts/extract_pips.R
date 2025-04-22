@@ -10,4 +10,4 @@ susie_rds = args[1]
 out = args[2]
 
 susie_results = readRDS(susie_rds)
-write.table(susie_results$fitted$pip, file=out, row.names=T, sep="\t", quote=F, col.names=F)
+write.table(susieR::susie_get_pip(susie_results$fitted), file=out, row.names=T, sep="\t", quote=F, col.names=F)
