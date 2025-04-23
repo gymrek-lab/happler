@@ -85,24 +85,25 @@ names(susie_pip) = names(fitted$pip)
 
 # if a haplotype was not provided, we just output metrics for each credible set
 if (is.null(happler_hap_ids)) {
-    # do not filter susie credible sets by default purity
-    susie_CS_details = susieR::susie_get_cs(fitted)
+    # do not filter susie credible sets by default purity or coverage
+    susie_CS_details = susieR::susie_get_cs(fitted, X = X, min_abs_corr = 0)
     susie_CSs = susie_CS_details$cs
     write("No haplotype provided", stderr())
     # The metrics are:
-    # 1) False (N/A)
-    # 2) False (N/A)
-    # 3) False (N/A)
+    # 1) False (NA)
+    # 2) False (0)
+    # 3) False (0)
     # 4) What is the best PIP in the credible set?
-    # 5) False (N/A)
+    # 5) False (0)
     # 6) How many credible sets are there?
     # 7) What is the purity of this credible set?
     # 8) What is the length of this credible set?
     obs_pip = 0
-    has_highest_pip = 0
-    num_credible_sets = length(susie_CSs)
+    coverage = 0
     curr_id = "NA"
+    has_highest_pip = 0
     in_credible_set = 0
+    num_credible_sets = length(susie_CSs)
     if (length(susie_CSs) == 0) {
         # if there are no credible sets, we warn the user
         write("No credible sets found", stderr())
@@ -111,10 +112,6 @@ if (is.null(happler_hap_ids)) {
         for (credible_set in names(susie_CSs)) {
             best_variant_pip = max(susie_pip[susie_CSs[[credible_set]]])
             purity = susie_CS_details$purity[credible_set, "min.abs.corr"]
-            if (is.null(purity)) {
-                # if the purity is NULL, we set it to 0
-                purity = 0
-            }
             cs_length = length(susie_CSs[[credible_set]])
             write(paste(curr_id, obs_pip, has_highest_pip, best_variant_pip, in_credible_set, num_credible_sets, purity, cs_length), stdout())   
         }
@@ -152,11 +149,13 @@ for (happler_hap_id in happler_hap_ids) {
         }
     }
     purity = 0
+    coverage = 0
     cs_length = 0
     in_credible_set = 0
     best_variant_pip = 0
     if (!is.null(credible_set)) {
         purity = susie_CS_details$purity[credible_set, "min.abs.corr"]
+        coverage = susie_CS_details$purity[credible_set, "coverage"]
         actual_cs = susie_CSs[[credible_set]]
         cs_length = length(actual_cs)
         # if the hap was in a credible set, what is the index of the credible set?

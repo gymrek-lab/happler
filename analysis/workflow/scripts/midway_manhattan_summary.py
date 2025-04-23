@@ -109,17 +109,18 @@ def get_finemap_metrics(
     # 6) How many credible sets are there?
     # 7) What is the purity of the credible set with the observed/causal hap?
     # 8) What is the length of the credible set with the observed/causal hap?
+
     # If you add or remove any metrics here, make sure to also change the
-    # "num_expected_vals" in get_metrics_mean_std so it knows the number of metrics
+    # copy of this function in parameter_plot.py 
     dtype = [
         ("hap_id", "U30"),
         ("pip", np.float64),
         ("has_highest_pip", np.bool_),
         ("best_variant_pip", np.float64),
-        ("in_credible_set", np.bool_),
+        ("in_credible_set", np.uint8),
         ("num_credible_sets", np.uint8),
         ("cs_purity", np.float64),
-        ("cs_length", np.float64)
+        ("cs_length", np.float64),
     ]
     null_val = np.array([
         (np.nan, np.nan, False, np.nan, False, 0, np.nan, 0),
@@ -365,6 +366,13 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     help="Do not show points on the -log10 scale but on the normal scale instead",
 )
 @click.option(
+    "--reverse",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="If True, put a negative sign in front of each (p)val. This flips the ROC and PRC upside down",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -392,6 +400,7 @@ def main(
     thresh: float = None,
     kind: str = "pval",
     no_log10: bool = False,
+    reverse: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -421,12 +430,18 @@ def main(
         is_finemap_metric = True
 
     # if this is a pval, take the -log10 of it, otherwise take the ln of it
-    if not bic:
+    if kind == "pval":
         tsfm_pval = lambda pval: -np.log10(pval) if pval != 0 else np.inf
         rvrs_tsfm = lambda pval: np.power(10, -pval)
-    else:
+    elif bic:
         tsfm_pval = lambda val: np.log(val) if val != 0 else -np.inf
         rvrs_tsfm = lambda pval: np.power(10, pval)
+    elif reverse:
+        tsfm_pval = lambda val: -val
+        rvrs_tsfm = lambda pval: -pval        
+    else:
+        tsfm_pval = lambda val: val
+        rvrs_tsfm = lambda pval: pval
 
     # which files should we originally consider?
     # by default, we just grab as many as we can
@@ -575,6 +590,8 @@ def main(
         pos_labs[:,pos_type] = True
         y_true = pos_labs.flatten("F")
         y_score = vals.flatten("F")
+        if reverse:
+            y_score = -y_score
         fpr, tpr, roc_threshold = roc_curve(y_true, y_score, drop_intermediate=True)
         precision, recall, prc_threshold = precision_recall_curve(y_true, y_score, drop_intermediate=True)
 
@@ -592,7 +609,7 @@ def main(
         if bic:
             optimal_thresh = roc_threshold[thresh_idx]
         else:
-            optimal_thresh = 10**(-roc_threshold[thresh_idx])
+            optimal_thresh = rvrs_tsfm(roc_threshold[thresh_idx])
         final_metrics["Significance Threshold"] = optimal_thresh
         if thresh is not None:
             thresh_idx = np.argmax(roc_threshold < tsfm_pval(thresh))
@@ -685,7 +702,7 @@ def main(
             if kind == "pip":
                 threshold_type = "PIP"
             else:
-                raise ValueError("Unsupported metric type")
+                threshold_type = ""
         fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
         if not no_log10:
             thresh = tsfm_pval(thresh)

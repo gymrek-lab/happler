@@ -188,6 +188,7 @@ def get_finemap_metrics(
     # 6) How many credible sets are there?
     # 7) What is the purity of the credible set with the observed/causal hap?
     # 8) What is the length of the credible set with the observed/causal hap?
+
     # If you add or remove any metrics here, make sure to also change the
     # "num_expected_vals" in get_metrics_mean_std so it knows the number of metrics
     dtype = [
@@ -195,10 +196,10 @@ def get_finemap_metrics(
         ("pip", np.float64),
         ("has_highest_pip", np.bool_),
         ("best_variant_pip", np.float64),
-        ("in_credible_set", np.bool_),
+        ("in_credible_set", np.uint8),
         ("num_credible_sets", np.uint8),
         ("cs_purity", np.float64),
-        ("cs_length", np.float64)
+        ("cs_length", np.float64),
     ]
     null_val = np.array([
         (np.nan, np.nan, False, np.nan, False, 0, np.nan, 0),
@@ -217,7 +218,7 @@ def get_finemap_metrics(
     return metrics
 
 
-def get_metrics_mean_std(metrics_vals: npt.NDArray, num_expected_vals: int = 7):
+def get_metrics_mean_std(metrics_vals: npt.NDArray, num_expected_vals: int = 8):
     """
     Compute the mean and standard error of the metrics
 
