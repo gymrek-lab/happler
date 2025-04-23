@@ -112,7 +112,7 @@ def get_finemap_metrics(
     # If you add or remove any metrics here, make sure to also change the
     # "num_expected_vals" in get_metrics_mean_std so it knows the number of metrics
     dtype = [
-        ("hap_id", "S30"),
+        ("hap_id", "U30"),
         ("pip", np.float64),
         ("has_highest_pip", np.bool_),
         ("best_variant_pip", np.float64),
@@ -351,11 +351,11 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     help="The significance threshold. Inferred at an FDR of 0.05 if not specified"
 )
 @click.option(
-    "--bic",
-    is_flag=True,
+    "--kind",
+    type=click.Choice(["pval", "bic", "pip", "cs_length", "in_credible_set", "num_credible_sets"]),
+    default="pval",
     show_default=True,
-    default=False,
-    help="Use the difference in BIC values rather than the pval from the t-test",
+    help="What kind of value are we plotting?",
 )
 @click.option(
     "--no-log10",
@@ -363,20 +363,6 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     show_default=True,
     default=False,
     help="Do not show points on the -log10 scale but on the normal scale instead",
-)
-@click.option(
-    "--pips",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Load finemapping PIPs from susie_metrics.tsv files instead"
-)
-@click.option(
-    "--cs-len",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Load finemapping PIPs from susie_metrics.tsv files instead"
 )
 @click.option(
     "-o",
@@ -404,10 +390,8 @@ def main(
     color: str = None,
     pos_type: str = None,
     thresh: float = None,
-    bic: bool = False,
+    kind: str = "pval",
     no_log10: bool = False,
-    pips: bool = False,
-    cs_len: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -427,6 +411,14 @@ def main(
     """
     log = getLogger("midway_manhattan_summary", level=verbosity)
     final_metrics={}
+
+    # set the kind of value
+    bic = False
+    is_finemap_metric = False
+    if kind == "bic":
+        bic = True
+    elif kind in ("pip", "cs_length", "in_credible_set", "num_credible_sets"):
+        is_finemap_metric = True
 
     # if this is a pval, take the -log10 of it, otherwise take the ln of it
     if not bic:
@@ -463,7 +455,7 @@ def main(
     snp_IDs = {
         idx: get_snp_id(
             get_fname(str(snplists), params[idx]),
-            hap_id=pips or cs_len,
+            hap_id=is_finemap_metric,
             log=log
         )
         for idx in range(len(params))
@@ -535,8 +527,8 @@ def main(
     # compute -log10 pval for the target SNP in each linear file
     # Note: this will return a 2D array where each column corresponds to a plot axis
     log.debug(f"Extracting pvals from linear files")
-    if pips or cs_len:
-        get_val_method = partial(get_pip, target_metric="cs_length" if cs_len else "pip")
+    if is_finemap_metric:
+        get_val_method = partial(get_pip, target_metric=kind)
     else:
         get_val_method = partial(get_pval, bic=bic)
     vals = np.array(
@@ -685,12 +677,15 @@ def main(
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy)
     else:
         scatter_hist(vals[:,1], vals[:,0], ax, ax_histx, ax_histy, colors=colors)
-    threshold_type = "P-value"
-    if bic:
-        threshold_type = "Bayes factor"
-    elif pips:
-        threshold_type = "PIP"
     if thresh is not None:
+        threshold_type = "P-value"
+        if bic:
+            threshold_type = "Bayes factor"
+        elif is_finemap_metric:
+            if kind == "pip":
+                threshold_type = "PIP"
+            else:
+                raise ValueError("Unsupported metric type")
         fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
         if not no_log10:
             thresh = tsfm_pval(thresh)

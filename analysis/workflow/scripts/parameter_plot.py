@@ -191,7 +191,7 @@ def get_finemap_metrics(
     # If you add or remove any metrics here, make sure to also change the
     # "num_expected_vals" in get_metrics_mean_std so it knows the number of metrics
     dtype = [
-        ("hap_id", "S30"),
+        ("hap_id", "U30"),
         ("pip", np.float64),
         ("has_highest_pip", np.bool_),
         ("best_variant_pip", np.float64),

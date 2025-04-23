@@ -263,7 +263,7 @@ rule midway:
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
         )[0],
-        bic=lambda wildcards: "--bic " if wildcards.switch in ("bic", "interact-bic") else "",
+        bic=lambda wildcards: "--kind bic " if wildcards.switch in ("bic", "interact-bic") else "",
         thresh=lambda wildcards: "--thresh 3 " if wildcards.switch in ("bic", "interact-bic") else "--thresh 0.05 ",
     output:
         png=out + "/midway_summary.{switch}.pdf",
@@ -303,7 +303,7 @@ rule midway_beta:
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
         )[0],
-        bic=lambda wildcards: "--bic " if wildcards.switch in ("bic", "interact-bic") else "",
+        bic=lambda wildcards: "--kind bic " if wildcards.switch in ("bic", "interact-bic") else "",
         thresh=lambda wildcards: "--thresh 3 " if wildcards.switch in ("bic", "interact-bic") else "--thresh 0.05 ",
     output:
         png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
@@ -357,7 +357,7 @@ rule finemap:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py --pips "
+        "workflow/scripts/midway_manhattan_summary.py --kind pip "
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.finemaps_glob}) --color locus "
         "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
@@ -432,7 +432,7 @@ rule finemap_cs_length:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py --cs-len "
+        "workflow/scripts/midway_manhattan_summary.py --kind cs_length "
         "-o {output.png} --verbosity DEBUG "
         "-f <(ls -1 {params.finemaps_glob}) --color locus "
         "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
