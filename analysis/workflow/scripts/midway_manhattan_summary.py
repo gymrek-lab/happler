@@ -704,7 +704,7 @@ def main(
             else:
                 threshold_type = ""
         fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
-        if not no_log10:
+        if not no_log10 and not is_finemap_metric:
             thresh = tsfm_pval(thresh)
     ax.set_xlabel(case_type + ": " + ax_labs[1])
     ax.set_ylabel(case_type + ": " + ax_labs[0])

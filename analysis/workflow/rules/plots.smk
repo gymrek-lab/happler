@@ -343,6 +343,7 @@ rule finemap:
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
         )[0],
+        thresh=lambda wildcards: "--thresh 0.9 ",
     output:
         png=out + "/midway_summary.{switch}.pdf",
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
@@ -357,7 +358,7 @@ rule finemap:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py --kind pip "
+        "workflow/scripts/midway_manhattan_summary.py --kind pip {params.thresh}"
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.finemaps_glob}) --color locus "
         "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
@@ -381,6 +382,7 @@ rule finemap_beta:
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
         )[0],
+        thresh=lambda wildcards: "--thresh 0.9 ",
     output:
         png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
         metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
@@ -395,7 +397,7 @@ rule finemap_beta:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py --pips "
+        "workflow/scripts/midway_manhattan_summary.py --kind pip {params.thresh}"
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.finemaps_glob}) --color locus "
         "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
