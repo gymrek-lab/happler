@@ -117,7 +117,7 @@ def get_finemap_metrics(
         ("pip", np.float64),
         ("has_highest_pip", np.bool_),
         ("best_variant_pip", np.float64),
-        ("in_credible_set", np.uint8),
+        ("in_credible_set", np.bool_),
         ("num_credible_sets", np.uint8),
         ("cs_purity", np.float64),
         ("cs_length", np.float64),
@@ -285,6 +285,10 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
     ymax = np.max(y)
     xbinwidth = ((xmax-xmin)/25)/2
     ybinwidth = ((ymax-ymin)/25)/2
+    if not xbinwidth:
+        xbinwidth = 1
+    if not ybinwidth:
+        ybinwidth = 1
     padding = 50
     if zoom:
         ax.set_xlim(xmin-(xmax/padding), xmax+(xmax/padding))
@@ -353,7 +357,7 @@ def scatter_hist(x, y, ax, ax_histx, ax_histy, colors=None, zoom=True):
 )
 @click.option(
     "--kind",
-    type=click.Choice(["pval", "bic", "pip", "cs_length", "in_credible_set", "num_credible_sets"]),
+    type=click.Choice(["pval", "bic", "pip", "cs_length", "in_credible_set", "num_credible_sets", "cs_purity", "has_highest_pip", "best_variant_pip"]),
     default="pval",
     show_default=True,
     help="What kind of value are we plotting?",
@@ -426,7 +430,7 @@ def main(
     is_finemap_metric = False
     if kind == "bic":
         bic = True
-    elif kind in ("pip", "cs_length", "in_credible_set", "num_credible_sets"):
+    elif kind in ("pip", "cs_length", "in_credible_set", "num_credible_sets", "cs_purity", "has_highest_pip", "best_variant_pip"):
         is_finemap_metric = True
 
     # if this is a pval, take the -log10 of it, otherwise take the ln of it

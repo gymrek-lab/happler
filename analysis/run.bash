@@ -47,8 +47,8 @@ if [ "$ENVIRONMENT" = "BATCH" ]; then
     --rerun-trigger {mtime,params,input} \
     --notemp \
     -k \
-    -j 32 \
-    -c 32 \
+    -j 64 \
+    -c 64 \
     "$@" &>"$out_path/log" &
 else
     snakemake \

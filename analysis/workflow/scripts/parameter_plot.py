@@ -196,7 +196,7 @@ def get_finemap_metrics(
         ("pip", np.float64),
         ("has_highest_pip", np.bool_),
         ("best_variant_pip", np.float64),
-        ("in_credible_set", np.uint8),
+        ("in_credible_set", np.bool_),
         ("num_credible_sets", np.uint8),
         ("cs_purity", np.float64),
         ("cs_length", np.float64),

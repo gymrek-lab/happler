@@ -149,10 +149,10 @@ def main(
         axs[1].set_ylim((-0.001, 1.001))
         if max_alpha > 1:
             axs[2].set_ylim((-2.005, 10.005))
-        elif max_alpha < 0.25:
-            axs[2].set_ylim((-0.005, 0.255))
-        else:
+        elif max_alpha > 0.25:
             axs[2].set_ylim((-0.005, 1.005))
+        else:
+            axs[2].set_ylim((-0.005, 0.255))
         if min_auroc < 0.5:
             axs[3].set_ylim((0.295, 1.005))
         elif min_auroc < 0.9:
