@@ -134,7 +134,7 @@ if mode in ("str", "snp", "hap", "ld_range", "midway"):
         elif mode == "ld_range":
             happler_config["out"] = config["out"] + "/happler/"+mode+"/{num_haps}_haps/ld_{ld}/beta_{beta}/alpha_{alpha}"
         elif mode == "midway":
-            happler_config["hap_file"] = rules.simulate_simphenotype.input.hap
+            # happler_config["hap_file"] = rules.simulate_simphenotype.input.hap # do not uncomment!
             happler_config["out"] = config["out"] + "/midway/sim_{sim_mode}/beta_{beta}"
     elif mode in ("str", "snp"):
         # also provide the SNP and STR IDs so that they can be used in the manhattan plot

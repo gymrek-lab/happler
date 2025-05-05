@@ -25,7 +25,7 @@ rule manhattan:
         gts_pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
         gts_psam=Path(config["snp_panel"]).with_suffix(".psam"),
         pts=config["pheno"],
-        hap=config["hap_file"]
+        hap=config["hap_file"],
     params:
         out_prefix = lambda wildcards, output: str(output.dir) + "/out",
         maf=config["min_maf"],

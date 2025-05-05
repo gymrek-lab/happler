@@ -450,7 +450,7 @@ rule metrics:
     params:
         hap=lambda wildcards: expand(
             (
-                config["hap_file"](wildcards)
+                config["hap_file"]
                 if mode == "midway" else rules.run.output.hap
             ), **wildcards
         )[0] if wildcards.ex == "in" else "NULL",
