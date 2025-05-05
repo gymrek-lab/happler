@@ -13,7 +13,12 @@ from haptools.ld import pearson_corr_ld
 
 from happler.tree.assoc_test import NodeResults, NodeResultsExtra
 from happler.tree.terminator import TTestTerminator, BICTerminator
-from happler.tree.assoc_test import AssocResults, AssocTestSimple, AssocTestSimpleSM
+from happler.tree.assoc_test import (
+    AssocResults,
+    AssocTestSimple,
+    AssocTestSimpleSM,
+    AssocTestSimpleCovariates
+)
 
 
 PLINK_COLS = {
@@ -59,10 +64,20 @@ def load_linear_file(linear_fname: Path):
 @click.option(
     "-m",
     "--mode",
-    type=click.Choice(["tscore", "covariance", "bic"]),
+    type=click.Choice(["tscore", "covariance", "bic", "interact-bic"]),
     default="tscore",
     show_default=True,
     help="The type of values to compute",
+)
+@click.option(
+    "--child-gts",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    show_default=True,
+    help=(
+        "The genotypes file for the child haplotype. "
+        "Only needed if --mode is interact-bic"
+    ),
 )
 @click.option(
     "-o",
@@ -88,6 +103,7 @@ def main(
     phenotype: Path,
     hap_id: str = None,
     mode: str = "tscore",
+    child_gts: Path = None,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -114,6 +130,14 @@ def main(
     # reorder to match
     linear_gts.subset(variants=tuple(df["id"]), inplace=True)
     linear_stds = linear_gts.data.sum(axis=2).std(axis=0)
+    # also load child gts if needed
+    if mode == "interact-bic":
+        if child_gts is None:
+            raise ValueError("Child genotypes file is required for interact-bic mode")
+        child_gts = data.GenotypesPLINK.load(child_gts)
+        # reorder to match
+        child_gts.subset(variants=tuple(child_gts.variants["id"]), inplace=True)
+        child_stds = child_gts.data.sum(axis=2).std(axis=0)
 
     log.info("Adjusting betas and stderrs")
     df["beta"] = df["beta"] * linear_stds
@@ -133,18 +157,65 @@ def main(
     log.info("Setting up t-tests")
     num_tests = 1
     num_samps = int(parent_df.samples)
-    if mode == "bic":
+    if mode == "bic" or mode == "interact-bic":
         phen = data.Phenotypes.load(phenotype)
-        parent_res = NodeResultsExtra.from_np(
-                AssocTestSimpleSM(with_bic=True).run(
-                parent_gts.data.sum(axis=2),
+        if mode == "bic":
+            # parent node model: y ~ h_parent
+            parent_res = NodeResultsExtra.from_np(
+                    AssocTestSimpleSM(with_bic=True).run(
+                    parent_gts.data.sum(axis=2),
+                    phen.data[:, 0],
+                ).data[0]
+            )
+            # current node model: y ~ h_hap
+            results = AssocTestSimpleSM(with_bic=True).run(
+                linear_gts.data.sum(axis=2),
                 phen.data[:, 0],
-            ).data[0]
-        )
-        results = AssocTestSimpleSM(with_bic=True).run(
-            linear_gts.data.sum(axis=2),
-            phen.data[:, 0],
-        )
+            )
+        elif mode == "interact-bic":
+            child_covar = child_gts.data.sum(axis=2)
+            parent_and_child_covar = data.GenotypesPLINK.merge_variants(
+                (parent_gts, child_gts), fname=None
+            ).data.sum(axis=2)
+            if True:
+                # parent node model: y ~ h_parent + z_child
+                parent_res = NodeResultsExtra.from_np(
+                        AssocTestSimpleCovariates(covars=child_covar, with_bic=True).run(
+                        parent_gts.data.sum(axis=2),
+                        phen.data[:, 0],
+                    ).data[0]
+                )
+                # current node model: y ~ h_hap
+                results = AssocTestSimpleSM(with_bic=True).run(
+                    linear_gts.data.sum(axis=2),
+                    phen.data[:, 0],
+                )
+            elif False:
+                # parent node model: y ~ h_parent + z_child
+                parent_res = NodeResultsExtra.from_np(
+                        AssocTestSimpleCovariates(covars=child_covar, with_bic=True).run(
+                        parent_gts.data.sum(axis=2),
+                        phen.data[:, 0],
+                    ).data[0]
+                )
+                # current node model: y ~ h_hap + h_parent + z_child
+                results = AssocTestSimpleCovariates(covars=parent_and_child_covar, with_bic=True).run(
+                    linear_gts.data.sum(axis=2),
+                    phen.data[:, 0],
+                ).data[0]
+            elif False:
+                # parent node model: y ~ h_hap + h_parent + z_child
+                parent_res = NodeResultsExtra.from_np(
+                        AssocTestSimpleCovariates(covars=parent_and_child_covar, with_bic=True).run(
+                        linear_gts.data.sum(axis=2),
+                        phen.data[:, 0],
+                    ).data[0]
+                )
+                # current node model: y ~ h_hap
+                results = AssocTestSimpleSM(with_bic=True).run(
+                    linear_gts.data.sum(axis=2),
+                    phen.data[:, 0],
+                )
         node_res = NodeResultsExtra
         terminator = BICTerminator()
     else:
@@ -171,7 +242,7 @@ def main(
             short_circuit=False,
         ) for idx, val in enumerate(results.data)
     ]
-    bic = int(mode == "bic")
+    bic = int(mode == "bic" or mode == "interact-bic")
     df["pval"] = np.array([(val[bic] if val != True else 1) for val in vals])
 
     if df["pval"].isna().any():

@@ -101,7 +101,8 @@ if [ "$condition" -eq 1 ]; then
     --pfile "${pgen_file%.pgen}" \
     --snps $parent_snp_id $snp_id
     { echo -n "#"; cut -f 2,7- "$out_prefix".raw; } > "$out_prefix".covar
-    # incorporate the parent and child nodes as covariates in the model
+    # get summary stats for the hap and incorporate the parent and child nodes as
+    # covariates in the model
     plink2 \
     --maf $maf \
     --nonfounders \
@@ -142,50 +143,36 @@ if [ "$condition" -eq 2 ] || [ "$condition" -eq 3 ] || [ "$condition" -eq 4 ] ||
         grep -E '^#' "$hap_file"
         echo "$hap"
     )
-    if [ "$condition" -eq 5 ]; then
-        # output the child node to a covariate file
-        plink2 \
-        --maf $maf \
-        --nonfounders \
-        --out "$out_prefix".parent \
-        --export A ref-first \
-        --pfile "${pgen_file%.pgen}" \
-        --snps $snp_id
-        { echo -n "#"; cut -f 2,7- "$out_prefix".parent.raw; } > "$out_prefix".parent.covar
-        # get summary statistics for the parent haplotype
-        plink2 \
-        --maf $maf \
-        --nonfounders \
-        --vif 10000000000 \
-        --variance-standardize \
-        --max-corr 0.9999999999 \
-        --glm no-x-sex hide-covar \
-        --out "$out_prefix".parent \
-        --pfile "$out_prefix".parent \
-        --no-input-missing-phenotype \
-        --pheno iid-only "$pheno_file" \
-        --covar 'iid-only' "$out_prefix".parent.covar
-    else
-        # get summary statistics for the parent haplotype
-        plink2 \
-        --maf $maf \
-        --nonfounders \
-        --variance-standardize \
-        --out "$out_prefix".parent \
-        --pfile "$out_prefix".parent \
-        --no-input-missing-phenotype \
-        --pheno iid-only "$pheno_file" \
-        --glm no-x-sex allow-no-covars
-    fi
+    # get summary statistics for the parent haplotype
+    plink2 \
+    --maf $maf \
+    --nonfounders \
+    --variance-standardize \
+    --out "$out_prefix".parent \
+    --pfile "$out_prefix".parent \
+    --no-input-missing-phenotype \
+    --pheno iid-only "$pheno_file" \
+    --glm no-x-sex allow-no-covars
     # set up the --bic or --covariance flag, if needed
     extra_flag=""
     if [ "$condition" -eq 3 ]; then
         extra_flag="--mode covariance"
-    elif [ "$condition" -eq 4 ] || [ "$condition" -eq 5 ]; then
+    elif [ "$condition" -eq 4 ]; then
         extra_flag="--mode bic"
+    elif [ "$condition" -eq 5 ]; then
+        # output the child node to its own gts file
+        plink2 \
+        --maf $maf \
+        --make-pgen \
+        --snp $snp_id \
+        --nonfounders \
+        --out "$out_prefix".child \
+        --pfile "${pgen_file%.pgen}"
+        # TODO: add child gts as path
+        extra_flag="--mode interact-bic --child-gts $out_prefix.child.pgen"
     fi
     # now, convert the plink2 --glm results into t-test p-values
-    "$SCRIPT_DIR"/linear2ttest.py \
+    python "$SCRIPT_DIR"/linear2ttest.py \
     $extra_flag \
     -i "$hap_id" \
     --verbosity DEBUG \
@@ -203,7 +190,7 @@ ln -sfnr "$linear_file" "$out_prefix".linear
 
 if [ "$just_target" == "" ]; then
     # step 3: use manhattan.py to actually create the manhattan plot
-    "$SCRIPT_DIR"/manhattan.py \
+    python "$SCRIPT_DIR"/manhattan.py \
     --bic \
     -i "$snp_id" \
     -o "$out_prefix".png \
