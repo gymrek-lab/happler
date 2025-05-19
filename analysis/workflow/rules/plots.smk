@@ -122,6 +122,10 @@ def agg_finemap(wildcards, beta: bool = False, also_exclude = False):
         expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
     else:
         expand_partial = partial(expand_partial, beta=wildcards.beta)
+    # use the same "switch" value for both pip-parent and pip-interact
+    wildcards = dict(wildcards)
+    wildcards["switch"] = "pip"
+    # now, return the finemap files
     if also_exclude:
         return expand_partial(
             config["finemap_metrics"],
@@ -161,7 +165,7 @@ fill_out_globals_midway = lambda wildcards, val: expand(
 fill_out_globals_finemap = lambda wildcards, val: expand(
     val,
     sampsize=wildcards.sampsize,
-    switch=wildcards.switch,
+    switch="pip",
     ex=("in",),
     allow_missing=True,
 )
@@ -175,7 +179,7 @@ fill_out_globals_finemap_beta = lambda wildcards, val: expand(
 fill_out_globals_finemap_cs_len = lambda wildcards, val: expand(
     val,
     sampsize=wildcards.sampsize,
-    switch=wildcards.switch,
+    switch="pip",
     sim_mode=("hap",),
     allow_missing=True,
 )

@@ -322,13 +322,10 @@ def merge_hps_input(wildcards):
                 # include the random hap
                 return config["random"]
     elif mode == "midway":
-        if wildcards.sim_mode == "parent":
-            return snakemake.io.Namedlist(fromdict=dict(zip(
-                dict(config["causal_gt"]).keys(),
-                expand(config["causal_gt"], sim_mode="hap", allow_missing=True)
-            )))
-        else:
-            return config["causal_gt"]
+        return snakemake.io.Namedlist(fromdict=dict(zip(
+            dict(config["causal_gt"]).keys(),
+            expand(config["causal_gt"], sim_mode="hap", allow_missing=True)
+        )))
     else:
         raise ValueError("Unsupported mode: {}".format(mode))
 
@@ -338,7 +335,7 @@ if mode == "midway":
     logs = logs[:-len("logs")] + "{switch}/logs"
     bench = bench[:-len("bench")] + "{switch}/bench"
     wildcard_constraints:
-        switch="(pip-parent|pip-interact)"
+        switch="pip"
 
 
 rule merge:
@@ -360,6 +357,7 @@ rule merge:
         runtime=lambda wildcards, input: (
             rsrc_func(input.gts)(10, Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844)
         ),
+        mem_mb = 6000,
     log:
         logs + "/{ex}clude/merge",
     benchmark:
@@ -372,11 +370,10 @@ rule merge:
 
 
 def finemapper_input(wildcards):
-    midway_merge_status = (mode == "midway") and (wildcards.sim_mode == "indep")
-    if midway_merge_status or (exclude_obs[wildcards.ex] and config["random"] is None):
-        # include the hap that happler found
+    if exclude_obs[wildcards.ex] and config["random"] is None:
         return rules.transform.input
     else:
+        # include the hap that happler found
         return rules.merge.output
 
 
@@ -427,8 +424,9 @@ rule pips:
     output:
         tsv=out + "/{ex}clude/susie_pips.tsv",
     resources:
-        runtime=10,
-    threads: 3,
+        runtime=7,
+        mem_mb = 4000,
+    threads: 1,
     log:
         logs + "/{ex}clude/pips",
     benchmark:
