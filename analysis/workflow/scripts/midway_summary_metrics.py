@@ -141,11 +141,16 @@ def main(
         axs[4].plot(params_beta["sampsize"], metrics_beta["Average Precision"], "o")
 
     log.info("Setting axes limits appropriately")
+    max_fpr = max(metrics["FPR"])
+    min_recall = min(metrics["Recall"])
     max_alpha = max(metrics["Significance Threshold"])
     min_auroc = min(metrics["AUROC"])
     min_ap = min(metrics["Average Precision"])
     if not use_flex_axes_limits:
-        axs[0].set_ylim((-0.001, 0.051))
+        if max_fpr > 0.05:
+            axs[0].set_ylim((-0.001, 0.051))
+        else:
+            axs[0].set_ylim((-0.001, 0.051))
         axs[1].set_ylim((-0.001, 1.001))
         if max_alpha > 1:
             axs[2].set_ylim((-2.005, 10.005))
