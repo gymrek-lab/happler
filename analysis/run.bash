@@ -8,7 +8,7 @@
 #SBATCH --ntasks 1
 #SBATCH --cpus-per-task 1
 #SBATCH --time 0:30:00
-#SBATCH --mem 2G
+#SBATCH --mem 3G
 #SBATCH --output /dev/null
 #SBATCH --signal=B:SIGUSR1@5
 
