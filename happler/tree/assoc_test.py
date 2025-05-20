@@ -379,6 +379,7 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
         x: npt.NDArray[np.float64],
         y: npt.NDArray[np.float64],
         parent_res: NodeResults = None,
+        parent_corr: float = 0,
     ) -> tuple:
         """
         Perform the test for a single haplotype.
@@ -403,7 +404,8 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
         if parent_res is None:
             t_score = 0
         else:
-            std_err = np.sqrt(((stderr**2) + (parent_res.stderr**2)) / 2)
+            cov = parent_corr * parent_res.stderr * stderr
+            std_err = np.sqrt((((stderr**2) + (parent_res.stderr**2)) / 2) - 2 * cov)
             t_score = (np.abs(beta) - np.abs(parent_res.beta)) / std_err
         if self.with_bic:
             return beta, pval, stderr, bic, t_score
@@ -415,6 +417,7 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
         X: npt.NDArray[np.float64],
         y: npt.NDArray[np.float64],
         parent_res: NodeResults = None,
+        parent_corr: npt.NDArray[np.float64] = None,
     ) -> AssocResults:
         """
         Implement AssocTest for a simple linear regression.
@@ -433,12 +436,16 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
             The results from testing each haplotype, with shape p x 3
         """
         X = self.standardize(X)
+        if parent_corr is None:
+            corr = lambda i: 0
+        else:
+            corr = lambda i: parent_corr[i]
         # use ordinary least squares for a simple regression
         # return an array of p-values
         return AssocResults(
             np.array(
                 [
-                    self.perform_test(X[:, variant_idx], y, parent_res)
+                    self.perform_test(X[:, variant_idx], y, parent_res, corr(variant_idx))
                     for variant_idx in range(X.shape[1])
                 ],
                 dtype=self.return_dtype,

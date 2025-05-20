@@ -94,12 +94,16 @@ save_curr_env = function(env = parent.frame(), filePath = "myenv.RData") {
   #
   # Within an R session on the command line, you can then execute load("myenv.RData")
   # or load(filePath) to inspect the environment.
+  # 
+  # Another alternative is to place browser() somewhere in the script, and then run it
+  # with the same command line args (but replacing the script name with "R --args").
+  # Then, source the script using source() inside the R console
 
   save(list = ls(all.names = TRUE, envir = env), file = filePath, envir = env)
 }
 
 readHap = function(hapfile) {
-  # Return a data.frame with the start, end, and ID columns of the haplotyp lines
+  # Return a data.frame with the start, end, and ID columns of the haplotype lines
   # in the .hap file
   # Parameters:
   #   hapfile: The path to the .hap file

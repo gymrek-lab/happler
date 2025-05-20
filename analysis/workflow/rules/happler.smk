@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 out = config["out"]
+mode = config["mode"]
 logs = out + "/logs"
 bench = out + "/bench"
 
@@ -25,15 +26,19 @@ def parse_locus(locus):
 
 
 rule sub_pheno:
-    """subset the phenotype file to include only the desired replicate"""
+    """
+    subset the phenotype file to include only the desired replicate
+    """
     input:
         pheno=config["pheno"],
     params:
         rep=lambda wildcards: int(wildcards.rep)+2,
     output:
         pheno=out + "/phen.pheno",
+    wildcard_constraints:
+        rep="\d+"
     resources:
-        runtime=5,
+        runtime=7,
     threads: 1,
     log:
         logs + "/sub_pheno",
@@ -305,16 +310,32 @@ rule sv_ld:
 
 
 def merge_hps_input(wildcards):
-    if config["random"] is None:
-        # include the hap that happler found
-        return rules.transform.output
-    else:
-        if exclude_obs[wildcards.ex]:
-            # exclude the random hap (and use the causal hap, instead)
-            return config["causal_gt"]
+    if mode == "happler":
+        if config["random"] is None:
+            # include the hap that happler found
+            return rules.transform.output
         else:
-            # include the random hap
-            return config["random"]
+            if exclude_obs[wildcards.ex]:
+                # exclude the random hap (and use the causal hap, instead)
+                return config["causal_gt"]
+            else:
+                # include the random hap
+                return config["random"]
+    elif mode == "midway":
+        return snakemake.io.Namedlist(fromdict=dict(zip(
+            dict(config["causal_gt"]).keys(),
+            expand(config["causal_gt"], sim_mode="hap", allow_missing=True)
+        )))
+    else:
+        raise ValueError("Unsupported mode: {}".format(mode))
+
+
+if mode == "midway":
+    out += "/{switch}"
+    logs = logs[:-len("logs")] + "{switch}/logs"
+    bench = bench[:-len("bench")] + "{switch}/bench"
+    wildcard_constraints:
+        switch="pip"
 
 
 rule merge:
@@ -336,6 +357,7 @@ rule merge:
         runtime=lambda wildcards, input: (
             rsrc_func(input.gts)(10, Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844)
         ),
+        mem_mb = 6000,
     log:
         logs + "/{ex}clude/merge",
     benchmark:
@@ -347,7 +369,12 @@ rule merge:
         "--verbosity DEBUG {input.gts} {input.hps} {output.pgen} &> {log}"
 
 
-finemapper_input = lambda wildcards: rules.transform.input if (exclude_obs[wildcards.ex] and config["random"] is None) else rules.merge.output
+def finemapper_input(wildcards):
+    if exclude_obs[wildcards.ex] and config["random"] is None:
+        return rules.transform.input
+    else:
+        # include the hap that happler found
+        return rules.merge.output
 
 
 def get_num_haplotypes(hap_file):
@@ -397,8 +424,9 @@ rule pips:
     output:
         tsv=out + "/{ex}clude/susie_pips.tsv",
     resources:
-        runtime=10,
-    threads: 3,
+        runtime=7,
+        mem_mb = 4000,
+    threads: 1,
     log:
         logs + "/{ex}clude/pips",
     benchmark:
@@ -412,22 +440,34 @@ rule pips:
 rule metrics:
     """ compute summary metrics from the output of the finemapper """
     input:
-        finemap=expand(rules.finemapper.output.susie, ex="in", allow_missing=True),
-        obs_hap=rules.run.output.hap,
-        # caus_hap=config["hap_file"],
+        gt=lambda wildcards: finemapper_input(wildcards).pgen,
+        gt_pvar=lambda wildcards: finemapper_input(wildcards).pvar,
+        gt_psam=lambda wildcards: finemapper_input(wildcards).psam,
+        phen=pheno,
+        finemap=rules.finemapper.output.susie,
+    params:
+        hap=lambda wildcards: expand(
+            (
+                config["hap_file"]
+                if mode == "midway" else rules.run.output.hap
+            ), **wildcards
+        )[0] if wildcards.ex == "in" else "NULL",
+        exclude_causal="NULL",
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
     output:
-        metrics=out + "/susie_metrics.tsv",
+        metrics=out + "/{ex}clude/susie_metrics.tsv",
     resources:
         runtime=10,
     threads: 6,
     log:
-        logs + "/metrics",
+        logs + "/{ex}clude/metrics",
     benchmark:
-        bench + "/metrics",
+        bench + "/{ex}clude/metrics",
     conda:
         "../envs/susie.yml"
     shell:
-        "workflow/scripts/susie_metrics.R {input} >{output} 2>{log}"
+        "workflow/scripts/susie_metrics.R {input.gt} {input.phen} {input.finemap} "
+        "{params} >{output} 2>{log}"
 
 
 def results_happler_hap_input(wildcards):
@@ -536,7 +576,7 @@ rule gwas:
         "../envs/default.yml"
     shell:
         "plink2 --glm {params.covar} --variance-standardize --maf {params.maf} "
-        "--pheno iid-only {input.pts} --pfile {params.in_prefix} "
+        "--nonfounders --pheno iid-only {input.pts} --pfile {params.in_prefix} "
         # "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} " # unnecessary b/c merge subsets by region already
         "--out {params.out_prefix} --threads {threads} &>{log}"
 

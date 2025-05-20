@@ -15,20 +15,41 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "mamba env create -n happler -f dev-env.yml && conda run -n happler poetry install",
+	"postCreateCommand": "mamba env create -y -n happler -f dev-env.yml && conda run -n happler poetry config virtualenvs.in-project true && conda run -n happler poetry install",
 
 	// Configure tool-specific properties.
 	"customizations": {
 		"vscode": {
-			"extensions": ["ms-python.python"],
+			"extensions": [
+				"ms-python.python",
+				"ms-vscode.live-server",
+				"ms-python.black-formatter@2025.2.0",
+				"GitHub.vscode-github-actions"
+			],
 			"settings": {
+				"python.analysis.typeCheckingMode": "off", // TODO: set to "strict"
 				"python.condaPath": "/opt/conda/condabin/conda",
-				"python.defaultInterpreterPath": "/opt/conda/envs/happler/bin/python",
 				"python.terminal.activateEnvironment": true,
 				"python.terminal.activateEnvInCurrentTerminal": true,
-				"python.venvFolders": ["/home/vscode/.cache/pypoetry/virtualenvs"],
+				"python.venvPath": "/opt/conda/envs/happler",
+				"python.defaultInterpreterPath": "/opt/conda/envs/happler/bin/python",
+				"python.testing.pytestArgs": [
+					"tests"
+				],
+				"python.testing.pytestEnabled": true,
+				"python.testing.unittestEnabled": false,
 				"terminal.integrated.environmentChangesRelaunch": true,
-				"terminal.integrated.hideOnStartup": "always"
+				"[python]": {
+					"editor.defaultFormatter": "ms-python.black-formatter",
+					"editor.formatOnSave": true
+				},
+				"black-formatter.importStrategy": "fromEnvironment",
+				"black-formatter.showNotification": "always",
+				"terminal.integrated.hideOnStartup": "always",
+				"files.eol": "\n",
+				"git.autofetch": true,
+				"git.enableSmartCommit": true,
+				"git.confirmSync": false
 			}
 		}
 	}

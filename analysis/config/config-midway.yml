@@ -12,10 +12,7 @@
 # If the VCFs are per-chromosome, replace the contig name in the file name with "{chr}"
 # The VCF(s) must be sorted and indexed (with a .tbi file in the same directory)
 # required!
-# snp_panel: "data/simulations/1000G/19_45401409-46401409.pgen"
-# str_panel: "/tscc/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
-snp_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.SNPs.pgen"
-str_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.STRs.pgen"
+snp_panel: data/simulations/midway/1000G/gts.pgen
 
 
 # Path to a list of samples to exclude from the analysis
@@ -41,7 +38,7 @@ str_panel: "data/simulations/1000G.SNP-STR/19_45401409-46401409.STRs.pgen"
 # genome of the reference panel VCFs
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required! and unless otherwise noted, all attributes of each mode are required
-locus: 19:45401409-46401409 # center: 45901409 (APOe4)
+locus: data/simulations/midway/1000G/loci.bed
 modes:
  str:
   pos: 19:45903859
@@ -67,8 +64,10 @@ modes:
   random: false # whether to also produce random haplotypes
   num_haps: [1, 2, 3, 4]
  midway:
-  reps: 10
-  haps: data/simulations/midway/1000G/haps
+  # beta: [0.214, 0.285, 0.356]
+  beta: [0.1, 0.2, 0.3]
+  reps: 3
+  haps: data/simulations/midway/1000G/haps/{locus}.hap
  run:
   pheno: data/geuvadis/phenos/{trait}.pheno
   SVs: data/geuvadis/pangenie_hprc_hg38_all-samples_bi_SVs-missing_removed.pgen
@@ -82,11 +81,13 @@ mode: midway
 
 # Discard rare variants with a MAF below this number
 # Defaults to 0 if not specified
-min_maf: 0.05
+# NOTE: This is not necessary for midway manhattan simulations because the input data
+# has already been filtered, so we set this to 0 for now
+min_maf: 0
 
 # Sample sizes to use
-# sample_size: [777, 800, 1600, 2400, 3200]
-sample_size: 3200
+sample_size: [800, 1600, 2400, 3200]
+# sample_size: 3200
 
 # Whether to include the causal variant in the set of genotypes provided to the
 # finemapping methods. Set this to true if you're interested in seeing how the

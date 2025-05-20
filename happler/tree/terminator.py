@@ -119,6 +119,7 @@ class TTestTerminator(Terminator):
         best_idx: int,
         num_samps: int,
         num_tests: int,
+        parent_corr: float = 0,
         short_circuit: bool = True,
     ) -> tuple[float, float]:
         t_stat = None
@@ -133,15 +134,18 @@ class TTestTerminator(Terminator):
                 self.log.debug("Terminated b/c effect size did not improve")
                 return True
             # perform a one tailed, two-sample t-test using the difference of the effect sizes
-            # first, we compute the standard error of the difference of the effect sizes
-            std_err = np.sqrt(
-                ((results.data["stderr"] ** 2) + (parent_res.stderr**2)) / 2
-            )
+            # first, we compute the covariance of the effect sizes
+            cov = 0
+            if parent_corr is not None:
+                cov = parent_corr * parent_res.stderr * results.data["stderr"]
+            # now, we can compute the standard error of the difference of the effect sizes
+            std_err = ((results.data["stderr"] ** 2) + (parent_res.stderr**2)) - 2 * cov
             if std_err[best_idx] == 0:
-                # if we have a standard error of 0, then we already know the result is
+                # if we have a standard error less than 0, then we already know the result is
                 # significant! It doesn't matter what the effect sizes are b/c t_stat
                 # will be inf
                 return (0, np.inf)
+            std_err = np.sqrt(std_err / 2)
             # then, we compute the test statistic
             # use np.abs to account for the directions that the effect size may take
             t_stat = (np.abs(results.data["beta"]) - np.abs(parent_res.beta)) / std_err
@@ -176,6 +180,7 @@ class TTestTerminator(Terminator):
         best_idx: int,
         num_samps: int,
         num_tests: int,
+        parent_corr: float = 0,
     ) -> bool:
         computed_val = self.compute_val(
             parent_res,
@@ -184,6 +189,7 @@ class TTestTerminator(Terminator):
             best_idx,
             num_samps,
             num_tests,
+            parent_corr,
         )
         if isinstance(computed_val, bool):
             return computed_val
@@ -205,9 +211,10 @@ class TTestTerminator(Terminator):
 
 
 class BICTerminator(Terminator):
-    def __init__(self, thresh: float = 10, log: Logger = None):
+    def __init__(self, thresh: float = 0.05, bic_thresh: float = 3, log: Logger = None):
         super().__init__()
         self.thresh = thresh
+        self.bic_thresh = bic_thresh
         self.log = log or getLogger(self.__class__.__name__)
 
     def compute_val(
@@ -218,6 +225,7 @@ class BICTerminator(Terminator):
         best_idx: int,
         num_samps: int,
         num_tests: int,
+        parent_corr: float = 0,
         short_circuit: bool = True,
     ) -> tuple[float, float]:
         stat = None
@@ -232,11 +240,11 @@ class BICTerminator(Terminator):
                 # terminate if the effect sizes have gone in the opposite direction
                 self.log.debug("Terminated b/c effect size did not improve")
                 return True
-            stat = results.data["bic"] - parent_res.bic
-            # just choose an arbitrary threshold
-            if stat[best_idx] < self.thresh:
-                self.log.debug("Terminated with delta BIC {}".format(stat))
-                return True
+            stat = parent_res.bic - results.data["bic"]
+            # compute the bayes factor approximation from the delta BIC:
+            # https://easystats.github.io/bayestestR/reference/bic_to_bf.html
+            stat = np.exp(stat / 2)
+            stat = stat[best_idx]
         else:
             # parent_res = None when the parent node is the root node
             pval = results.data["pval"]
@@ -246,9 +254,6 @@ class BICTerminator(Terminator):
                 pval = self.corrector.correct(None, pval, num_samps, len(pval))[best_idx]
             else:
                 pval = pval[best_idx]
-            if pval >= self.thresh:
-                self.log.debug("Terminated with p-value {}".format(pval))
-                return True
         return pval, stat
 
     def check(
@@ -272,8 +277,18 @@ class BICTerminator(Terminator):
             return computed_val
         else:
             pval, stat = computed_val
-        self.log.debug(
-            "Significant with "
-            + ("delta BIC {}".format(stat) if parent_res else "pval {}".format(pval))
-        )
+        if stat is None:
+            # TODO: handle this case by using delta BIC to rank, instead?
+            if pval >= self.thresh:
+                self.log.debug(
+                    f"Terminated with delta BIC {stat} and p-value {pval} >= {self.thresh}"
+                )
+                return True
+        else:
+            if stat < self.bic_thresh:
+                self.log.debug(
+                    f"Terminated with delta BIC {stat} < {self.thresh} and p-value {pval}"
+                )
+                return True
+        self.log.debug(f"Significant with delta BIC {stat} > {self.thresh}")
         return False

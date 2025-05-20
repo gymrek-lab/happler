@@ -1,33 +1,74 @@
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.poetry]
+[project]
 name = "happler"
 version = "0.0.1"
 description = "A haplotype-based fine-mapping method"
-authors = ["Arya Massarat"]
+authors = [
+    {name = "Arya Massarat"},
+]
 license = "MIT"
-repository = "https://github.com/gymrek-lab/happler"
-homepage = "https://github.com/gymrek-lab/happler"
-documentation = "https://happler.readthedocs.io"
 readme = "README.md"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.20.0",
+    "click>=8.0.4",
+    "networkx>=2.6.3",
+    "scipy>=1.7.3",
+    "pydot>=1.4.2",
+    "pysam>=0.19.0",
+    "haptools @ git+https://github.com/cast-genomics/haptools.git@cf4219f820a09366778bd4734ae496a18c69a902",
+    "statsmodels>=0.13.4",
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<4.0"
-click = ">=8.0.4"
-networkx = ">=2.6.3"
-scipy = ">=1.7.3"
-pydot = ">=1.4.2"
-pysam = ">=0.19.0"
-haptools = {git = "https://github.com/cast-genomics/haptools.git", rev = "f0ba9a3a464725fe66b9bbf31726af886c516374"} # switch to 0.5.0 once released
-# haptools = ">=0.5.0"
-statsmodels = ">=0.13.4"
+numpy = [
+    { version = "1.20.0" , markers = "python_version <= '3.9'" },
+    { version = "2.2.2" , markers = "python_version > '3.9'" },
+]
+click = [
+    { version = "8.0.4" , markers = "python_version <= '3.9'" },
+    { version = "8.1.1" , markers = "python_version > '3.9'" },
+]
+networkx = [
+    { version = "2.6.3" , markers = "python_version <= '3.9'" },
+    { version = "3.4.2" , markers = "python_version > '3.9'" },
+]
+scipy = [
+    { version = "1.7.3" , markers = "python_version <= '3.9'" },
+    { version = "1.15.2" , markers = "python_version > '3.9'" },
+]
+pydot = [
+    { version = "1.4.2" , markers = "python_version <= '3.9'" },
+    { version = "3.0.4" , markers = "python_version > '3.9'" },
+]
+pysam = [
+    { version = "0.19.0" , markers = "python_version <= '3.9'" },
+    { version = "0.23.0" , markers = "python_version > '3.9'" },
+]
+# upgrade to haptools 0.6.0 once released
+haptools = [
+    { rev = "cf4219f820a09366778bd4734ae496a18c69a902" , markers = "python_version <= '3.9'", git = "https://github.com/cast-genomics/haptools.git" },
+    { rev = "cf4219f820a09366778bd4734ae496a18c69a902" , markers = "python_version > '3.9'", git = "https://github.com/cast-genomics/haptools.git" },
+]
+statsmodels = [
+    { version = "0.13.4" , markers = "python_version <= '3.9'" },
+    { version = "0.14.4" , markers = "python_version > '3.9'" },
+]
+
+[project.urls]
+repository = "https://github.com/gymrek-lab/happler"
+homepage = "https://github.com/gymrek-lab/happler"
+documentation = "https://haptools.readthedocs.io"
+changelog = "https://github.com/gymrek-lab/happler/blob/main/CHANGELOG.md"
+
+[tool.poetry.scripts]
+happler = 'happler.__main__:main'
+
+[tool.poetry]
+requires-poetry = ">=2.0"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = ">=4.3.2"
@@ -38,13 +79,17 @@ sphinx-click = ">=3.0.2"
 
 [tool.poetry.group.tests.dependencies]
 pytest = ">=7.4.3"
-black = ">=23.3.0"
+black = [
+    { version = ">=23.3.0" , markers = "python_version < '3.9'" },
+    { version = ">=25.1.0" , markers = "python_version >= '3.9'" },
+]
 ipython = ">=7.34.0"
 coverage = {extras = ["toml"], version = ">=7.2.7"}
-filprofiler = ">=2023.3.1"
 
-[tool.poetry.scripts]
-happler = 'happler.__main__:main'
+[tool.poetry.requires-plugins]
+poetry-conda = ">=0.1.4"
+poetry-plugin-export = ">=1.9"
+poetry-plugin-shell = ">=1.0.1"
 
 [tool.black]
 line-length = 90

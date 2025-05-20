@@ -18,7 +18,6 @@ from happler.tree import (
     NodeResultsExtra,
 )
 
-
 DATADIR = Path(__file__).parent.joinpath("data")
 
 
@@ -264,7 +263,7 @@ def test_two_snps_one_branch_perfect_bic():
         gens,
         phens,
         method=AssocTestSimple(with_bic=True),
-        terminator=BICTerminator(),
+        terminator=BICTerminator(bic_thresh=0),
     ).run()
     haps = _view_tree_haps(tree)
 
@@ -549,43 +548,6 @@ def test_two_snps_two_branches_perfect():
     assert haps[1][0] == ("snp0", 1)
 
 
-def test_two_snps_one_branch_perfect_bic():
-    """
-    Two causal SNPs on a single haplotype with perfect phenotype associations
-    Y = 0.5 * ( X1 && X2 )
-    This should yield two haplotypes with both SNPs having the same allele.
-    The psuedocode looks like:
-        if X1:
-            return X2
-        return 0
-    """
-    split_list_in_half = lambda pair: [pair[:2], pair[2:]]
-    gens = np.array(
-        list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
-    )
-    gens = _create_fake_gens(gens)
-    gts = gens.data
-    phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
-
-    # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(
-        gens,
-        phens,
-        method=AssocTestSimple(with_bic=True),
-        terminator=BICTerminator(),
-    ).run()
-    haps = _view_tree_haps(tree)
-
-    # check: did the output turn out how we expected?
-    # two haplotypes: one with one SNP and the other with both
-    assert len(haps) == 2
-    assert len(haps[0]) == 2
-    assert haps[0][0] == ("snp0", 0)
-    assert haps[0][1] == ("snp1", 0)
-    assert len(haps[1]) == 1
-    assert haps[1][0] == ("snp0", 1)
-
-
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_two_snps_two_branches_perfect_one_snp_not_causal():
     """
@@ -675,7 +637,7 @@ def test_1000G_simulated(capfd):
     hp_file = DATADIR / "19_45401409-46401409_1000G.hap"
     out_hp_file = "test.hap"
 
-    cmd = f"run -o {out_hp_file} {gt_file} {pt_file}"
+    cmd = f"run --no-covariance-correction --out-thresh 0.05 -o {out_hp_file} {gt_file} {pt_file}"
     runner = CliRunner()
     result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
     captured = capfd.readouterr()
@@ -695,7 +657,7 @@ def test_1000G_simulated_multihap(capfd):
     hp_file = DATADIR / "19_45401409-46401409_1000G.multi.hap"
     out_hp_file = "test.hap"
 
-    cmd = f"run --remove-SNPs --max-signals 3 --max-iterations 3 -o {out_hp_file} {gt_file} {pt_file}"
+    cmd = f"run --no-covariance-correction --remove-SNPs --max-signals 3 --max-iterations 3 -o {out_hp_file} {gt_file} {pt_file}"
     runner = CliRunner()
     result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
     captured = capfd.readouterr()
@@ -716,7 +678,7 @@ def test_1000G_simulated_maf(capfd):
     out_vars = ("rs1046282", "rs36046716")
 
     for maf in (0.05, 0.30, 0.31, 0.38):
-        cmd = f"run --out-thresh 1 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        cmd = f"run --no-covariance-correction --out-thresh 1 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
         runner = CliRunner()
         result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
         captured = capfd.readouterr()
@@ -758,7 +720,7 @@ def test_1000G_real(capfd, caplog):
     caplog.set_level(logging.INFO)
 
     for maf in (0.05, 0.14, 0.22, 0.23, 0.35):
-        cmd = f"run --out-thresh 1 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        cmd = f"run --no-covariance-correction --out-thresh 1 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
         runner = CliRunner()
         result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
         captured = capfd.readouterr()

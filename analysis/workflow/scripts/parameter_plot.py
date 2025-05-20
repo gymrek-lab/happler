@@ -162,7 +162,11 @@ def get_best_ld(
     return observed_ld[best_row_idx, best_col_idx], extras_labels, labels_bool
 
 
-def get_finemap_metrics(metrics_path: Path, log: Logger = None):
+def get_finemap_metrics(
+    metrics_path: Path,
+    keep_hap_ids: bool = False,
+    log: logging.Logger = None
+):
     """
     Parse data from a TSV containing metrics from fine-mapping
 
@@ -170,40 +174,51 @@ def get_finemap_metrics(metrics_path: Path, log: Logger = None):
     ----------
     metrics: Path
         The path to a metrics.tsv file
+    keep_hap_ids: bool, optional
+        If True, do not remove the hap IDs in the first column
     log: Logger, optional
         A logging module to pass to haptools
     """
     # The metrics are:
-    # 1) What is the PIP of the observed hap?
-    # 2) Does the observed hap get the highest PIP?
-    # 3) What is the best PIP among the variants?
-    # 4) Is the observed hap in a credible set?
-    # 5) What is the purity of the credible set?
-    # 6) What is the length of the credible set?
+    # 1) What is the ID of the hap?
+    # 2) What is the PIP of the hap?
+    # 3) Does the observed/causal hap get the highest PIP?
+    # 4) What is the next best PIP in the credible set, excluding the hap?
+    # 5) Is the observed/causal hap in a credible set? If so, what is it's index?
+    # 6) How many credible sets are there?
+    # 7) What is the purity of the credible set with the observed/causal hap?
+    # 8) What is the length of the credible set with the observed/causal hap?
+
     # If you add or remove any metrics here, make sure to also change the
     # "num_expected_vals" in get_metrics_mean_std so it knows the number of metrics
     dtype = [
+        ("hap_id", "U30"),
         ("pip", np.float64),
         ("has_highest_pip", np.bool_),
         ("best_variant_pip", np.float64),
         ("in_credible_set", np.bool_),
+        ("num_credible_sets", np.uint8),
         ("cs_purity", np.float64),
-        ("cs_length", np.float64)
+        ("cs_length", np.float64),
     ]
     null_val = np.array([
-        (np.nan, False, np.nan, False, np.nan, np.nan),
+        (np.nan, np.nan, False, np.nan, False, 0, np.nan, 0),
     ], dtype=dtype)
     # if there are no observed haplotypes, then we can't compute LD
     if not metrics_path.exists():
         return null_val
-    metrics = np.loadtxt(fname=metrics_path, delimiter=" ", dtype=dtype)
-    if not metrics.shape:
-        log.debug(f"No metrics found in the metrics file {metrics_path}")
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always", UserWarning)
+        metrics = np.atleast_1d(np.loadtxt(fname=metrics_path, delimiter=" ", dtype=dtype))
+    if not metrics.shape[0]:
         return null_val
+    if not keep_hap_ids:
+        # Remove the 'hap_id' column (index 0)
+        metrics = np.delete(metrics, 0, axis=1)
     return metrics
 
 
-def get_metrics_mean_std(metrics_vals: npt.NDArray, num_expected_vals: int = 6):
+def get_metrics_mean_std(metrics_vals: npt.NDArray, num_expected_vals: int = 8):
     """
     Compute the mean and standard error of the metrics
 
@@ -222,7 +237,8 @@ def get_metrics_mean_std(metrics_vals: npt.NDArray, num_expected_vals: int = 6):
         A numpy array containing the standard error of the metrics
     """
     if len(metrics_vals) == 0:
-        return np.array([np.nan,]*6), np.array([np.nan,]*6)
+        n = num_expected_vals
+        return np.array([np.nan,]*n), np.array([np.nan,]*n)
     nan_vals = np.isnan(metrics_vals["pip"])
     metrics_vals = metrics_vals[~nan_vals]
     mean_vals = np.array(

@@ -25,7 +25,17 @@ mode = config["mode"]
 # handle locus
 if mode == "run":
     pheno_set = set(glob_wildcards(Path(config["modes"][mode]["pheno"])).trait)
-if Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
+if mode == "midway":
+    locus = glob_wildcards(config["modes"][mode]["haps"]).locus
+    if Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
+        with open(Path(config["locus"])) as f:
+            # filter out loci that are not in the BED file
+            regions = set(
+                "\t".join(line.strip().split("\t")[:3]).replace("\t", "_", 1).replace("\t", "-", 1)
+                for line in f
+            )
+            locus = [l for l in locus if l in regions]
+elif Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
     with open(Path(config["locus"])) as f:
         # the fourth column of the bed file must contain the name of the trait
         locus_file = [
@@ -64,6 +74,15 @@ if mode == "ld_range" and check_config("num_haps", place=config["modes"][mode]):
     if isinstance(config["modes"][mode]["num_haps"], int):
         config["modes"][mode]["num_haps"] = [config["modes"][mode]["num_haps"],]
 
+if mode == "midway":
+    if not check_config("beta", place=config["modes"][mode]):
+        # if no beta is specified, then we default to whatever is in the original hap
+        # file (represented by a placeholder of 0)
+        config["modes"][mode]["beta"] = (0,)
+    if not check_config("reps", place=config["modes"][mode]):
+        # if no reps are specified, then we default to just 1
+        config["modes"][mode]["reps"] = 1
+
 if mode != "run":
     module simulate:
         snakefile: "rules/simulate.smk"
@@ -95,7 +114,7 @@ if check_config("covar"):
     if "pheno_matrix" in covar_config:
         covar_file = rules.covariates_merge.output.covar
 
-if mode in ("str", "snp", "hap", "ld_range"):
+if mode in ("str", "snp", "hap", "ld_range", "midway"):
     happler_config = {
         "pheno": rules.simulate_simphenotype.output.pheno,
         "hap_file": rules.simulate_transform.input.hap,
@@ -105,14 +124,18 @@ if mode in ("str", "snp", "hap", "ld_range"):
         "covar": covar_file,
         "min_maf": check_config("min_maf", 0),
         "out_thresh": 1, # artificially set to 1 to avoid filtering
+        "mode": mode,
     }
-    if mode in ("hap", "ld_range"):
+    if mode in ("hap", "ld_range", "midway"):
         happler_config["snps"] = []
         happler_config["causal_gt"] = rules.simulate_transform.output
         if mode == "hap":
             happler_config["snps"] = config["modes"][mode]["alleles"]
         elif mode == "ld_range":
             happler_config["out"] = config["out"] + "/happler/"+mode+"/{num_haps}_haps/ld_{ld}/beta_{beta}/alpha_{alpha}"
+        elif mode == "midway":
+            # happler_config["hap_file"] = rules.simulate_simphenotype.input.hap # do not uncomment!
+            happler_config["out"] = config["out"] + "/midway/sim_{sim_mode}/beta_{beta}"
     elif mode in ("str", "snp"):
         # also provide the SNP and STR IDs so that they can be used in the manhattan plot
         happler_config["snps"] = (config["modes"][mode]["id"],)
@@ -131,6 +154,7 @@ elif mode == "run":
         "covar": covar_file,
         "min_maf": check_config("min_maf", 0),
         "out_thresh": check_config("out_thresh", 5e-8),
+        "mode": mode,
     }
     if check_config("SVs", place=config["modes"][mode]):
         happler_config["SVs"] = config["modes"][mode]["SVs"]
@@ -141,7 +165,13 @@ module happler:
     snakefile: "rules/happler.smk"
     config: happler_config
 use rule * from happler as happler_*
-merged_happler = rules.happler_merge.output.pgen
+
+if mode == "midway":
+    happler_config["pheno"] = rules.happler_run.input.pts
+    module midway:
+        snakefile: "rules/midway.smk"
+        config: happler_config
+    use rule manhattan from midway as midway_manhattan
 
 if mode == "ld_range" and config["modes"][mode]["random"]:
     happler_config["random"] = rules.simulate_random_transform.output
@@ -156,13 +186,20 @@ plots_config = {
     "out": config["out"] + "/plots",
     "mode": mode,
     "mode_attrs": config["modes"][mode],
-    "happler_hap": rules.happler_run.output.hap,
     "causal_hap": rules.simulate_transform.input.hap if mode != "run" else [],
     "snp_panel": config["gts_snp_panel"],
-    "happler_metrics": rules.happler_metrics.output.metrics,
+    "sample_size": config["sample_size"],
 }
 if mode == "ld_range":
     plots_config["ld_range_checkpoint"] = checkpoints.simulate_create_hap_ld_range
+elif mode == "midway":
+    plots_config["midway_linear"] = rules.midway_manhattan.output.linear
+    plots_config["finemap_metrics"] = rules.happler_metrics.output.metrics
+    plots_config["loci"] = locus
+    plots_config["out"] = plots_config["out"].replace("/plots", "").replace("{locus}", "plots")
+else:
+    plots_config["happler_metrics"] = rules.happler_metrics.output.metrics
+    plots_config["happler_hap"] = rules.happler_run.output.hap
 
 module plots:
     snakefile: "rules/plots.smk"
@@ -222,6 +259,31 @@ elif mode == "run":
         input:
             FINAL_OUTPUT
         default_target: True
+elif mode == "midway":
+    FINAL_OUTPUT = expand(
+        expand(
+            [
+                rules.plots_midway.output.png,
+                rules.plots_midway_metrics.output.png,
+            ],
+            switch=("tscore", "interact", "bic", "covariance", "interact-bic"),
+            allow_missing=True,
+        ) + expand(
+            [
+                rules.plots_finemap.output.png,
+                rules.plots_finemap_metrics.output.png,
+            ],
+            switch=("pip-parent", "pip-interact"),
+            allow_missing=True,
+        ) + expand(
+            [
+                rules.plots_finemap_cs_length.output.png,
+            ],
+            switch=("pip-parent"),
+            allow_missing=True,
+        ),
+        sampsize=config["sample_size"],
+    )
 else:
     FINAL_OUTPUT = expand(
         [
@@ -232,7 +294,7 @@ else:
             # rules.plots_params.output.png,
         ],
         ex=(("in",) if mode == "hap" else ("ex", "in")),
-        beta=config["modes"]["hap"]["beta"],
+        beta=config["modes"][mode]["beta"],
         allow_missing=True,
     )
     if check_config("reps", place=config["modes"][mode]):
@@ -243,7 +305,7 @@ else:
         )
 
 # If '--config debug=true' is specified, we won't try to build the entire DAG
-# This can be helpful when you want to play around with a specific target output
+# This can be faster when you want to play around with a specific target output
 if not check_config("debug", False) and mode != "run":
     rule all:
         input:

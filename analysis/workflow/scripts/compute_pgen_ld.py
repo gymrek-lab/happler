@@ -72,6 +72,13 @@ def corr(a, b):
     ),
 )
 @click.option(
+    "--no-estimate",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Compute the actual correlation instead of a speedy estimate",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -93,12 +100,16 @@ def main(
     region: str = None,
     maf: float = None,
     hap_id: str = None,
+    no_estimate: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
     """
     Compute LD between a SNP in a PGEN file and all other SNPs in a different
     PGEN file
+
+    Note that this command computes r (signed) not r^2 (unsigned). This corresponds
+    with the output of plink2 --r-unphased --ld-snp TARGET --nonfounders
     """
     log = getLogger("compute_pgen_ld", verbosity)
 
@@ -124,7 +135,10 @@ def main(
     target_gts = target.data[:, 0, :2].sum(axis=1)
     variant_gts = gts.data[:, :, :2].sum(axis=2)
 
-    variant_lds = corr(variant_gts, target_gts)
+    if no_estimate:
+        variant_lds = pearson_corr_ld(variant_gts, target_gts)
+    else:
+        variant_lds = corr(variant_gts, target_gts)
 
     log.info("Computing LD between genotypes and the target")
     with Data.hook_compressed(output, mode="w") as ld_file:
@@ -133,7 +147,7 @@ def main(
         for idx, variant in enumerate(gts.variants):
             var_chr, var_bp, var_snp = variant[["chrom", "pos", "id"]]
             variant_ld = variant_lds[idx]
-            ld_file.write(f"{var_chr}\t{var_bp}\t{var_snp}\t{variant_ld:.3f}\n")
+            ld_file.write(f"{var_chr}\t{var_bp}\t{var_snp}\t{variant_ld:.6f}\n")
 
 
 if __name__ == "__main__":

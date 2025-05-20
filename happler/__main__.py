@@ -4,7 +4,6 @@ import click
 from pathlib import Path
 from typing import Tuple
 
-
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 
@@ -179,6 +178,14 @@ def main():
     help="Remove haplotypes with only a single variant",
 )
 @click.option(
+    "--no-covariance-correction",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    hidden=True,
+    help="Do not perform any covariance corrections",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -217,6 +224,7 @@ def run(
     covars: Path = None,
     corrector: str = "n",
     remove_snps: bool = False,
+    no_covariance_correction: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "INFO",
 ):
@@ -344,6 +352,7 @@ def run(
         terminator=terminator,
         indep_thresh=indep_thresh,
         ld_prune_thresh=ld_prune_thresh,
+        covariance_correction=not no_covariance_correction,
         log=log,
     )
     forest = tree.ForestBuilder(
@@ -363,13 +372,17 @@ def run(
     hap_id = 0
     # merge the Haplotypes objects
     # TODO: use a method of the Haplotypes class
+    log_out_thresh = -np.log10(out_thresh)
     for haps in forest.run():
         if haps is None:
             continue
         if len(haps.data) == 1:
             hap = next(iter(haps.data.values()))
-            if hap.pval < -np.log10(out_thresh):
-                log.info(f"Ignoring haplotype with low pval {hap.pval}")
+            if hap.pval < log_out_thresh:
+                log.info(
+                    f"Ignoring haplotype with low log pval {hap.pval} < "
+                    f"{log_out_thresh}"
+                )
                 continue
         for hap in haps.data.values():
             if len(hap.variants) <= 1 and remove_snps:
@@ -427,6 +440,17 @@ def run(
     help=(
         "A single column txt file containing a list of the samples (one per line) to"
         " subset from the genotypes file"
+    ),
+)
+@click.option(
+    "--var-id",
+    "variants",
+    type=str,
+    multiple=True,
+    show_default="all variants",
+    help=(
+        "A list of the variants to subset from the genotypes file (ex: '-s sample1 -s"
+        " sample2')"
     ),
 )
 @click.option(
@@ -495,6 +519,7 @@ def transform(
     region: str = None,
     samples: Tuple[str] = tuple(),
     samples_file: Path = None,
+    variants: Tuple[str] = tuple(),
     discard_multiallelic: bool = False,
     discard_missing: bool = False,
     chunk_size: int = None,
@@ -532,13 +557,27 @@ def transform(
         samples = set(samples)
     else:
         samples = None
+
     # load data
+    log.info("Loading haplotypes")
+    hp = data.Haplotypes(haplotypes, log=log)
+    hp.read(haplotypes=(set((hap_id,)) if hap_id is not None else None))
+    if hap_id is None:
+        hap_id = list(hp.data.keys())[0]
+        hp.subset(haplotypes=(hap_id,))
+
+    if variants:
+        variants = set(variants)
+        variants.update(variant.id for variant in hp.data[hap_id].variants)
+    else:
+        variants = None
+
     log.info("Loading genotypes")
     if genotypes.suffix == ".pgen":
         gt = data.GenotypesPLINK(fname=genotypes, log=log, chunk_size=chunk_size)
     else:
         gt = data.GenotypesVCF(fname=genotypes, log=log)
-    gt.read(region=region, samples=samples)
+    gt.read(region=region, samples=samples, variants=variants)
     num_variants, num_samples = len(gt.variants), len(gt.samples)
     gt.check_missing(discard_also=discard_missing)
     removed = num_samples - len(gt.samples)
@@ -555,12 +594,6 @@ def transform(
         log.info(f"Ignoring {removed} variants with MAF < {maf}")
     gt.check_phase()
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
-
-    hp = data.Haplotypes(haplotypes, log=log)
-    hp.read(haplotypes=(set((hap_id,)) if hap_id is not None else None))
-    if hap_id is None:
-        hap_id = list(hp.data.keys())[0]
-        hp.subset(haplotypes=(hap_id,))
 
     tsfm = hp.data[hap_id].transform(gt)
 
