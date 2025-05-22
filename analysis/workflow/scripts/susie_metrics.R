@@ -116,6 +116,7 @@ if (is.null(happler_hap_ids)) {
             write(paste(curr_id, obs_pip, has_highest_pip, best_variant_pip, in_credible_set, num_credible_sets, purity, cs_length), stdout())   
         }
     }
+    write("trying to exit with successful error code", stderr())
     quit()
 }
 
@@ -172,3 +173,5 @@ for (happler_hap_id in happler_hap_ids) {
     write(paste(happler_hap_id, obs_pip, has_highest_pip, best_variant_pip, in_credible_set, num_credible_sets, purity, cs_length), stdout())
 
 }
+write("trying to exit with successful error code", stderr())
+quit()
