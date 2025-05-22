@@ -457,8 +457,9 @@ rule metrics:
     output:
         metrics=out + "/{ex}clude/susie_metrics.tsv",
     resources:
-        runtime=10,
-    threads: 6,
+        runtime=30,
+        mem_mb = 8500,
+    threads: 1,
     log:
         logs + "/{ex}clude/metrics",
     benchmark:

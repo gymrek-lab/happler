@@ -39,7 +39,8 @@ rule manhattan:
         transform_pvar=temp(out + "/{switch}/out.pvar"),
         transform_psam=temp(out + "/{switch}/out.psam"),
     resources:
-        runtime=10,
+        runtime=15,
+        mem_mb=6000,
     log:
         logs + "/{switch}/manhattan",
     benchmark:
