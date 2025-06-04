@@ -180,7 +180,7 @@ def main(
             if True:
                 # parent node model: y ~ h_parent + z_child
                 parent_res = NodeResultsExtra.from_np(
-                        AssocTestSimpleCovariates(covars=child_covar, with_bic=True).run(
+                    AssocTestSimpleCovariates(covars=child_covar, with_bic=True).run(
                         parent_gts.data.sum(axis=2),
                         phen.data[:, 0],
                     ).data[0]
@@ -193,7 +193,7 @@ def main(
             elif False:
                 # parent node model: y ~ h_parent + z_child
                 parent_res = NodeResultsExtra.from_np(
-                        AssocTestSimpleCovariates(covars=child_covar, with_bic=True).run(
+                    AssocTestSimpleCovariates(covars=child_covar, with_bic=True).run(
                         parent_gts.data.sum(axis=2),
                         phen.data[:, 0],
                     ).data[0]
@@ -206,7 +206,7 @@ def main(
             elif False:
                 # parent node model: y ~ h_hap + h_parent + z_child
                 parent_res = NodeResultsExtra.from_np(
-                        AssocTestSimpleCovariates(covars=parent_and_child_covar, with_bic=True).run(
+                    AssocTestSimpleCovariates(covars=parent_and_child_covar, with_bic=True).run(
                         linear_gts.data.sum(axis=2),
                         phen.data[:, 0],
                     ).data[0]

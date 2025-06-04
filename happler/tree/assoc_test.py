@@ -212,6 +212,10 @@ class AssocTestSimple(AssocTest):
         float
             The Bayesian Information Criterion
         """
+        raise ValueError(
+            "BIC is not properly implemented in this class. "
+            "It will yield weird/incorrect values."
+        )
         k = 2
         sse = residuals.dot(residuals)
         if sse == 0:
@@ -332,6 +336,11 @@ class AssocTestSimpleSM(AssocTestSimple):
             return param, pval, stderr, bic
         else:
             return param, pval, stderr
+
+
+class AssocTestSimpleFastBIC(AssocTest):
+    # TODO: calculate only BIC in a quick, vectorized fashion without statsmodels
+    pass
 
 
 class AssocTestSimpleCovariates(AssocTestSimpleSM):

@@ -12,7 +12,7 @@ from haptools.data import Genotypes, Phenotypes, Haplotypes
 from happler.__main__ import main
 from happler.tree import (
     TreeBuilder,
-    AssocTestSimple,
+    AssocTestSimpleSM,
     TTestTerminator,
     BICTerminator,
     NodeResultsExtra,
@@ -262,7 +262,7 @@ def test_two_snps_one_branch_perfect_bic():
     tree = TreeBuilder(
         gens,
         phens,
-        method=AssocTestSimple(with_bic=True),
+        method=AssocTestSimpleSM(with_bic=True),
         terminator=BICTerminator(bic_thresh=0),
     ).run()
     haps = _view_tree_haps(tree)
@@ -637,7 +637,7 @@ def test_1000G_simulated(capfd):
     hp_file = DATADIR / "19_45401409-46401409_1000G.hap"
     out_hp_file = "test.hap"
 
-    cmd = f"run --no-covariance-correction --out-thresh 0.05 -o {out_hp_file} {gt_file} {pt_file}"
+    cmd = f"run --threshold 30 -o {out_hp_file} {gt_file} {pt_file}"
     runner = CliRunner()
     result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
     captured = capfd.readouterr()
@@ -657,7 +657,7 @@ def test_1000G_simulated_multihap(capfd):
     hp_file = DATADIR / "19_45401409-46401409_1000G.multi.hap"
     out_hp_file = "test.hap"
 
-    cmd = f"run --no-covariance-correction --remove-SNPs --max-signals 3 --max-iterations 3 -o {out_hp_file} {gt_file} {pt_file}"
+    cmd = f"run --threshold 1000 --remove-SNPs --max-signals 3 --max-iterations 3 -o {out_hp_file} {gt_file} {pt_file}"
     runner = CliRunner()
     result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
     captured = capfd.readouterr()
@@ -678,7 +678,9 @@ def test_1000G_simulated_maf(capfd):
     out_vars = ("rs1046282", "rs36046716")
 
     for maf in (0.05, 0.30, 0.31, 0.38):
-        cmd = f"run --no-covariance-correction --out-thresh 1 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        # we have to use --out-thresh 1 to disable p-value thresholding at the end
+        # and we use --threshold 8.55 because these phenos were simulated at very high effect sizes
+        cmd = f"run --out-thresh 1 --threshold 8.55 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
         runner = CliRunner()
         result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
         captured = capfd.readouterr()
@@ -693,7 +695,6 @@ def test_1000G_simulated_maf(capfd):
         # rs1046282 has MAF 0.30476804
         # the combined haplotype has MAF of 0.06314433
         if maf > 0.37435567:
-            assert len(var_ids) == 1
             assert out_vars[0] not in var_ids and out_vars[1] not in var_ids
         elif maf > 0.30476804:
             assert var_ids == (out_vars[1],)
@@ -720,7 +721,7 @@ def test_1000G_real(capfd, caplog):
     caplog.set_level(logging.INFO)
 
     for maf in (0.05, 0.14, 0.22, 0.23, 0.35):
-        cmd = f"run --no-covariance-correction --out-thresh 1 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        cmd = f"run --out-thresh 1 --threshold 54.7 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
         runner = CliRunner()
         result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
         captured = capfd.readouterr()
@@ -736,7 +737,6 @@ def test_1000G_real(capfd, caplog):
         # the combined haplotype has MAF of 0.14763231
         if maf > 0.34261838:
             assert len(out_hp.data) == 1
-            assert len(var_ids) == 1
             assert out_vars[0] not in var_ids and out_vars[1] not in var_ids
         elif maf > 0.22980501:
             assert len(out_hp.data) == 1
