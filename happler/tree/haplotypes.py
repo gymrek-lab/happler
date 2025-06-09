@@ -188,7 +188,7 @@ class HapplerVariant(VariantBase):
     _extras: tuple = field(
         repr=False,
         init=False,
-        default=(Extra("score", ".2f", "-log(pval) assigned to this variant"),),
+        default=(Extra("score", ".2f", "BIC assigned to this variant"),),
     )
 
 
@@ -289,7 +289,7 @@ class Haplotypes(HaplotypesBase):
                     end=node["variant"].pos + len(alleles[node["variant"].idx]),
                     id=node["variant"].id,
                     allele=alleles[node["variant"].idx],
-                    score=-np.log10(cls._handle_nan(node["results"], "pval")),
+                    score=cls._handle_nan(node["results"], "bic"),
                 )
                 for node in haplotype
             )

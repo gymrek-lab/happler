@@ -3,7 +3,7 @@
 #	version	0.2.0
 #H	beta	.2f	Effect size in linear model
 #H	pval	.2f	-log(pval) in linear model
-#V	score	.2f	-log(pval) assigned to this variant
+#V	score	.2f	BIC assigned to this variant
 H	19	45892145	45910673	H0	0.40	30.09
-V	H0	45910672	45910673	rs1046282	G	5.02
-V	H0	45892145	45892146	rs36046716	G	30.09
+V	H0	45910672	45910673	rs1046282	G	2195.83
+V	H0	45892145	45892146	rs36046716	G	2081.85

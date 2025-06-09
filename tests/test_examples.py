@@ -1,4 +1,5 @@
 import filecmp
+import warnings
 from pathlib import Path
 from itertools import product
 
@@ -124,6 +125,7 @@ def test_one_snp_perfect():
     assert haps[1][0]["allele"] == 1
 
 
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_one_snp_not_causal():
     """
     One non-causal SNP with no phenotype association
