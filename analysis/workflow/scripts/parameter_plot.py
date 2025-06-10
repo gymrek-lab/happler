@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import pickle
+import warnings
 from pathlib import Path
 from logging import Logger
 
@@ -12,6 +13,7 @@ from scipy.stats import sem
 from haptools import logging
 import matplotlib.pyplot as plt
 from haptools.ld import pearson_corr_ld
+from numpy.lib import recfunctions as rfn
 from scipy.optimize import linear_sum_assignment
 from haptools.data import Genotypes, GenotypesVCF, GenotypesPLINK, Haplotypes
 
@@ -165,7 +167,7 @@ def get_best_ld(
 def get_finemap_metrics(
     metrics_path: Path,
     keep_hap_ids: bool = False,
-    log: logging.Logger = None
+    log: Logger = None
 ):
     """
     Parse data from a TSV containing metrics from fine-mapping
@@ -214,11 +216,11 @@ def get_finemap_metrics(
         return null_val
     if not keep_hap_ids:
         # Remove the 'hap_id' column (index 0)
-        metrics = np.delete(metrics, 0, axis=1)
+        metrics = rfn.drop_fields(metrics, 'hap_id')
     return metrics
 
 
-def get_metrics_mean_std(metrics_vals: npt.NDArray, num_expected_vals: int = 8):
+def get_metrics_mean_std(metrics_vals, num_expected_vals: int = 8):
     """
     Compute the mean and standard error of the metrics
 
@@ -272,11 +274,11 @@ def count_shared(observed, causal, log, observed_id: str = None, causal_id: str 
 
 
 def plot_params(
-        params: npt.NDArray,
-        vals: npt.NDArray,
-        vals_sem: npt.NDArray,
+        params,
+        vals,
+        vals_sem,
         val_title: str,
-        val_color: npt.NDArray,
+        val_color,
         metrics: dict = None,
         hide_extras: bool = False,
     ):
@@ -359,11 +361,11 @@ def plot_params(
 
 
 def plot_params_simple(
-        params: npt.NDArray,
-        vals: npt.NDArray,
-        vals_sem: npt.NDArray,
+        params,
+        vals,
+        vals_sem,
         val_title: str,
-        val_color: npt.NDArray,
+        val_color,
         hide_extras: bool = False,
     ):
     """
@@ -405,11 +407,11 @@ def plot_params_simple(
 
 
 def group_by_rep(
-        params: npt.NDArray,
-        vals: npt.NDArray,
-        causal_idxs: npt.NDArray,
-        bools: npt.NDArray,
-        metrics: npt.NDArray = None,
+        params,
+        vals,
+        causal_idxs,
+        bools,
+        metrics = None,
     ):
     """
     Group replicates with identical parameter values

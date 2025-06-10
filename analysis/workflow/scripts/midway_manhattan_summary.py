@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from numpy.lib import recfunctions as rfn
 # this gets imported later down only if --pos-type is specified
 # from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score, precision_recall_fscore_support
 
@@ -135,7 +136,7 @@ def get_finemap_metrics(
         return null_val
     if not keep_hap_ids:
         # Remove the 'hap_id' column (index 0)
-        metrics = np.delete(metrics, 0, axis=1)
+        metrics = rfn.drop_fields(metrics, 'hap_id')
     return metrics
 
 
