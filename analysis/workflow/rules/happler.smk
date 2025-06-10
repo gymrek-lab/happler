@@ -52,8 +52,11 @@ rule sub_pheno:
 
 
 pheno = rules.sub_pheno.output.pheno if "{rep}" in out else config["pheno"]
-# if the pvar size is larger than 0.5 GB, just use the default memory instead
-rsrc_func = lambda x: max if .5 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000/1000 else min
+if mode in ("run", "midway"):
+    # if the pvar size is larger than 0.5 GB, just use the default memory instead
+    rsrc_func = lambda x: max if .5 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000/1000 else min
+else:
+    rsrc_func = lambda x: min
 
 
 rule run:
@@ -310,7 +313,7 @@ rule sv_ld:
 
 
 def merge_hps_input(wildcards):
-    if mode == "happler":
+    if mode in ("happler", "ld_range"):
         if config["random"] is None:
             # include the hap that happler found
             return rules.transform.output
