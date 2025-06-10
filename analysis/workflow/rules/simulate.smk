@@ -52,7 +52,7 @@ checkpoint create_hap_ld_range:
     output:
         hap=directory(out + "/create_ld_range")
     resources:
-        runtime=5,
+        runtime=25,
     log:
         logs + "/create_hap_ld_range",
     benchmark:

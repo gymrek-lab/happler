@@ -47,33 +47,34 @@ modes:
   pos: 19:45903859
   id: 19:45903859
   reps: 10
-  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
  snp:
   pos: 19:45910672 # rs1046282
-  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
  hap:
   alleles: [rs36046716:G, rs1046282:G] # 45892145, 45910672
-  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
  ld_range:
   reps: 10
   min_ld: 0
   max_ld: 1
   step: 0.1
-  min_af: 0.25
-  max_af: 0.75
+  min_af: 0.05
+  max_af: 0.95
   # beta: [0.35]
-  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
-  alpha: [0.05]
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
+  alpha: [3]
   random: false # whether to also produce random haplotypes
   num_haps: [1, 2, 3, 4]
  midway:
-  reps: 10
-  haps: data/simulations/midway/1000G/haps
+  # beta: [0.214, 0.285, 0.356]
+  beta: [0.1, 0.2, 0.3]
+  reps: 3
+  haps: data/simulations/midway/1000G/haps/{locus}.hap
  run:
   pheno: data/geuvadis/phenos/{trait}.pheno
   SVs: data/geuvadis/pangenie_hprc_hg38_all-samples_bi_SVs-missing_removed.pgen
-  # pheno_matrix: data/geuvadis/EUR_converted_expr_hg38.csv # optional
-mode: midway
+mode: ld_range
 
 # Covariates to use if they're needed
 # Otherwise, they're assumed to be regressed out of the phenotypes
@@ -86,7 +87,7 @@ min_maf: 0.05
 
 # Sample sizes to use
 # sample_size: [777, 800, 1600, 2400, 3200]
-sample_size: 3200
+sample_size: [800, 1600, 2400, 3200]
 
 # Whether to include the causal variant in the set of genotypes provided to the
 # finemapping methods. Set this to true if you're interested in seeing how the

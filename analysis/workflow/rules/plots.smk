@@ -74,6 +74,7 @@ def agg_ld_range_metrics(wildcards):
             num_haps=config["mode_attrs"]["num_haps"],
             alpha=config["mode_attrs"]["alpha"],
             rep=range(config["mode_attrs"]["reps"]),
+            ex=("in",),
             **wildcards,
         )
     else:
@@ -81,6 +82,7 @@ def agg_ld_range_metrics(wildcards):
             config["happler_metrics"],
             beta=config["mode_attrs"]["beta"],
             num_haps=config["mode_attrs"]["num_haps"],
+            ex=("in",),
             **wildcards,
         )
 
@@ -152,6 +154,14 @@ fill_out_globals = lambda wildcards, val: expand(
     val,
     locus=wildcards.locus,
     sampsize=wildcards.sampsize,
+    allow_missing=True,
+)
+
+fill_out_globals_metrics = lambda wildcards, val: expand(
+    val,
+    locus=wildcards.locus,
+    sampsize=wildcards.sampsize,
+    ex=("in",),
     allow_missing=True,
 )
 
@@ -229,7 +239,7 @@ rule metrics:
     params:
         observed_haps = lambda wildcards: fill_out_globals(wildcards, config["happler_hap"]),
         causal_hap = lambda wildcards: fill_out_globals(wildcards, config["causal_hap"]),
-        metrics = lambda wildcards: fill_out_globals(wildcards, config["happler_metrics"]),
+        metrics = lambda wildcards: fill_out_globals_metrics(wildcards, config["happler_metrics"]),
     output:
         png=out + "/finemapping_metrics.png",
     resources:

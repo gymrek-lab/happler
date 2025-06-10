@@ -190,14 +190,14 @@ plots_config = {
     "snp_panel": config["gts_snp_panel"],
     "sample_size": config["sample_size"],
 }
-if mode == "ld_range":
-    plots_config["ld_range_checkpoint"] = checkpoints.simulate_create_hap_ld_range
-elif mode == "midway":
+if mode == "midway":
     plots_config["midway_linear"] = rules.midway_manhattan.output.linear
     plots_config["finemap_metrics"] = rules.happler_metrics.output.metrics
     plots_config["loci"] = locus
     plots_config["out"] = plots_config["out"].replace("/plots", "").replace("{locus}", "plots")
 else:
+    if mode == "ld_range":
+        plots_config["ld_range_checkpoint"] = checkpoints.simulate_create_hap_ld_range
     plots_config["happler_metrics"] = rules.happler_metrics.output.metrics
     plots_config["happler_hap"] = rules.happler_run.output.hap
 
