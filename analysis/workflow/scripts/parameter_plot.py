@@ -25,12 +25,13 @@ DTYPES = {
     "ld": np.float64,
     "rep": np.uint8,
     "gt": "U5",
-    "alpha": np.float64,
+    "alpha": np.uint32,
     "samp": np.uint32,
     "num_haps": np.uint8,
 }
 
-LOG_SCALE = {"alpha",}
+# LOG_SCALE = {"alpha",}
+LOG_SCALE = {}
 
 plt.rcParams['figure.dpi'] = 400  # Set the figure DPI to 300
 plt.rcParams['savefig.dpi'] = plt.rcParams['figure.dpi']  # Set the DPI for saving figures
@@ -519,6 +520,14 @@ def group_by_rep(
 @click.argument("observed_hap", type=click.Path(path_type=Path))
 @click.argument("causal_hap", type=click.Path(path_type=Path))
 @click.option(
+    "-f",
+    "--files",
+    type=click.Path(path_type=Path),
+    default=None,
+    show_default=True,
+    help="A file listing a subset of observed hap files to which we will apply the match",
+)
+@click.option(
     "-m",
     "--metrics",
     type=Path,
@@ -597,7 +606,8 @@ def main(
     genotypes: Path,
     observed_hap: Path,
     causal_hap: Path,
-    metrics: Path,
+    files: Path = None,
+    metrics: Path = None,
     use_metric: str = None,
     region: str = None,
     observed_id: str = None,
@@ -624,9 +634,16 @@ def main(
         gts = GenotypesPLINK
     gts = gts(genotypes, log=log)
 
+    # which files should we originally consider?
+    # by default, we just grab as many as we can
+    if files is not None:
+        log.debug("Obtaining filtering list")
+        with open(files, "r") as files_subset_file:
+            files = files_subset_file.read().splitlines()
+
     # extract parameters and parameter values by globbing wildcards
     # params will be a dictionary mapping parameter names to lists of values
-    params = dict(glob_wildcards(observed_hap)._asdict())
+    params = dict(glob_wildcards(observed_hap, files=files)._asdict())
     # convert the dictionary to a numpy mixed dtype array
     dtypes = {k: DTYPES[k] for k in params.keys()}
     # if the user specified an order, then we will sort the parameters by that order

@@ -2,6 +2,7 @@ import re
 import sys
 from pathlib import Path
 from functools import partial
+from snakemake.io import glob_wildcards
 
 out = config["out"]
 logs = out + "/logs"
@@ -200,6 +201,26 @@ fill_out_globals_midway_beta = lambda wildcards, val: expand(
     allow_missing=True,
 )
 
+
+def make_brace_expanded_path(pattern, files):
+    """
+    Given a wildcarded pattern and a list of matching file paths,
+    return a new path with bash-style brace expansion for all wildcards
+    that have multiple values. Single-value wildcards are substituted directly.
+    """
+    wc = glob_wildcards(pattern, files=files)
+
+    for name in wc._fields:
+        values = sorted(set(getattr(wc, name))) # ensures reproducibility
+        if len(values) > 1:
+            replacement = "{" + ",".join(values) + "}"
+        else:
+            replacement = values[0]
+        pattern = pattern.replace(f"{{{name}}}", replacement)
+
+    return pattern
+
+
 rule params:
     """ check how wildcards affect the haplotypes output by happler """
     input:
@@ -211,6 +232,10 @@ rule params:
     params:
         observed_haps = lambda wildcards: fill_out_globals(wildcards, config["happler_hap"]),
         causal_hap = lambda wildcards: fill_out_globals(wildcards, config["causal_hap"]),
+        observed_haps_glob = lambda wildcards, input: make_brace_expanded_path(
+            fill_out_globals(wildcards, config["happler_hap"])[0],
+            agg_ld_range_obs(wildcards),
+        ),
     output:
         png=out + "/happler_params.png",
     resources:
@@ -223,7 +248,7 @@ rule params:
         "happler"
     shell:
         "workflow/scripts/parameter_plot.py -o {output.png} "
-        "--order num_haps,beta,ld "
+        "--order num_haps,beta,ld -f <(ls -1 {params.observed_haps_glob}) "
         "{input.gts} {params.observed_haps} {params.causal_hap} &> {log}"
 
 
@@ -240,6 +265,10 @@ rule metrics:
         observed_haps = lambda wildcards: fill_out_globals(wildcards, config["happler_hap"]),
         causal_hap = lambda wildcards: fill_out_globals(wildcards, config["causal_hap"]),
         metrics = lambda wildcards: fill_out_globals_metrics(wildcards, config["happler_metrics"]),
+        observed_haps_glob = lambda wildcards, input: make_brace_expanded_path(
+            fill_out_globals(wildcards, config["happler_hap"])[0],
+            agg_ld_range_obs(wildcards),
+        ),
     output:
         png=out + "/finemapping_metrics.png",
     resources:
@@ -252,7 +281,7 @@ rule metrics:
         "happler"
     shell:
         "workflow/scripts/parameter_plot.py -o {output.png} -m {params.metrics} "
-        "--order num_haps,beta,ld "
+        "--order num_haps,beta,ld -f <(ls -1 {params.observed_haps_glob}) "
         "{input.gts} {params.observed_haps} {params.causal_hap} &> {log}"
 
 
