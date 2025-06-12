@@ -87,7 +87,7 @@ rule run:
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
         mem_mb=lambda wildcards, input: (
-            rsrc_func(input.gts)(2500, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
+            rsrc_func(input.gts)(3500, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
         ),
     threads: 1
     log:
