@@ -240,6 +240,7 @@ rule params:
         png=out + "/happler_params.png",
     resources:
         runtime=20,
+        mem_mb=2000,
     log:
         logs + "/plot_params",
     benchmark:
@@ -273,6 +274,7 @@ rule metrics:
         png=out + "/finemapping_metrics.png",
     resources:
         runtime=20,
+        mem_mb=2000,
     log:
         logs + "/metrics",
     benchmark:

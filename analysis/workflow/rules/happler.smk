@@ -66,15 +66,15 @@ rule run:
         pts=pheno,
         covar=config["covar"],
     params:
-        thresh=lambda wildcards: 3 if "alpha" not in wildcards else wildcards.alpha,
+        thresh=lambda wildcards: 3 if not hasattr(wildcards, "alpha") else wildcards.alpha,
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
         covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else "",
         maf = check_config("min_maf", 0),
-        indep=lambda wildcards: 4 if "indep_alpha" not in wildcards else wildcards.indep_alpha,
+        indep=lambda wildcards: 4 if not hasattr(wildcards, "indep_alpha") else wildcards.indep_alpha,
         max_signals=3,
         max_iterations=3,
         out_thresh=check_config("out_thresh", 5e-8),
-        keep_SNPs="--remove-SNPs " if not ("{rep}" in out) else "",
+        keep_SNPs=lambda wildcards: "--remove-SNPs " if not hasattr(wildcards, "rep") else "",
     output:
         hap=ensure(out + "/happler.hap", non_empty=True),
         gz=out + "/happler.hap.gz",
@@ -87,7 +87,7 @@ rule run:
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
         mem_mb=lambda wildcards, input: (
-            rsrc_func(input.gts)(3500, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
+            rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
         ),
     threads: 1
     log:
