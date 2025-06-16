@@ -274,6 +274,37 @@ def count_shared(observed, causal, log, observed_id: str = None, causal_id: str 
     return len(obs_vars & causal_vars), len(causal_vars)
 
 
+def draw_vertical_gridlines(fig, axs, num_ticks):
+    for x in range(num_ticks):
+        color = "#eeeeee" if x % 2 == 0 else "#cccccc"
+        for ax in axs:
+            ax.axvline(
+                x,
+                color=color,
+                linewidth=0.5,
+                zorder=0,
+            )
+
+
+def remove_same_valued_columns(arr):
+    """
+    remove any columns that have the same value across all rows
+    """
+    cols_to_keep = []
+    for name in arr.dtype.names:
+        col = arr[name]
+        if not np.all(col == col[0]):
+            cols_to_keep.append(name)
+
+    # Create new array with only non-constant columns
+    new_dtype = [(name, arr.dtype[name]) for name in cols_to_keep]
+    filtered_arr = np.empty(arr.shape, dtype=new_dtype)
+    for name in cols_to_keep:
+        filtered_arr[name] = arr[name]
+
+    return filtered_arr
+
+
 def plot_params(
         params,
         vals,
@@ -305,6 +336,7 @@ def plot_params(
         Whether to hide the observed haps that have no causal hap match
     """
     figsize = matplotlib.rcParams["figure.figsize"]
+    params = remove_same_valued_columns(params)
     if len(params) > 75:
         figsize[0] = len(params) / 15
     num_rows = len(params.dtype)
@@ -327,37 +359,29 @@ def plot_params(
             continue
         axs[0].errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=3)
     axs[0].set_ylabel(val_title, rotation="horizontal", ha="right")
-    axs[0].set_xticks(range(0, len(x_vals)))
+    axs[0].set_xticks(range(0, len(np.unique(x_vals))))
     axs[0].set_xticklabels([])
-    axs[0].grid(axis="x")
     axs[0].set_ylim(None, 1)
     # now, plot each of the parameter values on the other axes
     for idx, param in enumerate(params.dtype.names):
         val_title = param
-        if len(np.unique(params[param])) == 1:
-            axs[idx+1].remove()
-            continue
         if param in LOG_SCALE:
             params[param] = -np.log10(params[param])
             val_title = "-log " + val_title
         axs[idx+1].plot(params[param], "-")
         axs[idx+1].set_ylabel(val_title, rotation="horizontal", ha="right")
-        axs[idx+1].grid(axis="x")
     if metrics is not None:
         for idx, metric in enumerate(metrics.keys()):
             curr_ax = axs[idx+len(params.dtype)+1]
             val_title = metric
             vals = np.concatenate(metrics[metric][0])
-            if len(np.unique(vals)) == 1:
-                curr_ax.remove()
-                continue
             vals_sem = np.concatenate(metrics[metric][1])
             for v in zip(x_vals, vals, vals_sem, val_color):
                 if hide_extras and v[3] != "green":
                     continue
                 curr_ax.errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=3)
             curr_ax.set_ylabel(val_title, rotation="horizontal", ha="right")
-            curr_ax.grid(axis="x")
+    draw_vertical_gridlines(fig, axs, len(np.unique(x_vals)))
     return fig
 
 
@@ -388,6 +412,7 @@ def plot_params_simple(
         Whether to hide the observed haps that have no causal hap match
     """
     fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, figsize=(3.5, 3))
+    params = remove_same_valued_columns(params)
     val_xlabel = params.dtype.names[0]
     if val_xlabel in LOG_SCALE:
         params = -np.log10(params)
@@ -400,7 +425,8 @@ def plot_params_simple(
     for v in zip(params, vals, vals_sem, val_color):
         if hide_extras and v[3] != "green":
             continue
-        ax.errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=5)
+        for v_0 in v[0]:
+            ax.errorbar(v_0, v[1], yerr=v[2], marker="o", c=v[3], markersize=5)
     ax.set_ylabel(val_title, color="g")
     ax.set_xlabel(val_xlabel)
     ax.set_ylim(0, 1.03)
@@ -711,8 +737,9 @@ def main(
             else:
                 pickle.dump([params, ld_vals, ld_sem, ld_extras_bool], f)
 
+    diff_dtype = remove_same_valued_columns(params).dtype
     if use_metric is None:
-        if len(dtypes) > 1:
+        if len(diff_dtype) > 1:
             fig = plot_params(
                 params,
                 ld_vals,
@@ -722,7 +749,7 @@ def main(
                 metrics=metrics,
                 hide_extras=hide_extras
             )
-        elif len(dtypes) == 1:
+        elif len(diff_dtype) == 1:
             fig = plot_params_simple(
                 params,
                 ld_vals,
@@ -732,7 +759,7 @@ def main(
                 hide_extras=hide_extras
             )
     else:
-        if len(dtypes) > 2:
+        if len(diff_dtype) > 2:
             fig = plot_params(
                 params,
                 metrics[use_metric][0],
@@ -741,7 +768,7 @@ def main(
                 ld_extras_bool,
                 hide_extras=hide_extras
             )
-        elif len(dtypes) == 1:
+        elif len(diff_dtype) == 1:
             fig = plot_params_simple(
                 params,
                 metrics[use_metric][0],
