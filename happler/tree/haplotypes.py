@@ -129,7 +129,7 @@ class Haplotype:
             The allele associated with this node
         variant_genotypes : npt.NDArray[bool]
             A np array (with length n x 2, num_samples x num_chromosomes) denoting the
-            presence of this haplotype in each chromosome of each sample
+            presence of the new allele in each chromosome of each sample
 
         Returns
         -------

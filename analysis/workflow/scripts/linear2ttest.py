@@ -217,6 +217,8 @@ def main(
     ]
     bic = int(mode == "bic" or mode == "interact-bic")
     df["pval"] = np.array([(val[bic] if val != True else 1) for val in vals])
+    df["beta"] = results.data["beta"]
+    df["stderr"] = results.data["stderr"]
 
     if df["pval"].isna().any():
         raise ValueError("Some pvals were NA")
