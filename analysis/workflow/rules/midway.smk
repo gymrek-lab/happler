@@ -5,9 +5,6 @@ logs = out + "/logs"
 bench = out + "/bench"
 
 
-wildcard_constraints:
-    switch="(interact|tscore|covariance|bic|interact-bic)"
-
 # mapping from switch wildcard to integer for bash script
 tswitch = {
     "interact": 1,
@@ -15,7 +12,11 @@ tswitch = {
     "covariance": 3,
     "bic": 4,
     "interact-bic": 5,
+    "extension-bic": 6,
 }
+
+wildcard_constraints:
+    switch="("+"|".join(tswitch.keys())+")"
 
 
 rule manhattan:

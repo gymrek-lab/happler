@@ -94,6 +94,7 @@ switch_sim_mode = {
     "covariance": ("hap", "parent"),
     "bic": ("hap", "parent"),
     "interact-bic": ("hap", "indep"),
+    "extension-bic": ("hap", "hap"),
     "pip-parent": ("hap", "parent"),
     "pip-interact": ("hap", "indep"),
 }
@@ -308,15 +309,15 @@ rule midway:
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
         )[0],
-        bic=lambda wildcards: "--kind bic " if wildcards.switch in ("bic", "interact-bic") else "",
-        thresh=lambda wildcards: "--thresh 3 " if wildcards.switch in ("bic", "interact-bic") else "--thresh 0.05 ",
+        bic=lambda wildcards: "--kind bic " if str(wildcards.switch).endswith("bic") else "",
+        thresh=lambda wildcards: "--thresh 3 " if str(wildcards.switch).endswith("bic") else "--thresh 0.05 ",
     output:
         png=out + "/midway_summary.{switch}.pdf",
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
     resources:
         runtime=7,
     wildcard_constraints:
-        switch="(interact|tscore|covariance|bic|interact-bic)"
+        switch="("+"|".join(switch_sim_mode.keys())+")"
     log:
         logs + "/midway.{switch}",
     benchmark:
@@ -356,7 +357,7 @@ rule midway_beta:
     resources:
         runtime=7,
     wildcard_constraints:
-        switch="(interact|tscore|covariance|bic|interact-bic)"
+        switch="("+"|".join(switch_sim_mode.keys())+")"
     log:
         logs + "/beta_{beta}/midway.{switch}",
     benchmark:
