@@ -4,7 +4,7 @@ from logging import getLogger
 
 import pytest
 import numpy as np
-from haptools.data import Genotypes, GenotypesVCF, Phenotypes
+from haptools.data import Genotypes, GenotypesVCF, Phenotypes, GenotypesPLINK
 
 from happler.tree import (
     VariantType,
@@ -219,6 +219,21 @@ def test_haplotype():
     nodes = ((node, node_allele), (new_node, new_node_allele))
     assert hap.nodes == Haplotype(nodes, hap.data).nodes
     np.testing.assert_allclose(hap.data, hap_data & new_hap_data)
+
+
+def test_haplotype_from_haptools():
+    haplotype = list(Haplotypes.load(
+        DATADIR.joinpath("19_45401409-46401409_1000G.hap")
+    ).data.values())[0]
+    variant_genotypes = GenotypesPLINK.load(
+        DATADIR.joinpath("19_45401409-46401409_1000G.pgen")
+    )
+    hap = Haplotype.from_haptools_haplotype(haplotype, variant_genotypes)
+    assert hap.nodes == (
+        (Variant(idx=831, id='rs1046282', pos=45910672), 1),
+        (Variant(idx=797, id='rs36046716', pos=45892145), 1),
+    )
+    assert hap.data.shape == (len(variant_genotypes.samples), 2)
 
 
 def test_haplotype_transform():

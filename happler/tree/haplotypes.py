@@ -94,6 +94,27 @@ class Haplotype:
         """
         return cls(((node, allele),), variant_genotypes)
 
+    @classmethod
+    def from_haptools_haplotype(
+        cls, haplotype: HaplotypeBase, variant_genotypes: GenotypesVCF
+    ) -> Haplotype:
+        """
+        Create a new haplotype from a haptools Haplotype and a GenotypesVCF object
+        """
+        variants = {
+            vr.id: vr.allele for vr in haplotype.variants
+        }
+        variant_genotypes.index(variants = True)
+        gts = variant_genotypes.subset(variants=tuple(variants.keys()))
+        nodes = tuple(
+            (
+                Variant.from_np(variant, variant_genotypes._var_idx[variant["id"]]),
+                list(variant["alleles"]).index(allele)
+            )
+            for variant, allele in zip(gts.variants, variants.values())
+        )
+        return cls(nodes, haplotype.transform(gts))
+
     def append(
         self, node: Variant, allele: int, variant_genotypes: npt.NDArray[bool]
     ) -> Haplotype:
