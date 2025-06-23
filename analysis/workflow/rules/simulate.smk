@@ -183,7 +183,7 @@ rule simphenotype:
     params:
         hap=simphenotype_params_hap,
         seed = 42,
-        reps = lambda wildcards: config["modes"]["ld_range"]["reps"],
+        reps = lambda wildcards: config["modes"][mode]["reps"] if "reps" in config["modes"][mode] else 1,
     output:
         pheno=out + "/{beta}.pheno",
     resources:
