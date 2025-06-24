@@ -74,13 +74,14 @@ def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes) -> tupl
     # The rows and columns of ld_mat both correspond to the observed and causal haps in
     # the order they were given. For example, if there is 1 observed hap and 3 causal
     # haps, then there should be four rows and four columns in ld_mat
-    # Note that ld_mat is symmetric, so the upper triangle is always redundant
-    # TODO: use the latest haptools.ld.pearson_corr_ld to do this, instead
-    ld_mat = np.corrcoef(obs, exp, rowvar=False)
     # Retrieve only the correlation of observed haps (as rows) vs causal haps (as cols)
-    ld_mat = np.abs(ld_mat[:obs.shape[1], obs.shape[1]:])
-    # Return the ld_mat idxs of the optimal match of each observed hap to a causal hap
-    row_idx, col_idx = linear_sum_assignment(ld_mat, maximize=True)
+    ld_mat = np.abs(pearson_corr_ld(obs, exp))
+    if exp.shape[1] == 1:
+        row_idx, col_idx = np.argmax(ld_mat, axis=0), np.array([0], dtype=np.int64)
+        assert (row_idx, col_idx) == linear_sum_assignment(ld_mat, maximize=True)
+    else:
+        # Return the ld_mat idxs of the optimal match of each observed hap to a causal hap
+        row_idx, col_idx = linear_sum_assignment(ld_mat, maximize=True)
     # now deal with the extras (observed haps with no causal hap match)
     extras_labels = np.zeros(ld_mat.shape[0], dtype=np.uint8)
     extras_labels_bool = np.zeros(ld_mat.shape[0], dtype=bool)
@@ -98,14 +99,14 @@ def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes) -> tupl
 
 
 def get_best_ld(
-        gts: GenotypesVCF,
-        observed_hap: Path,
-        causal_hap: Path,
-        region: str = None,
-        observed_id: str = None,
-        causal_id: str = None,
-        log: Logger = None
-    ):
+    gts: GenotypesVCF,
+    observed_hap: Path,
+    causal_hap: Path,
+    region: str = None,
+    observed_id: str = None,
+    causal_id: str = None,
+    log: Logger = None
+):
     """
     Compute the best LD between the observed haplotypes and the causal haplotype
 
@@ -162,7 +163,12 @@ def get_best_ld(
         gts, observed_hap, causal_hap,
     )
     # return the strongest possible LD for each observed hap with a causal hap
-    return observed_ld[best_row_idx, best_col_idx], extras_labels, labels_bool
+    # note: incidentally, extras_labels[best_row_idx] will always be the same as best_col_idx
+    return (
+        observed_ld[best_row_idx, best_col_idx],
+        extras_labels[best_row_idx],
+        labels_bool[best_row_idx],
+    )
 
 
 def get_finemap_metrics(
@@ -306,14 +312,14 @@ def remove_same_valued_columns(arr):
 
 
 def plot_params(
-        params,
-        vals,
-        vals_sem,
-        val_title: str,
-        val_color,
-        metrics: dict = None,
-        hide_extras: bool = False,
-    ):
+    params,
+    vals,
+    vals_sem,
+    val_title: str,
+    val_color,
+    metrics: dict = None,
+    hide_extras: bool = False,
+):
     """
     Plot vals against parameter values
 
@@ -354,7 +360,11 @@ def plot_params(
     val_color = ["green" if j else "red" for i in val_color for j in i]
     vals = np.concatenate(vals)
     vals_sem = np.concatenate(vals_sem)
-    for v in zip(x_vals, vals, vals_sem, val_color):
+    for v in sorted(
+        zip(x_vals, vals, vals_sem, val_color),
+        key=lambda x: x[3],
+        reverse=True
+    ):
         if hide_extras and v[3] != "green":
             continue
         axs[0].errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=3)
@@ -376,7 +386,11 @@ def plot_params(
             val_title = metric
             vals = np.concatenate(metrics[metric][0])
             vals_sem = np.concatenate(metrics[metric][1])
-            for v in zip(x_vals, vals, vals_sem, val_color):
+            for v in sorted(
+                zip(x_vals, vals, vals_sem, val_color),
+                key=lambda x: x[3],
+                reverse=True
+            ):
                 if hide_extras and v[3] != "green":
                     continue
                 curr_ax.errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=3)
@@ -386,13 +400,13 @@ def plot_params(
 
 
 def plot_params_simple(
-        params,
-        vals,
-        vals_sem,
-        val_title: str,
-        val_color,
-        hide_extras: bool = False,
-    ):
+    params,
+    vals,
+    vals_sem,
+    val_title: str,
+    val_color,
+    hide_extras: bool = False,
+):
     """
     Plot vals against only a single column of parameter values
 
@@ -422,7 +436,11 @@ def plot_params_simple(
     vals = np.concatenate(vals)
     vals_sem = np.concatenate(vals_sem)
     # plot params against vals
-    for v in zip(params, vals, vals_sem, val_color):
+    for v in sorted(
+        zip(params, vals, vals_sem, val_color),
+        key=lambda x: x[3],
+        reverse=True
+    ):
         if hide_extras and v[3] != "green":
             continue
         for v_0 in v[0]:
@@ -434,12 +452,12 @@ def plot_params_simple(
 
 
 def group_by_rep(
-        params,
-        vals,
-        causal_idxs,
-        bools,
-        metrics = None,
-    ):
+    params,
+    vals,
+    causal_idxs,
+    bools,
+    metrics = None,
+):
     """
     Group replicates with identical parameter values
 
