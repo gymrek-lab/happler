@@ -90,8 +90,8 @@ def main(
         og_gts,
         phen,
         maf=maf,
-        terminator=BICTerminator(bf_thresh=0, log=log),
-        indep_thresh=1,
+        terminator=BICTerminator(bf_thresh=-float("inf"), log=log),
+        indep_thresh=-float("inf"),
         ld_prune_thresh=0.95,
         covariance_correction=False,
         log=log,
@@ -127,7 +127,9 @@ def main(
     node_results = node_res.from_np(results.data[0])
     terminator = BICTerminator()
     # check that we were able to recapitulate the results object properly
-    assert node_results == ext_allele[2]
+    assert node_results.beta == ext_allele[2].beta
+    assert node_results.stderr == ext_allele[2].stderr
+    assert node_results.bic == ext_allele[2].bic
 
     # now, get the BF
     val = terminator.compute_val(

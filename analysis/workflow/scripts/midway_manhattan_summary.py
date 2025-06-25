@@ -168,7 +168,12 @@ def get_pval(
     """
     # load the linear file
     df = load_linear_file(linear)
-    pval = df[df.id == snp_id].iloc[0]["pval"]
+    # figure out which pval to extract from the linear file
+    # or just use the first one if there's only one
+    if len(df) == 1:
+        pval = df.pval[0]
+    else:
+        pval = df[df.id == snp_id].iloc[0]["pval"]
     if bic:
         pval = math.log(pval)
     else:
