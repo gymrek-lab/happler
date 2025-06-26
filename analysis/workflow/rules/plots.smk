@@ -94,28 +94,52 @@ switch_sim_mode = {
     "covariance": ("hap", "parent"),
     "bic": ("hap", "parent"),
     "interact-bic": ("hap", "indep"),
-    "extension-bic": ("hap", "hap"),
     "pip-parent": ("hap", "parent"),
     "pip-interact": ("hap", "indep"),
+    "extension-bic": ("hap", "hap"),
+}
+
+switch_ext_mode = {
+    "extension-bic": ("bic", "extension-bic"),
 }
 
 
 def agg_midway_linear(wildcards, beta: bool = False):
     """ return a list of midway linear files """
-    sim_modes = switch_sim_mode[wildcards.switch]
-    expand_partial = expand
-    if beta:
-        expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
+    if wildcards.switch.startswith("extension"):
+        switches = switch_ext_mode[wildcards.switch]
+        expand_partial = expand
+        if beta:
+            expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
+        else:
+            expand_partial = partial(expand_partial, beta=wildcards.beta)
+        # make sure to remove 'switch' wildcard since we will be replacing it
+        wildcards = dict(wildcards)
+        del wildcards["switch"]
+        return expand_partial(
+            config["midway_linear"],
+            locus=config["loci"],
+            rep=range(config["mode_attrs"]["reps"]),
+            sim_mode=("hap",),
+            switch=switches,
+            **wildcards,
+            allow_missing=True,
+        )
     else:
-        expand_partial = partial(expand_partial, beta=wildcards.beta)
-    return expand_partial(
-        config["midway_linear"],
-        locus=config["loci"],
-        rep=range(config["mode_attrs"]["reps"]),
-        sim_mode=sim_modes,
-        **wildcards,
-        allow_missing=True,
-    )
+        sim_modes = switch_sim_mode[wildcards.switch]
+        expand_partial = expand
+        if beta:
+            expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
+        else:
+            expand_partial = partial(expand_partial, beta=wildcards.beta)
+        return expand_partial(
+            config["midway_linear"],
+            locus=config["loci"],
+            rep=range(config["mode_attrs"]["reps"]),
+            sim_mode=sim_modes,
+            **wildcards,
+            allow_missing=True,
+        )
 
 
 def agg_finemap(wildcards, beta: bool = False, also_exclude = False):
@@ -170,6 +194,11 @@ fill_out_globals_metrics = lambda wildcards, val: expand(
 fill_out_globals_midway = lambda wildcards, val: expand(
     val,
     sampsize=wildcards.sampsize,
+    sim_mode=("hap",),
+    allow_missing=True,    
+) if wildcards.switch.startswith("extension") else expand(
+    val,
+    sampsize=wildcards.sampsize,
     switch=wildcards.switch,
     allow_missing=True,
 )
@@ -201,6 +230,22 @@ fill_out_globals_midway_beta = lambda wildcards, val: expand(
     beta=wildcards.beta,
     allow_missing=True,
 )
+
+linears_glob = lambda wildcards, method = fill_out_globals_midway: (expand(
+    re.sub(
+        r"\{(?!switch\})[^}]+\}", "*",
+        method(wildcards, config["midway_linear"])[0],
+    ),
+    switch="{"+",".join(switch_ext_mode[wildcards.switch])+"}",
+    allow_missing=True,    
+) if wildcards.switch.startswith("extension") else expand(
+    re.sub(
+        r"\{(?!sim_mode\})[^}]+\}", "*",
+        method(wildcards, config["midway_linear"])[0],
+    ),
+    sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
+    allow_missing=True,
+))[0]
 
 
 def make_brace_expanded_path(pattern, files):
@@ -297,20 +342,13 @@ rule midway:
         linears=partial(agg_midway_linear, beta=True),
         snplists=agg_ld_range_causal,
     params:
-        case_type="sim_mode",
-        pos_type="hap",
+        case_type=lambda wildcards: "switch" if wildcards.switch.startswith("extension") else "sim_mode",
+        pos_type=lambda wildcards: "bic" if wildcards.switch.startswith("extension") else "hap",
         linears=lambda wildcards: fill_out_globals_midway(wildcards, config["midway_linear"]),
         causal_hap = lambda wildcards: fill_out_globals_midway(wildcards, config["causal_hap"]),
-        linears_glob = lambda wildcards: expand(
-            re.sub(
-                r"\{(?!sim_mode\})[^}]+\}", "*",
-                fill_out_globals_midway(wildcards, config["midway_linear"])[0],
-            ),
-            sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
-            allow_missing=True,
-        )[0],
+        linears_glob = partial(linears_glob, method=fill_out_globals_midway),
         bic=lambda wildcards: "--kind bic " if str(wildcards.switch).endswith("bic") else "",
-        thresh=lambda wildcards: "--thresh 3 " if str(wildcards.switch).endswith("bic") else "--thresh 0.05 ",
+        thresh=lambda wildcards: "--thresh 10 " if str(wildcards.switch).endswith("bic") else "--thresh 0.05 ",
     output:
         png=out + "/midway_summary.{switch}.pdf",
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
@@ -337,20 +375,13 @@ rule midway_beta:
         linears=agg_midway_linear,
         snplists=agg_ld_range_causal,
     params:
-        case_type="sim_mode",
-        pos_type="hap",
+        case_type=lambda wildcards: "switch" if wildcards.switch.startswith("extension") else "sim_mode",
+        pos_type=lambda wildcards: "bic" if wildcards.switch.startswith("extension") else "hap",
         linears=lambda wildcards: fill_out_globals_midway_beta(wildcards, config["midway_linear"]),
         causal_hap = lambda wildcards: fill_out_globals_midway_beta(wildcards, config["causal_hap"]),
-        linears_glob = lambda wildcards: expand(
-            re.sub(
-                r"\{(?!sim_mode\})[^}]+\}", "*",
-                fill_out_globals_midway_beta(wildcards, config["midway_linear"])[0],
-            ),
-            sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
-            allow_missing=True,
-        )[0],
-        bic=lambda wildcards: "--kind bic " if wildcards.switch in ("bic", "interact-bic") else "",
-        thresh=lambda wildcards: "--thresh 3 " if wildcards.switch in ("bic", "interact-bic") else "--thresh 0.05 ",
+        linears_glob = partial(linears_glob, method=fill_out_globals_midway_beta),
+        bic=lambda wildcards: "--kind bic " if str(wildcards.switch).endswith("bic") else "",
+        thresh=lambda wildcards: "--thresh 10 " if str(wildcards.switch).endswith("bic") else "--thresh 0.05 ",
     output:
         png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
         metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",

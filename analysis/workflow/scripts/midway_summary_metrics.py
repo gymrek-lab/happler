@@ -143,28 +143,42 @@ def main(
     log.info("Setting axes limits appropriately")
     max_fpr = max(metrics["FPR"])
     min_recall = min(metrics["Recall"])
+    min_alpha = min(metrics["Significance Threshold"])
     max_alpha = max(metrics["Significance Threshold"])
     min_auroc = min(metrics["AUROC"])
     min_ap = min(metrics["Average Precision"])
     if not use_flex_axes_limits:
         if max_fpr > 0.05:
-            axs[0].set_ylim((-0.001, 0.051))
+            axs[0].set_ylim((-0.001, 1.005))
         else:
             axs[0].set_ylim((-0.001, 0.051))
         axs[1].set_ylim((-0.001, 1.001))
         if max_alpha > 1:
-            axs[2].set_ylim((-2.005, 10.005))
+            if max_alpha > 10:
+                if min_alpha < 0:
+                    axs[2].set_ylim((-2.005, 30.005))
+                else:
+                    axs[2].set_ylim((-0.005, 30.005))
+            else:
+                if min_alpha < 0:
+                    axs[2].set_ylim((-2.005, 10.005))
+                else:
+                    axs[2].set_ylim((-0.005, 10.005))
         elif max_alpha > 0.25:
             axs[2].set_ylim((-0.005, 1.005))
         else:
             axs[2].set_ylim((-0.005, 0.255))
-        if min_auroc < 0.5:
+        if min_auroc < 0.3:
+            axs[3].set_ylim((-0.005, 1.005))
+        elif min_auroc < 0.5:
             axs[3].set_ylim((0.295, 1.005))
         elif min_auroc < 0.9:
             axs[3].set_ylim((0.495, 1.005))
         else:
             axs[3].set_ylim((0.895, 1.005))
-        if min_ap < 0.5:
+        if min_ap < 0.3:
+            axs[4].set_ylim((-0.005, 1.005))
+        elif min_ap < 0.5:
             axs[4].set_ylim((0.295, 1.005))
         elif min_ap < 0.9:
             axs[4].set_ylim((0.495, 1.005))
