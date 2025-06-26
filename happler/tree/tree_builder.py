@@ -299,7 +299,7 @@ class TreeBuilder:
                         self.phens.data[:, 0],
                     ).data[0]
                 )
-                if BICTerminator(bic_thresh=self.indep_thresh).check(
+                if BICTerminator(bf_thresh=self.indep_thresh).check(
                     hap_indep_effect,
                     node_res,
                     results,
@@ -448,7 +448,7 @@ class TreeBuilder:
                         self.phens.data[:, 0],
                     ).data[0]
                 )
-                if BICTerminator(bic_thresh=self.indep_thresh).check(
+                if BICTerminator(bf_thresh=self.indep_thresh).check(
                     hap_indep_effect,
                     node_res,
                     results[allele],
