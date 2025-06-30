@@ -168,18 +168,14 @@ def main(
             axs[2].set_ylim((-0.005, 1.005))
         else:
             axs[2].set_ylim((-0.005, 0.255))
-        if min_auroc < 0.3:
+        if min_auroc < 0.5:
             axs[3].set_ylim((-0.005, 1.005))
-        elif min_auroc < 0.5:
-            axs[3].set_ylim((0.295, 1.005))
         elif min_auroc < 0.9:
             axs[3].set_ylim((0.495, 1.005))
         else:
             axs[3].set_ylim((0.895, 1.005))
-        if min_ap < 0.3:
+        if min_ap < 0.5:
             axs[4].set_ylim((-0.005, 1.005))
-        elif min_ap < 0.5:
-            axs[4].set_ylim((0.295, 1.005))
         elif min_ap < 0.9:
             axs[4].set_ylim((0.495, 1.005))
         else:

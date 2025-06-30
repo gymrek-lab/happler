@@ -627,14 +627,12 @@ def main(
             thresh = optimal_thresh
         roc_auc = auc(fpr, tpr)
         prc_ap = average_precision_score(y_true, y_score)
-        # Find the index where thresholds > log_thresh b/c prc_threshold increases from 0 to inf
-        prc_thresh_idx = np.argmax(prc_threshold > tsfm_pval(thresh))
-
-        # Ensure index is within bounds (prc_threshold is shorter with precision/recall than roc)
-        if prc_thresh_idx >= len(precision):
-            prc_thresh_idx = len(precision) - 1
+        # Align PRC threshold to correct precision/recall index
+        score_thresh = tsfm_pval(thresh) if not no_log10 else thresh
+        prc_thresh_idx = np.searchsorted(prc_threshold, score_thresh, side="right")
+        prc_thresh_idx = min(prc_thresh_idx, len(precision) - 1)
         final_metrics["AUROC"] = roc_auc
-        final_metrics["Average Precision"] = roc_auc
+        final_metrics["Average Precision"] = prc_ap
 
         # now, make the fig
         fig = plt.figure(figsize=(16, 6), layout='constrained')
@@ -670,10 +668,10 @@ def main(
         ax_prc.plot([0, 1], [0, 1], "--", color="orange")
         precision_thresh = precision[prc_thresh_idx]
         if precision_thresh != 0:
-            ax_prc.axline((0, precision_thresh), (precision_thresh, precision_thresh), color="red", lw=0.9)
+            ax_prc.axhline(precision_thresh, color="red", lw=0.9)
         recall_thresh = recall[prc_thresh_idx]
         if recall_thresh != 0:
-            ax_prc.axline((recall_thresh, 0), (recall_thresh, recall_thresh), color="red", lw=0.9)
+            ax_prc.axvline(recall_thresh, color="red", lw=0.9)
         ax_prc.set_xlim([-0.005, 1.005])
         ax_prc.set_ylim([-0.005, 1.005])
         ax_prc.set_ylabel('Precision')
@@ -714,16 +712,16 @@ def main(
             else:
                 threshold_type = ""
         fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
-        if not no_log10 and not is_finemap_metric:
+        if not no_log10 and not is_finemap_metric and not bic:
             thresh = tsfm_pval(thresh)
     ax.set_xlabel(case_type + ": " + ax_labs[1])
     ax.set_ylabel(case_type + ": " + ax_labs[0])
     ax.axline((0,0), (vals.max(), vals.max()), linestyle="--", color="orange")
     if thresh is not None and thresh != 0:
-        ax.axline((0,thresh), (thresh, thresh), color="red")
-        ax_histx.axline((thresh,0), (thresh, thresh), color="red")
-        ax.axline((thresh,0), (thresh, thresh), color="red")
-        ax_histy.axline((0,thresh), (thresh, thresh), color="red")
+        ax.axhline(thresh, color="red")
+        ax.axvline(thresh, color="red")
+        ax_histx.axvline(thresh, color="red")
+        ax_histy.axhline(thresh, color="red")
     ax_histy.spines['top'].set_visible(False)
     ax_histx.spines['top'].set_visible(False)
     ax_histy.spines['right'].set_visible(False)
