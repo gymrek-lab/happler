@@ -57,6 +57,14 @@ def get_metrics(
     ),
 )
 @click.option(
+    "-t",
+    "--thresh",
+    type=float,
+    default=None,
+    show_default=None,
+    help="If provided, draw a red line at the significance threshold"
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -75,6 +83,7 @@ def get_metrics(
 def main(
     metrics_files: Path,
     use_flex_axes_limits: bool = False,
+    thresh: float = None,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -187,6 +196,9 @@ def main(
     axs[2].set_ylabel("Best Threshold")
     axs[3].set_ylabel("AUROC")
     axs[4].set_ylabel("Average Precision")
+
+    if thresh is not None:
+        axs[2].axhline(thresh, color="red", lw=0.9)
 
     log.info("Writing figure")
     fig.supxlabel("Sample size")

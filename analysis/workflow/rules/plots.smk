@@ -536,6 +536,7 @@ rule midway_metrics:
     params:
         metrics = lambda wildcards: expand(rules.midway_beta.output.metrics, switch=wildcards.switch, allow_missing=True),
         use_flex_axes = lambda wildcards: "--use-flex-axes-limits " if wildcards.switch == "interact" else "",
+        thresh=lambda wildcards: "--thresh 10 " if str(wildcards.switch).endswith("bic") else "--thresh 0.05 ",
     output:
         png=out + "/midway_summary_metrics.{switch}.pdf",
     resources:
@@ -547,7 +548,7 @@ rule midway_metrics:
     conda:
         "happler"
     shell:
-        "workflow/scripts/midway_summary_metrics.py {params.use_flex_axes}-o {output.png} {params.metrics} &>{log}"
+        "workflow/scripts/midway_summary_metrics.py {params.thresh} {params.use_flex_axes}-o {output.png} {params.metrics} &>{log}"
 
 
 rule finemap_metrics:
