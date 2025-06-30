@@ -15,10 +15,11 @@ from .haplotypes import Haplotype
 from .terminator import Terminator, BICTerminator, TTestTerminator
 from .assoc_test import (
     AssocTest,
-    AssocTestSimpleCovariates,
     NodeResults,
-    AssocTestSimpleSM,
     NodeResultsExtra,
+    AssocTestSimpleSM,
+    AssocTestSimpleSMTScore,
+    AssocTestSimpleCovariates,
 )
 
 
@@ -73,6 +74,7 @@ class TreeBuilder:
         self._split_method = self._find_split_rigid
         split_method = "rigid"
         self.ld_prune_thresh = ld_prune_thresh
+        self.ranking_val = "bic" if isinstance(self.method, AssocTestSimpleSM) and self.method.with_bic else "pval"
         # for now, let's comment this out because we want to try the rigid strategy
         # if self.ld_prune_thresh is not None:
         #     self._split_method = self._find_split_flexible
@@ -264,13 +266,29 @@ class TreeBuilder:
                 yield None, allele, None
                 continue
             hap_mat_sum = hap_matrix.sum(axis=2)
+            parent_corr = None
             # step 2: run all association tests on all of the haplotypes
-            results = self.method.run(
-                hap_mat_sum,
-                self.phens.data[:, 0],
-            )
-            # step 3: record the best BIC among all the SNPs with this allele
-            best_var_idx = results.data["pval"].argmin()
+            if isinstance(self.method, AssocTestSimpleSMTScore) and not (
+                parent_res is None
+            ):
+                if self.covariance_correction:
+                    parent_corr = pearson_corr_ld(hap_mat_sum, parent.data.sum(axis=1))
+                results = self.method.run(
+                    hap_mat_sum,
+                    self.phens.data[:, 0],
+                    parent_res=parent_res,
+                    parent_corr=parent_corr,
+                )
+                # step 3: record the best t-score among all the SNPs with this allele
+                best_var_idx = results.data["tscore"].argmax()
+                parent_corr = parent_corr[best_var_idx]
+            else:
+                results = self.method.run(
+                    hap_mat_sum,
+                    self.phens.data[:, 0],
+                )
+                # step 3: record the best p-value among all the SNPs with this allele
+                best_var_idx = results.data[self.ranking_val].argmin()
             node_res = self.results_type.from_np(results.data[best_var_idx])
             best_res_idx = best_var_idx
             num_tests = len(parent.nodes) + 1
@@ -363,6 +381,7 @@ class TreeBuilder:
         results = {}
         best_p_idx = {}
         maf_mask = {}
+        parent_corr = {}
         # iterate through the two possible alleles and try all SNPs with that allele
         alleles = (0, 1)
         for allele in alleles:
@@ -379,20 +398,42 @@ class TreeBuilder:
                 yield None, allele, None
                 continue
             hap_mat_sum = hap_matrix.sum(axis=2)
+            parent_corr[allele] = None
             # step 2: run all association tests on all of the haplotypes
-            results[allele] = self.method.run(
-                hap_mat_sum,
-                self.phens.data[:, 0],
-            )
-            # step 3: record the best BIC among all the SNPs with this allele
-            best_p_idx[allele] = results[allele].data["pval"].argmin()
+            if isinstance(self.method, AssocTestSimpleSMTScore) and not (
+                parent_res is None
+            ):
+                if self.covariance_correction:
+                    parent_corr[allele] = pearson_corr_ld(
+                        hap_mat_sum, parent.data.sum(axis=1)
+                    )
+                results[allele] = self.method.run(
+                    hap_mat_sum,
+                    self.phens.data[:, 0],
+                    parent_res=parent_res,
+                    parent_corr=parent_corr[allele],
+                )
+                # also, record the best t-score among all the SNPs with this allele
+                best_p_idx[allele] = results[allele].data["tscore"].argmax()
+            else:
+                results[allele] = self.method.run(
+                    hap_mat_sum,
+                    self.phens.data[:, 0],
+                )
+                # also record the best value among all the SNPs with this allele
+                best_p_idx[allele] = results[allele].data[self.ranking_val].argmin()
         # exit if neither of the alleles worked
         if not len(best_p_idx):
             return
         # step 3: find the index of the best variant within the haplotype matrix
-        best_allele = min(
-            best_p_idx, key=lambda a: results[a].data["pval"][best_p_idx[a]]
-        )
+        if isinstance(self.method, AssocTestSimpleSMTScore):
+            best_allele = max(
+                best_p_idx, key=lambda a: results[a].data["tscore"][best_p_idx[a]]
+            )
+        else:
+            best_allele = min(
+                best_p_idx, key=lambda a: results[a].data[self.ranking_val][best_p_idx[a]]
+            )
         best_var_idx = best_p_idx[best_allele]
         best_res_idx = {
             best_allele: best_var_idx,

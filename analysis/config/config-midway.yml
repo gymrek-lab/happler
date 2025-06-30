@@ -42,7 +42,7 @@ locus: data/simulations/midway/1000G/loci.bed
 modes:
  midway:
   # beta: [0.214, 0.285, 0.356]
-  beta: [0.1, 0.2, 0.3]
+  beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
   reps: 3
   haps: data/simulations/midway/1000G/haps/{locus}.hap
 mode: midway

@@ -231,15 +231,6 @@ class BICTerminator(Terminator):
         bf = None
         bic = results.data["bic"][best_idx]
         if parent_res:
-            # before we do any calculations, check whether the effect sizes have
-            # improved and return True if they haven't
-            if short_circuit and (
-                np.isnan(node_res.beta)
-                or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
-            ):
-                # terminate if the effect sizes have gone in the opposite direction
-                self.log.debug("Terminated b/c effect size did not improve")
-                return True
             bf = parent_res.bic - results.data["bic"]
             # compute the bayes factor approximation from the delta BIC:
             # https://easystats.github.io/bayestestR/reference/bic_to_bf.html

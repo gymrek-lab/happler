@@ -13,6 +13,7 @@ tswitch = {
     "bic": 4,
     "interact-bic": 5,
     "extension-bic": 6,
+    "extension-tscore": 7,
 }
 
 wildcard_constraints:

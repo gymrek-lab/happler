@@ -12,8 +12,8 @@ from happler.tree import TreeBuilder
 from happler.tree.variant import Variant
 from happler.tree.haplotypes import Haplotype
 from happler.tree.assoc_test import NodeResultsExtra
-from happler.tree.terminator import BICTerminator
-from happler.tree.assoc_test import AssocTestSimpleSM
+from happler.tree.terminator import BICTerminator, TTestTerminator
+from happler.tree.assoc_test import AssocTestSimpleSM, AssocTestSimpleSMTScore
 
 @click.command()
 @click.argument("hap", type=click.Path(exists=True, path_type=Path))
@@ -26,6 +26,14 @@ from happler.tree.assoc_test import AssocTestSimpleSM
     default=None,
     show_default="no filtering",
     help="Ignore variants with a MAF below this threshold",
+)
+@click.option(
+    "-m",
+    "--mode",
+    type=click.Choice(["tscore", "bic"]),
+    default="bic",
+    show_default=True,
+    help="The type of values to compute",
 )
 @click.option(
     "-o",
@@ -49,6 +57,7 @@ def main(
     og_gts: Path,
     phenotype: Path,
     maf: float = None,
+    mode: str = "bic",
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -69,21 +78,29 @@ def main(
     og_gts.check_phase()
     hap_gts = data.GenotypesPLINK.load(hap_gts)
     hap_gts.check_missing()
-    hap_gts.check_biallelic()
     hap_gts.check_maf(threshold=maf)
-    hap_gts.check_phase()
     assert len(hap_gts.variants) == 1
     assert phen.samples == og_gts.samples and phen.samples == hap_gts.samples
 
     log.info("Setting up delta BIC test")
     # parent node model: y ~ h_hap
     parent = Haplotype.from_haptools_haplotype(hp, og_gts)
-    parent_res = NodeResultsExtra.from_np(
-        AssocTestSimpleSM(with_bic=True).run(
-            hap_gts.data.sum(axis=2),
-            phen.data[:, 0],
-        ).data[0]
-    )
+    if mode == "bic":
+        parent_res = NodeResultsExtra.from_np(
+            AssocTestSimpleSM(with_bic=True).run(
+                hap_gts.data.sum(axis=2),
+                phen.data[:, 0],
+            ).data[0]
+        )
+    elif mode == "tscore":
+        parent_res = NodeResultsExtra.from_np(
+            AssocTestSimpleSMTScore(with_bic=True).run(
+                hap_gts.data.sum(axis=2),
+                phen.data[:, 0],
+            ).data[0]
+        )
+    else:
+        raise ValueError("Unsupported mode")
 
     log.info("Setting up tree builder")
     hap_tree = TreeBuilder(
@@ -104,7 +121,7 @@ def main(
     ))
     if len(ext_allele) > 1:
         # if both alleles were unterminated, we choose the one with the best BIC
-        ext_allele = max(ext_allele, key=lambda x: x[2].bic)
+        ext_allele = min(ext_allele, key=lambda x: x[2].bic)
     else:
         ext_allele = ext_allele[0]
     
@@ -114,10 +131,20 @@ def main(
         new_allele_gts = ~new_allele_gts
     new_hap = parent.append(ext_allele[0], ext_allele[1], new_allele_gts)
     # current node model: y ~ h_hap' where hap' is hap extended by the next best allele
-    results = AssocTestSimpleSM(with_bic=True).run(
-        new_hap.data.sum(axis=1)[:, np.newaxis],
-        phen.data[:, 0],
-    )
+    if mode == "bic":
+        terminator = BICTerminator()
+        results = AssocTestSimpleSM(with_bic=True).run(
+            new_hap.data.sum(axis=1)[:, np.newaxis],
+            phen.data[:, 0],
+        )
+    elif mode == "tscore":
+        terminator = TTestTerminator()
+        results = AssocTestSimpleSMTScore(with_bic=True).run(
+            new_hap.data.sum(axis=1)[:, np.newaxis],
+            phen.data[:, 0],
+        )
+    else:
+        raise ValueError("Unsupported mode")
 
     log.info("Computing BF values")
     num_tests = 1
@@ -125,7 +152,6 @@ def main(
     num_samps = int(len(og_gts.samples))
     node_res = NodeResultsExtra
     node_results = node_res.from_np(results.data[0])
-    terminator = BICTerminator()
     # check that we were able to recapitulate the results object properly
     assert node_results.beta == ext_allele[2].beta
     assert node_results.stderr == ext_allele[2].stderr
@@ -143,14 +169,14 @@ def main(
         short_circuit=False,
     )
     if val != True:
-        bf_val = val[1]
+        bf_val = val[mode == "bic"]
     else:
-        bf_val = float("inf")
+        bf_val = float("inf") if mode == "bic" else 0
 
     if np.isnan(bf_val):
         raise ValueError("Some BFs were NA")
 
-    log.info("Outputting t-test p-values")
+    log.info("Outputting BF values")
     PLINK_COLS = {
         "#CHROM": hp.chrom,
         "POS": ext_allele[0].pos,

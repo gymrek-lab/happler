@@ -97,16 +97,18 @@ switch_sim_mode = {
     "pip-parent": ("hap", "parent"),
     "pip-interact": ("hap", "indep"),
     "extension-bic": ("hap", "hap"),
+    "extension-tscore": ("hap", "hap"),
 }
 
 switch_ext_mode = {
     "extension-bic": ("bic", "extension-bic"),
+    "extension-tscore": ("tscore", "extension-tscore"),
 }
 
 
 def agg_midway_linear(wildcards, beta: bool = False):
     """ return a list of midway linear files """
-    if wildcards.switch.startswith("extension"):
+    if wildcards.switch.startswith("extension-"):
         switches = switch_ext_mode[wildcards.switch]
         expand_partial = expand
         if beta:
@@ -196,7 +198,7 @@ fill_out_globals_midway = lambda wildcards, val: expand(
     sampsize=wildcards.sampsize,
     sim_mode=("hap",),
     allow_missing=True,    
-) if wildcards.switch.startswith("extension") else expand(
+) if wildcards.switch.startswith("extension-") else expand(
     val,
     sampsize=wildcards.sampsize,
     switch=wildcards.switch,
@@ -238,7 +240,7 @@ linears_glob = lambda wildcards, method = fill_out_globals_midway: (expand(
     ),
     switch="{"+",".join(switch_ext_mode[wildcards.switch])+"}",
     allow_missing=True,    
-) if wildcards.switch.startswith("extension") else expand(
+) if wildcards.switch.startswith("extension-") else expand(
     re.sub(
         r"\{(?!sim_mode\})[^}]+\}", "*",
         method(wildcards, config["midway_linear"])[0],
@@ -342,8 +344,8 @@ rule midway:
         linears=partial(agg_midway_linear, beta=True),
         snplists=agg_ld_range_causal,
     params:
-        case_type=lambda wildcards: "switch" if wildcards.switch.startswith("extension") else "sim_mode",
-        pos_type=lambda wildcards: "bic" if wildcards.switch.startswith("extension") else "hap",
+        case_type=lambda wildcards: "switch" if wildcards.switch.startswith("extension-") else "sim_mode",
+        pos_type=lambda wildcards: wildcards.switch[len("extension-"):] if wildcards.switch.startswith("extension-") else "hap",
         linears=lambda wildcards: fill_out_globals_midway(wildcards, config["midway_linear"]),
         causal_hap = lambda wildcards: fill_out_globals_midway(wildcards, config["causal_hap"]),
         linears_glob = partial(linears_glob, method=fill_out_globals_midway),
@@ -375,8 +377,8 @@ rule midway_beta:
         linears=agg_midway_linear,
         snplists=agg_ld_range_causal,
     params:
-        case_type=lambda wildcards: "switch" if wildcards.switch.startswith("extension") else "sim_mode",
-        pos_type=lambda wildcards: "bic" if wildcards.switch.startswith("extension") else "hap",
+        case_type=lambda wildcards: "switch" if wildcards.switch.startswith("extension-") else "sim_mode",
+        pos_type=lambda wildcards: wildcards.switch[len("extension-"):] if wildcards.switch.startswith("extension-") else "hap",
         linears=lambda wildcards: fill_out_globals_midway_beta(wildcards, config["midway_linear"]),
         causal_hap = lambda wildcards: fill_out_globals_midway_beta(wildcards, config["causal_hap"]),
         linears_glob = partial(linears_glob, method=fill_out_globals_midway_beta),
