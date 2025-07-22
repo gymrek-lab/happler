@@ -189,7 +189,7 @@ elif [ "$condition" -eq 6 ] || [ "$condition" -eq 7 ]; then
     elif [ "$condition" -eq 7 ]; then
         extra_flag="--mode tscore"
     fi
-    python "$SCRIPT_DIR"/extension-bic.py \
+    python "$SCRIPT_DIR"/extension_bic.py \
     $extra_flag \
     --verbosity DEBUG \
     -o "$out_prefix".ttest.linear \

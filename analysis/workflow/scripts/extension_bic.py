@@ -15,73 +15,16 @@ from happler.tree.assoc_test import NodeResultsExtra
 from happler.tree.terminator import BICTerminator, TTestTerminator
 from happler.tree.assoc_test import AssocTestSimpleSM, AssocTestSimpleSMTScore
 
-@click.command()
-@click.argument("hap", type=click.Path(exists=True, path_type=Path))
-@click.argument("hap_gts", type=click.Path(exists=True, path_type=Path))
-@click.argument("og_gts", type=click.Path(exists=True, path_type=Path))
-@click.argument("phenotype", type=click.Path(exists=True, path_type=Path))
-@click.option(
-    "--maf",
-    type=float,
-    default=None,
-    show_default="no filtering",
-    help="Ignore variants with a MAF below this threshold",
-)
-@click.option(
-    "-m",
-    "--mode",
-    type=click.Choice(["tscore", "bic"]),
-    default="bic",
-    show_default=True,
-    help="The type of values to compute",
-)
-@click.option(
-    "-o",
-    "--output",
-    type=click.Path(path_type=Path),
-    default=Path("/dev/stdout"),
-    show_default="stdout",
-    help="A transformed genotypes file",
-)
-@click.option(
-    "-v",
-    "--verbosity",
-    type=click.Choice(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
-    default="INFO",
-    show_default=True,
-    help="The level of verbosity desired",
-)
-def main(
-    hap: Path,
-    hap_gts: Path,
-    og_gts: Path,
-    phenotype: Path,
-    maf: float = None,
+
+def get_extension_bf(
+    hp: data.Haplotype,
+    hap_gts: data.Genotypes,
+    og_gts: data.Genotypes,
+    phen: data.Phenotypes,
     mode: str = "bic",
-    output: Path = Path("/dev/stdout"),
-    verbosity: str = "DEBUG",
+    maf: float = None,
+    log: Logger = None,
 ):
-    """
-    Determine the difference in BIC (as a BF) between the hap and its best extension
-    """
-    log = getLogger("extension-bic", verbosity)
-
-    log.info("Loading haplotypes, phenotypes, and genotypes")
-    hp = list(data.Haplotypes.load(hap).data.values())[0]
-    phen = data.Phenotypes.load(phenotype)
-    og_gts = data.GenotypesPLINK(og_gts)
-    og_gts.read(samples=set(phen.samples))
-    phen.subset(samples=og_gts.samples, inplace=True)
-    og_gts.check_missing(discard_also=True)
-    og_gts.check_biallelic(discard_also=True)
-    og_gts.check_maf(threshold=maf, discard_also=True)
-    og_gts.check_phase()
-    hap_gts = data.GenotypesPLINK.load(hap_gts)
-    hap_gts.check_missing()
-    hap_gts.check_maf(threshold=maf)
-    assert len(hap_gts.variants) == 1
-    assert phen.samples == og_gts.samples and phen.samples == hap_gts.samples
-
     log.info("Setting up delta BIC test")
     # parent node model: y ~ h_hap
     parent = Haplotype.from_haptools_haplotype(hp, og_gts)
@@ -175,13 +118,89 @@ def main(
 
     if np.isnan(bf_val):
         raise ValueError("Some BFs were NA")
+    
+    return ext_allele, results, bf_val
+
+
+@click.command()
+@click.argument("hap", type=click.Path(exists=True, path_type=Path))
+@click.argument("hap_gts", type=click.Path(exists=True, path_type=Path))
+@click.argument("og_gts", type=click.Path(exists=True, path_type=Path))
+@click.argument("phenotype", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--maf",
+    type=float,
+    default=None,
+    show_default="no filtering",
+    help="Ignore variants with a MAF below this threshold",
+)
+@click.option(
+    "-m",
+    "--mode",
+    type=click.Choice(["tscore", "bic"]),
+    default="bic",
+    show_default=True,
+    help="The type of values to compute",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(path_type=Path),
+    default=Path("/dev/stdout"),
+    show_default="stdout",
+    help="A transformed genotypes file",
+)
+@click.option(
+    "-v",
+    "--verbosity",
+    type=click.Choice(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
+    default="INFO",
+    show_default=True,
+    help="The level of verbosity desired",
+)
+def main(
+    hap: Path,
+    hap_gts: Path,
+    og_gts: Path,
+    phenotype: Path,
+    maf: float = None,
+    mode: str = "bic",
+    output: Path = Path("/dev/stdout"),
+    verbosity: str = "DEBUG",
+):
+    """
+    Determine the difference in BIC (as a BF) between the hap and its best extension
+    """
+    log = getLogger("extension-bic", verbosity)
+
+    log.info("Loading haplotypes, phenotypes, and genotypes")
+    hp = list(data.Haplotypes.load(hap).data.values())[0]
+    phen = data.Phenotypes.load(phenotype)
+    og_gts = data.GenotypesPLINK(og_gts)
+    og_gts.read(samples=set(phen.samples))
+    phen.subset(samples=og_gts.samples, inplace=True)
+    og_gts.check_missing(discard_also=True)
+    og_gts.check_biallelic(discard_also=True)
+    og_gts.check_maf(threshold=maf, discard_also=True)
+    og_gts.check_phase()
+    hap_gts = data.GenotypesPLINK.load(hap_gts)
+    hap_gts.check_missing()
+    hap_gts.check_maf(threshold=maf)
+    assert len(hap_gts.variants) == 1
+    assert phen.samples == og_gts.samples and phen.samples == hap_gts.samples
+
+    # call method to compute BIC
+    ext_allele, results, bf_val = get_extension_bf(
+        hp, hap_gts, og_gts, phen, mode, maf, log,
+    )
+
 
     log.info("Outputting BF values")
     PLINK_COLS = {
         "#CHROM": hp.chrom,
         "POS": ext_allele[0].pos,
         "ID": ext_allele[0].id,
-        "OBS_CT": num_samps,
+        "OBS_CT": int(len(og_gts.samples)),
         "BETA": results.data["beta"][0],
         "SE": results.data["stderr"][0],
         "P": bf_val,
