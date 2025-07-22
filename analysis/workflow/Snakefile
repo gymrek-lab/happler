@@ -266,7 +266,15 @@ elif mode == "midway":
                 rules.plots_midway.output.png,
                 rules.plots_midway_metrics.output.png,
             ],
-            switch=("tscore", "interact", "bic", "covariance", "interact-bic", "extension-bic"),
+            switch=(
+                # "bic",
+                # "tscore",
+                "interact",
+                # "covariance",
+                "interact-bic",
+                "extension-bic",
+                "extension-tscore",
+            ),
             allow_missing=True,
         ) + expand(
             [
