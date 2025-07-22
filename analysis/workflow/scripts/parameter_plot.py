@@ -1,8 +1,11 @@
 #!/usr/bin/env python
+import copy
 import pickle
 import warnings
+from typing import Union
 from pathlib import Path
 from logging import Logger
+from dataclasses import replace
 
 import click
 import matplotlib
@@ -15,9 +18,15 @@ import matplotlib.pyplot as plt
 from haptools.ld import pearson_corr_ld
 from numpy.lib import recfunctions as rfn
 from scipy.optimize import linear_sum_assignment
-from haptools.data import Genotypes, GenotypesVCF, GenotypesPLINK, Haplotypes
+from haptools.data import Genotypes, GenotypesVCF, GenotypesPLINK, Haplotypes, Phenotypes
+
+from happler.tree.haplotypes import (
+    HapplerVariant as Variant,
+    HapplerHaplotype as Haplotype,
+)
 
 from snakemake_io import glob_wildcards
+from extension_bic import get_extension_bf
 
 
 DTYPES = {
@@ -35,8 +44,14 @@ LOG_SCALE = {}
 
 plt.rcParams['figure.dpi'] = 400  # Set the figure DPI to 300
 plt.rcParams['savefig.dpi'] = plt.rcParams['figure.dpi']  # Set the DPI for saving figures
+warnings.filterwarnings("ignore", message="Mean of empty slice", category=RuntimeWarning)
+warnings.filterwarnings("ignore", message="All-NaN axis encountered", category=RuntimeWarning)
 
-def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes) -> tuple:
+def match_haps(
+    gts: Genotypes,
+    observed: Union[Haplotype, Haplotypes],
+    causal: Union[Haplotype, Haplotypes],
+) -> tuple:
     """
     Match the observed and causal haplotypes to maximize best pairwise LD
 
@@ -47,9 +62,9 @@ def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes) -> tupl
     ----------
     gts: Genotypes
         The set of genotypes for each of the variants in the haplotypes
-    observed: Path
+    observed: Haplotype|Haplotypes
         A path to a .hap file containing haplotypes output by happler
-    causal: Path
+    causal: Haplotype|Haplotypes
         A path to a .hap file containing a simulated causal haplotype
 
     Returns
@@ -68,8 +83,14 @@ def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes) -> tupl
         An array of boolean values indicating whether each observed haplotype has a match
         in the causal haplotypes
     """
-    obs = observed.transform(gts).data.sum(axis=2)
-    exp = causal.transform(gts).data.sum(axis=2)
+    if isinstance(observed, Haplotypes):
+        obs = observed.transform(gts).data.sum(axis=2)
+    else:
+        obs = observed.transform(gts).sum(axis=1)[:,np.newaxis]
+    if isinstance(causal, Haplotypes):
+        exp = causal.transform(gts).data.sum(axis=2)
+    else:
+        exp = causal.transform(gts).sum(axis=1)[:,np.newaxis]
     # Compute the pairwise LD between each observed and causal haplotype
     # The rows and columns of ld_mat both correspond to the observed and causal haps in
     # the order they were given. For example, if there is 1 observed hap and 3 causal
@@ -98,13 +119,69 @@ def match_haps(gts: Genotypes, observed: Haplotypes, causal: Haplotypes) -> tupl
     return ld_mat, row_idx, col_idx, extras_labels, extras_labels_bool
 
 
+def hap_subsets(hap: Haplotype, log: Logger = None):
+    """
+    Yield subsets of a haplotype that increase in size by one variant/allele at a time
+
+    Parameters
+    ----------
+    hap: Haplotype
+    log: Logger, optional
+
+    Yields
+    ------
+    Iterator[Haplotype, float]
+        The haplotype and its Bayes factor value compared to its parent
+    """
+    variants = hap.variants
+    for i in range(1, len(variants)):
+        hp = replace(hap)
+        hp.variants = variants[:i]
+        bf = np.exp((variants[i-1].score - variants[i].score)/2)
+        yield hp, bf
+
+
+def optimize_all_observed_haps(
+    gts: Genotypes,
+    observed: Haplotypes,
+    causal: Haplotype,
+    log: Logger = None,
+):
+    optimized_haps = []
+    best_bfs = []
+
+    # Pre-transform causal hap once
+    causal_vec = causal.transform(gts).sum(axis=1)[:, np.newaxis]
+
+    for hap_id, hap in observed.data.items():
+        best_ld = 0
+        best_sub = hap
+        best_bf = None
+
+        for hp_sub, bf_sub in hap_subsets(hap):
+            sub_obs = hp_sub.transform(gts).sum(axis=1)[:, np.newaxis]
+            ld = np.abs(pearson_corr_ld(sub_obs, causal_vec))[0, 0]
+
+            if ld > best_ld:
+                best_ld = ld
+                best_sub = hp_sub
+                best_bf = bf_sub
+
+        optimized_haps.append(best_sub)
+        best_bfs.append(best_bf if best_bf is not None else 0.0)
+
+    return optimized_haps, np.array(best_bfs)
+
+
 def get_best_ld(
     gts: GenotypesVCF,
     observed_hap: Path,
     causal_hap: Path,
     region: str = None,
+    maf: float = None,
     observed_id: str = None,
     causal_id: str = None,
+    pheno: Path = None,
     log: Logger = None
 ):
     """
@@ -120,19 +197,36 @@ def get_best_ld(
         A path to a .hap file containing a simulated causal haplotype
     region: str, optional
         Only load genotypes from this region (or the entire file, otherwise)
+    maf: float, optional
+        Ignore variants with an MAF below this threshold
     observed_id: str, optional
         The ID to load from the observed_hap file (or just all of the IDs, otherwise)
     causal_id: str, optional
         The ID to load from the causal_hap file (or just the first hap, otherwise)
+    pheno: Path, optional
+        Should we also output the optimal bayes factor thresholds for the observed and
+        causal haps? This assumes that the V scores in the hap files are BIC values and
+        only works if the causal haps files have a single hap in them.
     log: Logger, optional
         A logging module to pass to haptools
+
+    Returns
+    -------
+    observed_ld : np.ndarray
+        The best LD value for each observed haplotype vs the causal
+    extras_labels : np.ndarray
+        The index of the causal haplotype that each observed haplotype is matched to
+    labels_bool : np.ndarray
+        Boolean array indicating which observed haps have a causal match
+    best_thresholds : np.ndarray, optional
+        The Bayes factor threshold that gave the best LD (if optimize_thresh is True)
     """
     # load the causal haplotype given by 'causal_id' or just the first hap
     causal_hap = Haplotypes(causal_hap, log=log)
     causal_hap.read(haplotypes=(set((causal_id,)) if causal_id is not None else None))
 
     # load the observed haplotype given by 'observed_id' or just all of the haps
-    observed_hap = Haplotypes(observed_hap, log=log)
+    observed_hap = Haplotypes(observed_hap, haplotype=Haplotype, variant=Variant, log=log)
     observed_hap.read(haplotypes=(set((observed_id,)) if observed_id is not None else None))
 
     # if there are no observed haplotypes, then we can't compute LD
@@ -153,22 +247,58 @@ def get_best_ld(
         for v in observed_hap.data[hap].variants
     })
     gts._var_idx = None
+    og_gts = copy.deepcopy(gts)
     gts.read(variants=variants, region=region)
     gts.check_phase()
     gts.check_missing()
     gts.check_biallelic()
 
+    # if requested, try to optimize the LD values by incrementally subsetting the
+    # haplotypes that matched with causal haplotypes
+    if pheno is not None:
+        assert len(causal_hap.data) == 1, "Only one causal haplotype is supported when --phenos is set."
+        causal_hap_single = next(iter(causal_hap.data.values()))
+        hap_gts = causal_hap.transform(gts)
+        phen = Phenotypes.load(pheno)
+        og_gts.read(samples=set(phen.samples))
+        phen.subset(samples=og_gts.samples, inplace=True)
+        og_gts.check_missing(discard_also=True)
+        og_gts.check_biallelic(discard_also=True)
+        og_gts.check_maf(threshold=maf, discard_also=True)
+        og_gts.check_phase()
+        _, _, causal_best_bf = get_extension_bf(
+            causal_hap_single, hap_gts, og_gts, phen, mode="bic", maf=maf, log=log,
+        )
+
+        # Optimize all observed haps
+        # Take subsets of them until we find the subset that 
+        optimized_hap_list, best_bfs = optimize_all_observed_haps(
+            gts, observed_hap, causal_hap_single, log=log
+        )
+
+        # Replace observed haplotype data with optimized ones
+        for hap_id, opt_hap in zip(observed_hap.data.keys(), optimized_hap_list):
+            observed_hap.data[hap_id] = opt_hap
+
     # compute LD between every observed haplotype and the causal haplotype
     observed_ld, best_row_idx, best_col_idx, extras_labels, labels_bool = match_haps(
         gts, observed_hap, causal_hap,
     )
-    # return the strongest possible LD for each observed hap with a causal hap
+
+    # get the strongest possible LD for each observed hap with a causal hap
     # note: incidentally, extras_labels[best_row_idx] will always be the same as best_col_idx
-    return (
-        observed_ld[best_row_idx, best_col_idx],
-        extras_labels[best_row_idx],
-        labels_bool[best_row_idx],
-    )
+    observed_ld = observed_ld[best_row_idx, best_col_idx]
+    extra_labels = extras_labels[best_row_idx]
+    labels_bool = labels_bool[best_row_idx]
+
+    if pheno is not None:
+        # reorder to match observed_ld order
+        best_bfs = best_bfs[best_row_idx]
+        # mark unmatched haps
+        best_bfs[~labels_bool] = np.nan
+        return observed_ld, extra_labels, labels_bool, best_bfs, causal_best_bf
+    else:
+        return observed_ld, extra_labels, labels_bool
 
 
 def get_finemap_metrics(
@@ -319,6 +449,7 @@ def plot_params(
     val_color,
     metrics: dict = None,
     hide_extras: bool = False,
+    best_bf_vals=None,
 ):
     """
     Plot vals against parameter values
@@ -340,6 +471,8 @@ def plot_params(
         containing means and standard errors of fine-mapping metrics for each observed hap
     hide_extras: bool, optional
         Whether to hide the observed haps that have no causal hap match
+    best_bf_vals: npt.NDArray
+        A numpy array of numpy arrays containing the best BF values
     """
     figsize = matplotlib.rcParams["figure.figsize"]
     params = remove_same_valued_columns(params)
@@ -347,24 +480,24 @@ def plot_params(
         figsize[0] = len(params) / 15
     num_rows = len(params.dtype)
     if metrics is not None:
-        num_rows = len(params.dtype) + len(metrics)
+        num_rows += len(metrics)
+    if best_bf_vals is not None:
+        num_rows += 1
     if num_rows > 5:
         figsize[1] = num_rows * 1.25
+
     fig, axs = plt.subplots(
-        nrows=num_rows+1, ncols=1,
+        nrows=num_rows + 1, ncols=1,
         sharex=True, figsize=figsize,
     )
     fig.subplots_adjust(hspace=0)
-    # create a plot for the vals, first
+
+    # main LD values
     x_vals = [j for j, arr in enumerate(vals) for i in arr]
     val_color = ["green" if j else "red" for i in val_color for j in i]
     vals = np.concatenate(vals)
     vals_sem = np.concatenate(vals_sem)
-    for v in sorted(
-        zip(x_vals, vals, vals_sem, val_color),
-        key=lambda x: x[3],
-        reverse=True
-    ):
+    for v in sorted(zip(x_vals, vals, vals_sem, val_color), key=lambda x: x[3], reverse=True):
         if hide_extras and v[3] != "green":
             continue
         axs[0].errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=3)
@@ -372,7 +505,8 @@ def plot_params(
     axs[0].set_xticks(range(0, len(np.unique(x_vals))))
     axs[0].set_xticklabels([])
     axs[0].set_ylim(None, 1)
-    # now, plot each of the parameter values on the other axes
+
+    # parameter plots
     for idx, param in enumerate(params.dtype.names):
         val_title = param
         if param in LOG_SCALE:
@@ -380,21 +514,32 @@ def plot_params(
             val_title = "-log " + val_title
         axs[idx+1].plot(params[param], "-")
         axs[idx+1].set_ylabel(val_title, rotation="horizontal", ha="right")
+
+    offset = len(params.dtype) + 1
+
+    # fine-mapping metrics
     if metrics is not None:
         for idx, metric in enumerate(metrics.keys()):
-            curr_ax = axs[idx+len(params.dtype)+1]
-            val_title = metric
+            curr_ax = axs[offset + idx]
             vals = np.concatenate(metrics[metric][0])
             vals_sem = np.concatenate(metrics[metric][1])
-            for v in sorted(
-                zip(x_vals, vals, vals_sem, val_color),
-                key=lambda x: x[3],
-                reverse=True
-            ):
+            for v in sorted(zip(x_vals, vals, vals_sem, val_color), key=lambda x: x[3], reverse=True):
                 if hide_extras and v[3] != "green":
                     continue
                 curr_ax.errorbar(v[0], v[1], yerr=v[2], marker="o", c=v[3], markersize=3)
-            curr_ax.set_ylabel(val_title, rotation="horizontal", ha="right")
+            curr_ax.set_ylabel(metric, rotation="horizontal", ha="right")
+
+    # best_bf panel
+    if best_bf_vals is not None:
+        curr_ax = axs[-1]
+        vals = np.concatenate(best_bf_vals)
+        vals_sem = np.full_like(vals, np.nan)
+        for v in sorted(zip(x_vals, vals, vals_sem, val_color), key=lambda x: x[3], reverse=True):
+            if hide_extras and v[3] != "green":
+                continue
+            curr_ax.errorbar(v[0], v[1], yerr=None, marker="o", c=v[3], markersize=3)
+        curr_ax.set_ylabel("Best BF", rotation="horizontal", ha="right")
+
     draw_vertical_gridlines(fig, axs, len(np.unique(x_vals)))
     return fig
 
@@ -456,7 +601,9 @@ def group_by_rep(
     vals,
     causal_idxs,
     bools,
-    metrics = None,
+    metrics=None,
+    extra_vals=None,
+    extra_vals_2=None,
 ):
     """
     Group replicates with identical parameter values
@@ -475,88 +622,139 @@ def group_by_rep(
         An array of boolean values indicating whether each observed haplotype has a match
     metrics: npt.NDArray
         A numpy array of numpy arrays containing the metrics for each observed hap
-
-    Returns
-    -------
-    npt.NDArray
-        A numpy array of the unique parameter values
-    npt.NDArray
-        A numpy array containing the mean and std of the values over the replicates
     """
     other_param_names = [name for name in params.dtype.names if name != "rep"]
     grouped_params = np.unique(params[other_param_names])
     get_mean_std = lambda x: (np.nanmean(x), sem(x, nan_policy="omit") if len(x) > 1 else np.nan)
     filter_causal_idxs = lambda x: np.unique(x[x != np.iinfo(np.uint8).max])
+
     grouped_vals = []
     grouped_sem = []
     grouped_bools = []
     grouped_metrics = []
     grouped_metrics_sem = []
+    grouped_extra = [] if extra_vals is not None else None
+    grouped_extra_2 = [] if extra_vals_2 is not None else None
+
+    def safe_index(val, indices, mask):
+        """Ensure val and mask shapes match before indexing."""
+        val = np.asarray(val)
+        indices = np.asarray(indices)
+        mask = np.asarray(mask)
+        if val.shape != mask.shape:
+            if val.size == 1:
+                val = np.full(mask.shape, val.item())
+            else:
+                return np.array([], dtype=val.dtype)
+        return val[mask]
+
     for group in grouped_params:
         subgrouped_vals = []
         subgrouped_sem = []
         subgrouped_bools = []
         subgrouped_metrics = []
         subgrouped_metrics_sem = []
+        subgrouped_extra = []
+        subgrouped_extra_2 = []
+
         curr_vals = vals[params[other_param_names] == group]
         curr_causal_idxs = causal_idxs[params[other_param_names] == group]
         curr_bools = bools[params[other_param_names] == group]
-        curr_metrics = None
-        if metrics is not None:
-            curr_metrics = metrics[params[other_param_names] == group]
-        # compute mean and std err for each causal match
+        curr_metrics = metrics[params[other_param_names] == group] if metrics is not None else None
+        curr_extra_vals = extra_vals[params[other_param_names] == group] if extra_vals is not None else None
+        curr_extra_vals_2 = extra_vals_2[params[other_param_names] == group] if extra_vals_2 is not None else None
+
         for causal_idx in filter_causal_idxs(np.concatenate(curr_causal_idxs)):
             try:
-                curr_vals_causal_idxs = np.concatenate([
-                    val[(indices == causal_idx) & curr_bool]
+                curr_vals_causal = np.concatenate([
+                    safe_index(val, indices, (indices == causal_idx) & curr_bool)
                     for val, indices, curr_bool in zip(curr_vals, curr_causal_idxs, curr_bools)
                 ])
             except ValueError:
                 continue
-            val_mean, val_sem = get_mean_std(curr_vals_causal_idxs)
+            val_mean, val_sem = get_mean_std(curr_vals_causal)
             subgrouped_vals.append(val_mean)
             subgrouped_sem.append(val_sem)
             subgrouped_bools.append(True)
+
             if curr_metrics is not None:
-                curr_metrics_causal_idxs = np.concatenate([
-                    val[(indices == causal_idx) & curr_bool]
+                curr_metrics_causal = np.concatenate([
+                    safe_index(val, indices, (indices == causal_idx) & curr_bool)
                     for val, indices, curr_bool in zip(curr_metrics, curr_causal_idxs, curr_bools)
                 ])
-                metrics_mean, metrics_sem = get_metrics_mean_std(curr_metrics_causal_idxs)
+                metrics_mean, metrics_sem = get_metrics_mean_std(curr_metrics_causal)
                 subgrouped_metrics.append(metrics_mean)
                 subgrouped_metrics_sem.append(metrics_sem)
-            # compute mean and std err for each unmatched observed hap
+
+            if curr_extra_vals is not None:
+                curr_extra_causal = np.concatenate([
+                    safe_index(val, indices, (indices == causal_idx) & curr_bool)
+                    for val, indices, curr_bool in zip(curr_extra_vals, curr_causal_idxs, curr_bools)
+                ])
+                subgrouped_extra.append(np.nanmean(curr_extra_causal))
+
+            if curr_extra_vals_2 is not None:
+                curr_extra_causal_2 = np.concatenate([
+                    safe_index(val, indices, (indices == causal_idx) & curr_bool)
+                    for val, indices, curr_bool in zip(curr_extra_vals_2, curr_causal_idxs, curr_bools)
+                ])
+                subgrouped_extra_2.append(np.nanmean(curr_extra_causal_2))
+
+            # unmatched haps
             for unmatched_idx in range(max([(~i).sum() for i in curr_bools])):
                 try:
-                    curr_vals_unmatched_idxs = np.array([
-                        val[(indices == causal_idx) & ~curr_bool][unmatched_idx]
+                    curr_vals_unmatched = np.array([
+                        safe_index(val, indices, (indices == causal_idx) & ~curr_bool)[unmatched_idx]
                         for val, indices, curr_bool in zip(curr_vals, curr_causal_idxs, curr_bools)
-                        if unmatched_idx < ((indices == causal_idx) & ~curr_bool).sum()
+                        if unmatched_idx < safe_index(val, indices, (indices == causal_idx) & ~curr_bool).shape[0]
                     ])
                 except ValueError:
                     continue
-                val_mean, val_sem = get_mean_std(curr_vals_unmatched_idxs)
+                val_mean, val_sem = get_mean_std(curr_vals_unmatched)
                 subgrouped_vals.append(val_mean)
                 subgrouped_sem.append(val_sem)
                 subgrouped_bools.append(False)
+
                 if curr_metrics is not None:
-                    curr_metrics_unmatched_idxs = np.array([
-                        val[(indices == causal_idx) & ~curr_bool][unmatched_idx]
+                    curr_metrics_unmatched = np.array([
+                        safe_index(val, indices, (indices == causal_idx) & ~curr_bool)[unmatched_idx]
                         for val, indices, curr_bool in zip(curr_metrics, curr_causal_idxs, curr_bools)
-                        if unmatched_idx < ((indices == causal_idx) & ~curr_bool).sum()
+                        if unmatched_idx < safe_index(val, indices, (indices == causal_idx) & ~curr_bool).shape[0]
                     ])
-                    metrics_mean, metrics_sem = get_metrics_mean_std(curr_metrics_unmatched_idxs)
+                    metrics_mean, metrics_sem = get_metrics_mean_std(curr_metrics_unmatched)
                     subgrouped_metrics.append(metrics_mean)
                     subgrouped_metrics_sem.append(metrics_sem)
+
+                if curr_extra_vals is not None:
+                    curr_extra_unmatched = np.array([
+                        safe_index(val, indices, (indices == causal_idx) & ~curr_bool)[unmatched_idx]
+                        for val, indices, curr_bool in zip(curr_extra_vals, curr_causal_idxs, curr_bools)
+                        if unmatched_idx < safe_index(val, indices, (indices == causal_idx) & ~curr_bool).shape[0]
+                    ])
+                    subgrouped_extra.append(np.nanmean(curr_extra_unmatched))
+
+                if curr_extra_vals_2 is not None:
+                    curr_extra_unmatched_2 = np.array([
+                        safe_index(val, indices, (indices == causal_idx) & ~curr_bool)[unmatched_idx]
+                        for val, indices, curr_bool in zip(curr_extra_vals_2, curr_causal_idxs, curr_bools)
+                        if unmatched_idx < safe_index(val, indices, (indices == causal_idx) & ~curr_bool).shape[0]
+                    ])
+                    subgrouped_extra_2.append(np.nanmean(curr_extra_unmatched_2))
+
         grouped_vals.append(np.array(subgrouped_vals, dtype=object))
         grouped_sem.append(np.array(subgrouped_sem, dtype=object))
         grouped_bools.append(np.array(subgrouped_bools, dtype=object))
         if curr_metrics is not None:
             grouped_metrics.append(np.array(subgrouped_metrics, dtype=object))
             grouped_metrics_sem.append(np.array(subgrouped_metrics_sem, dtype=object))
+        if curr_extra_vals is not None:
+            grouped_extra.append(np.array(subgrouped_extra, dtype=object))
+        if curr_extra_vals_2 is not None:
+            grouped_extra_2.append(np.array(subgrouped_extra_2, dtype=object))
+
     if curr_metrics is not None:
-        return grouped_params, grouped_vals, grouped_sem, grouped_bools, grouped_metrics, grouped_metrics_sem
-    return grouped_params, grouped_vals, grouped_sem, grouped_bools
+        return grouped_params, grouped_vals, grouped_sem, grouped_bools, grouped_metrics, grouped_metrics_sem, grouped_extra, grouped_extra_2
+    return grouped_params, grouped_vals, grouped_sem, grouped_bools, grouped_extra, grouped_extra_2
 
 
 @click.command()
@@ -596,6 +794,13 @@ def group_by_rep(
     For this to work, the VCF must be indexed and the seqname must match!""",
 )
 @click.option(
+    "--maf",
+    type=float,
+    default=None,
+    show_default="no filtering",
+    help="Ignore variants with a MAF below this threshold",
+)
+@click.option(
     "-i",
     "--observed-id",
     type=str,
@@ -631,6 +836,13 @@ def group_by_rep(
     help="The order of the parameters in the plot, as a comma-separated list",
 )
 @click.option(
+    "--phenos",
+    type=Path,
+    default=None,
+    show_default=True,
+    help="If passed, the optimal BF threshold is also plotted",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -654,11 +866,13 @@ def main(
     metrics: Path = None,
     use_metric: str = None,
     region: str = None,
+    maf: float = None,
     observed_id: str = None,
     causal_id: str = None,
     hide_extras: bool = False,
     pickle_out: bool = False,
     order: str = None,
+    phenos: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "ERROR",
 ):
@@ -707,21 +921,35 @@ def main(
     get_hap_fname = lambda hap_path, param_set: Path(str(hap_path).format(**dict(zip(dtypes.keys(), param_set))))
 
     # compute LD between the causal hap and the best observed hap across param vals
-    ld_vals, ld_extras_idxs, ld_extras_bool = zip(*tuple(
+    all_ld_values = zip(*tuple(
         get_best_ld(
             gts,
             get_hap_fname(observed_hap, params[idx]),
             get_hap_fname(causal_hap, params[idx]),
             region=region,
+            maf=maf,
             observed_id=observed_id,
             causal_id=causal_id,
+            pheno=get_hap_fname(phenos, params[idx]),
             log=log
         )
         for idx in range(len(params))
     ))
+    optimize_thresh = phenos is not None
+    if optimize_thresh:
+        ld_vals, ld_extras_idxs, ld_extras_bool, best_bf, causal_best_bf = all_ld_values
+        best_bf = np.array(best_bf, dtype=object)
+        causal_best_bf = np.array(causal_best_bf, dtype=object)
+    else:
+        ld_vals, ld_extras_idxs, ld_extras_bool = all_ld_values
+        best_bf = None
     ld_vals = np.array(ld_vals, dtype=object)
     ld_extras_idxs = np.array(ld_extras_idxs, dtype=object)
     ld_extras_bool = np.array(ld_extras_bool, dtype=object)
+
+    with open(output.with_suffix(".causal.pickle"), "wb") as f:
+        pickle.dump([causal_best_bf], f)
+    
 
     # extract fine-mapping metrics for the observed hap
     if metrics is not None:
@@ -732,8 +960,8 @@ def main(
             )
             for idx in range(len(params))
         ], dtype=object)
-        params, ld_vals, ld_sem, ld_extras_bool, metrics_vals, metrics_vals_sem = group_by_rep(
-            params, ld_vals, ld_extras_idxs, ld_extras_bool, metrics,
+        params, ld_vals, ld_sem, ld_extras_bool, metrics_vals, metrics_vals_sem, best_bf_grouped, causal_best_bf_grouped = group_by_rep(
+            params, ld_vals, ld_extras_idxs, ld_extras_bool, metrics, extra_vals=best_bf, extra_vals_2=causal_best_bf,
         )
         extract_metrics_vals = lambda x, idx: np.array([i[:, idx] for i in x], dtype=object)
         metrics = {
@@ -743,17 +971,17 @@ def main(
             ) for idx, name in enumerate(metrics[0].dtype.names)
         }
     else:
-        params, ld_vals, ld_sem, ld_extras_bool = group_by_rep(
-            params, ld_vals, ld_extras_idxs, ld_extras_bool,
+        params, ld_vals, ld_sem, ld_extras_bool, best_bf_grouped, causal_best_bf_grouped = group_by_rep(
+            params, ld_vals, ld_extras_idxs, ld_extras_bool, extra_vals=best_bf, extra_vals_2=causal_best_bf,
         )
     del dtypes["rep"]
 
     if pickle_out:
         with open(output.with_suffix(".pickle"), "wb") as f:
             if metrics is not None:
-                pickle.dump([params, ld_vals, ld_sem, ld_extras_bool, metrics], f)
+                pickle.dump([params, ld_vals, ld_sem, ld_extras_bool, metrics, best_bf_grouped, causal_best_bf_grouped], f)
             else:
-                pickle.dump([params, ld_vals, ld_sem, ld_extras_bool], f)
+                pickle.dump([params, ld_vals, ld_sem, ld_extras_bool, best_bf_grouped, causal_best_bf_grouped], f)
 
     diff_dtype = remove_same_valued_columns(params).dtype
     if use_metric is None:
@@ -765,7 +993,8 @@ def main(
                 "Observed LD",
                 ld_extras_bool,
                 metrics=metrics,
-                hide_extras=hide_extras
+                hide_extras=hide_extras,
+                best_bf_vals=best_bf_grouped,
             )
         elif len(diff_dtype) == 1:
             fig = plot_params_simple(
@@ -774,7 +1003,7 @@ def main(
                 ld_sem,
                 "Observed LD",
                 ld_extras_bool,
-                hide_extras=hide_extras
+                hide_extras=hide_extras,
             )
     else:
         if len(diff_dtype) > 2:
@@ -784,7 +1013,7 @@ def main(
                 metrics[use_metric][1],
                 use_metric,
                 ld_extras_bool,
-                hide_extras=hide_extras
+                hide_extras=hide_extras,
             )
         elif len(diff_dtype) == 1:
             fig = plot_params_simple(
@@ -794,7 +1023,7 @@ def main(
                 use_metric,
                 ld_extras_bool,
                 ld_extras_bool,
-                hide_extras=hide_extras
+                hide_extras=hide_extras,
             )
 
     fig.tight_layout()
