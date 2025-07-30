@@ -234,7 +234,6 @@ class BICTerminator(Terminator):
             bf = parent_res.bic - results.data["bic"]
             # compute the bayes factor approximation from the delta BIC:
             # https://easystats.github.io/bayestestR/reference/bic_to_bf.html
-            bf = np.exp(bf / 2)
             bf = bf[best_idx]
         return bic, bf
 

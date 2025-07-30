@@ -137,7 +137,7 @@ def hap_subsets(hap: Haplotype, log: Logger = None):
     for i in range(1, len(variants)):
         hp = replace(hap)
         hp.variants = variants[:i]
-        bf = np.exp((variants[i-1].score - variants[i].score)/2)
+        bf = variants[i-1].score - variants[i].score
         yield hp, bf
 
 
