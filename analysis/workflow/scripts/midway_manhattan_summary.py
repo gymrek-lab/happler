@@ -5,6 +5,7 @@ import warnings
 from pathlib import Path
 from decimal import Decimal
 from functools import partial
+from collections.abc import Callable
 
 import click
 import matplotlib
@@ -144,6 +145,7 @@ def get_pval(
     linear: Path,
     snp_id: str,
     bic: bool = False,
+    tsfm_func: Callable = None,
     log: logging.Logger = None
 ) -> float:
     """
@@ -174,10 +176,8 @@ def get_pval(
         pval = df.pval[0]
     else:
         pval = df[df.id == snp_id].iloc[0]["pval"]
-    if bic:
-        pval = math.log(pval)
-    else:
-        pval = -np.log10(pval)
+    if tsfm_func is not None:
+        pval = tsfm_func(pval)
     return np.float64(pval)
 
 
@@ -440,12 +440,15 @@ def main(
         is_finemap_metric = True
 
     # if this is a pval, take the -log10 of it, otherwise take the ln of it
+    scatter_tsfm_label = ""
     if kind == "pval":
         tsfm_pval = lambda pval: -np.log10(pval) if pval != 0 else np.inf
         rvrs_tsfm = lambda pval: np.power(10, -pval)
+        scatter_tsfm_label = "-log10 "
     elif bic:
-        tsfm_pval = lambda val: np.log(val) if val != 0 else -np.inf
-        rvrs_tsfm = lambda pval: np.power(10, pval)
+        tsfm_pval = lambda val: math.log(val) if val != 0 else -np.inf
+        rvrs_tsfm = lambda pval: np.exp(pval)
+        scatter_tsfm_label = "ln "
     elif reverse:
         tsfm_pval = lambda val: -val
         rvrs_tsfm = lambda pval: -pval        
@@ -555,7 +558,7 @@ def main(
     if is_finemap_metric:
         get_val_method = partial(get_pip, target_metric=kind)
     else:
-        get_val_method = partial(get_pval, bic=bic)
+        get_val_method = partial(get_pval, bic=bic, tsfm_func=tsfm_pval)
     vals = np.array(
         [
             [
@@ -616,10 +619,7 @@ def main(
             fdr[np.isnan(fdr)] = 0
         # find the threshold (last index) where FDR <= 0.05
         thresh_idx = np.where(fdr <= 0.05)[0][-1]
-        if bic:
-            optimal_thresh = roc_threshold[thresh_idx]
-        else:
-            optimal_thresh = rvrs_tsfm(roc_threshold[thresh_idx])
+        optimal_thresh = rvrs_tsfm(roc_threshold[thresh_idx])
         final_metrics["Significance Threshold"] = optimal_thresh
         if thresh is not None:
             thresh_idx = np.argmax(roc_threshold < tsfm_pval(thresh))
@@ -712,10 +712,10 @@ def main(
             else:
                 threshold_type = ""
         fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
-        if not no_log10 and not is_finemap_metric and not bic:
+        if not no_log10 and not is_finemap_metric:
             thresh = tsfm_pval(thresh)
-    ax.set_xlabel(case_type + ": " + ax_labs[1])
-    ax.set_ylabel(case_type + ": " + ax_labs[0])
+    ax.set_xlabel(scatter_tsfm_label + case_type + ": " + ax_labs[1])
+    ax.set_ylabel(scatter_tsfm_label + case_type + ": " + ax_labs[0])
     ax.axline((0,0), (vals.max(), vals.max()), linestyle="--", color="orange")
     if thresh is not None and thresh != 0:
         ax.axhline(thresh, color="red")
