@@ -445,10 +445,6 @@ def main(
         tsfm_pval = lambda pval: -np.log10(pval) if pval != 0 else np.inf
         rvrs_tsfm = lambda pval: np.power(10, -pval)
         scatter_tsfm_label = "-log10 "
-    elif bic:
-        tsfm_pval = lambda val: math.log(val) if val != 0 else -np.inf
-        rvrs_tsfm = lambda pval: np.exp(pval)
-        scatter_tsfm_label = "ln "
     elif reverse:
         tsfm_pval = lambda val: -val
         rvrs_tsfm = lambda pval: -pval        
@@ -577,8 +573,7 @@ def main(
     # remove any rows that were nan or greater than max-val (which defaults to inf)
     if no_log10:
         if max_val == float("inf"):
-            if not bic:
-                max_val = 1
+            max_val = 1
         na_rows = np.isnan(vals).any(axis=1) | (rvrs_tsfm(vals) >= max_val).any(axis=1)
     else:
         na_rows = np.isnan(vals).any(axis=1) | (vals >= max_val).any(axis=1)
@@ -712,6 +707,7 @@ def main(
             else:
                 threshold_type = ""
         fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
+        fig.text(0.98, 0.95, f'Optimal threshold: {final_metrics["Significance Threshold"]:.2f}', ha='right', va='top', fontsize=15)
         if not no_log10 and not is_finemap_metric:
             thresh = tsfm_pval(thresh)
     ax.set_xlabel(scatter_tsfm_label + case_type + ": " + ax_labs[1])

@@ -350,7 +350,7 @@ rule midway:
         causal_hap = lambda wildcards: fill_out_globals_midway(wildcards, config["causal_hap"]),
         linears_glob = partial(linears_glob, method=fill_out_globals_midway),
         bic=lambda wildcards: "--kind bic " if str(wildcards.switch).endswith("bic") else "",
-        thresh=lambda wildcards: "--thresh 10 " if str(wildcards.switch).endswith("bic") else "--thresh 0.05 ",
+        thresh=lambda wildcards: "--thresh 16" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
     output:
         png=out + "/midway_summary.{switch}.pdf",
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
@@ -367,7 +367,7 @@ rule midway:
     shell:
         "workflow/scripts/midway_manhattan_summary.py {params.bic}"
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
-        "-f <(ls -1 {params.linears_glob}) --color locus {params.thresh}"
+        "-f <(ls -1 {params.linears_glob}) --color locus {params.thresh} "
         "{params.linears} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
 
 
@@ -383,7 +383,7 @@ rule midway_beta:
         causal_hap = lambda wildcards: fill_out_globals_midway_beta(wildcards, config["causal_hap"]),
         linears_glob = partial(linears_glob, method=fill_out_globals_midway_beta),
         bic=lambda wildcards: "--kind bic " if str(wildcards.switch).endswith("bic") else "",
-        thresh=lambda wildcards: "--thresh 10 " if str(wildcards.switch).endswith("bic") else "--thresh 0.05 ",
+        thresh=lambda wildcards: "--thresh 16" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
     output:
         png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
         metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
@@ -400,7 +400,7 @@ rule midway_beta:
     shell:
         "workflow/scripts/midway_manhattan_summary.py {params.bic}"
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
-        "-f <(ls -1 {params.linears_glob}) --color locus {params.thresh}"
+        "-f <(ls -1 {params.linears_glob}) --color locus {params.thresh} "
         "{params.linears} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
 
 
@@ -422,7 +422,7 @@ rule finemap:
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
         )[0],
-        thresh=lambda wildcards: "--thresh 0.9 ",
+        thresh=lambda wildcards: "--thresh 0.9",
     output:
         png=out + "/midway_summary.{switch}.pdf",
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
@@ -437,7 +437,7 @@ rule finemap:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py --kind pip {params.thresh}"
+        "workflow/scripts/midway_manhattan_summary.py --kind pip {params.thresh} "
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.finemaps_glob}) --color locus "
         "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
@@ -461,7 +461,7 @@ rule finemap_beta:
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
         )[0],
-        thresh=lambda wildcards: "--thresh 0.9 ",
+        thresh=lambda wildcards: "--thresh 0.9",
     output:
         png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
         metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
@@ -476,7 +476,7 @@ rule finemap_beta:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py --kind pip {params.thresh}"
+        "workflow/scripts/midway_manhattan_summary.py --kind pip {params.thresh} "
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.finemaps_glob}) --color locus "
         "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
@@ -536,7 +536,7 @@ rule midway_metrics:
     params:
         metrics = lambda wildcards: expand(rules.midway_beta.output.metrics, switch=wildcards.switch, allow_missing=True),
         use_flex_axes = lambda wildcards: "--use-flex-axes-limits " if wildcards.switch == "interact" else "",
-        thresh=lambda wildcards: "--thresh 10 " if str(wildcards.switch).endswith("bic") else "--thresh 0.05 ",
+        thresh=lambda wildcards: "--thresh 16" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
     output:
         png=out + "/midway_summary_metrics.{switch}.pdf",
     resources:
