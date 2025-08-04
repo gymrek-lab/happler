@@ -195,6 +195,7 @@ rule subset:
         psam=out+"/subset/{sampsize}.psam",
         log=temp(out+"/subset/{sampsize}.log"),
     resources:
+        mem_mb=8000,
         runtime=12,
     threads: 2
     log:
@@ -204,8 +205,9 @@ rule subset:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --allow-extra-chr --nonfounders --from-bp {params.start} --out {params.out} "
-        "--to-bp {params.end} --chr {params.chrom} --max-alleles 2 {params.maf} "
+        "plink2 --threads {threads} --memory {resources.mem_mb} --allow-extra-chr "
+        "--nonfounders --out {params.out} --max-alleles 2 {params.maf} "
+        "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} "
         "--keep <(grep -Ev '^#' {input.psam} | cut -f1 | shuf --random-source <("
         "openssl enc -aes-256-ctr -pass pass:42 -nosalt < /dev/zero 2>/dev/null"
         ") | head -n {params.sampsize}) --make-pgen --pfile {params.prefix} &>{log}"

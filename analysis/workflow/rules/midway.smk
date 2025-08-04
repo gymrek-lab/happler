@@ -41,8 +41,10 @@ rule manhattan:
         transform_pvar=temp(out + "/{switch}/out.pvar"),
         transform_psam=temp(out + "/{switch}/out.psam"),
     resources:
-        runtime=15,
-        mem_mb=6000,
+        runtime=20,
+        mem_mb=lambda wildcards, input: (
+            rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.8376777564760598 + 406.70450996958743)
+        ) if wildcards.switch == "extension-bic" else 2000,
     log:
         logs + "/{switch}/manhattan",
     benchmark:
