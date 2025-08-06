@@ -659,7 +659,7 @@ def test_1000G_simulated_multihap(capfd):
     hp_file = DATADIR / "19_45401409-46401409_1000G.multi.hap"
     out_hp_file = "test.hap"
 
-    cmd = f"run --threshold 1000 --remove-SNPs --max-signals 3 --max-iterations 3 -o {out_hp_file} {gt_file} {pt_file}"
+    cmd = f"run --remove-SNPs --max-signals 3 --max-iterations 3 -o {out_hp_file} {gt_file} {pt_file}"
     runner = CliRunner()
     result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
     captured = capfd.readouterr()
@@ -723,7 +723,7 @@ def test_1000G_real(capfd, caplog):
     caplog.set_level(logging.INFO)
 
     for maf in (0.05, 0.14, 0.22, 0.23, 0.35):
-        cmd = f"run --out-thresh 1 --threshold 54.7 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
+        cmd = f"run --out-thresh 1 --maf {maf} -o {out_hp_file} {gt_file} {pt_file}"
         runner = CliRunner()
         result = runner.invoke(main, cmd.split(" "), catch_exceptions=False)
         captured = capfd.readouterr()

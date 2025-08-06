@@ -120,18 +120,18 @@ def main():
     "-t",
     "--threshold",
     type=float,
-    default=3,
+    default=16,
     show_default=True,
     hidden=True,
-    help="The alpha threshold used to determine when to terminate tree building",
+    help="The delta BIC threshold used to determine when to terminate tree building",
 )
 @click.option(
     "--indep-thresh",
     type=float,
-    default=4,
+    default=0,
     show_default=True,
     hidden=True,
-    help="Threshold used to detect whether SNP and haplotype are independently causal",
+    help="Threshold used to detect whether SNP and haplotypes are independently causal",
 )
 @click.option(
     "--ld-prune-thresh",

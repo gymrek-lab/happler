@@ -14,6 +14,7 @@ from happler.tree import (
     Tree,
     TreeBuilder,
     NodeResults,
+    NodeResultsExtra,
 )
 
 DATADIR = Path(__file__).parent.joinpath("data")
@@ -276,7 +277,7 @@ def test_haplotypes_write():
     gts.samples = None
 
     # create a results object that all of the SNPs can share
-    res = NodeResults(beta=0.1, pval=0.1, stderr=0.1)
+    res = NodeResultsExtra(beta=0.1, pval=0.1, stderr=0.1, bic=1)
 
     # create a tree composed of these nodes
     tree = Tree()
@@ -299,7 +300,7 @@ def test_haplotypes_write():
             "#\tversion\t0.2.0",
             "#H\tbeta\t.2f\tEffect size in linear model",
             "#H\tpval\t.2f\t-log(pval) in linear model",
-            "#V\tscore\t.2f\t-log(pval) assigned to this variant",
+            "#V\tscore\t.2f\tBIC assigned to this variant",
             "H\t1\t1\t4\tH0\t0.10\t1.00",
             "H\t1\t1\t3\tH1\t0.10\t1.00",
             "V\tH0\t1\t2\tSNP1\tA\t1.00",

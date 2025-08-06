@@ -211,9 +211,10 @@ class TTestTerminator(Terminator):
 
 
 class BICTerminator(Terminator):
-    def __init__(self, bic_thresh: float = -float("inf"), bf_thresh: float = 3, log: Logger = None):
+    def __init__(self, bic_thresh: float = -float("inf"), bf_thresh: float = 16, log: Logger = None):
         super().__init__()
         self.bic_thresh = bic_thresh
+        # bf_thresh is the threshold on the delta BIC
         self.bf_thresh = bf_thresh
         self.log = log or getLogger(self.__class__.__name__)
 
@@ -231,10 +232,7 @@ class BICTerminator(Terminator):
         bf = None
         bic = results.data["bic"][best_idx]
         if parent_res:
-            bf = parent_res.bic - results.data["bic"]
-            # compute the bayes factor approximation from the delta BIC:
-            # https://easystats.github.io/bayestestR/reference/bic_to_bf.html
-            bf = bf[best_idx]
+            bf = (parent_res.bic - results.data["bic"])[best_idx]
         return bic, bf
 
     def check(
@@ -267,8 +265,8 @@ class BICTerminator(Terminator):
             return False
         elif bf < self.bf_thresh:
             self.log.debug(
-                f"Terminated with BF {bf} < {self.bf_thresh} and BIC {bic}"
+                f"Terminated with delta BIC {bf} < {self.bf_thresh} and BIC {bic}"
             )
             return True
-        self.log.debug(f"Significant with BF {bf} > {self.bf_thresh}")
+        self.log.debug(f"Significant with delta BIC {bf} > {self.bf_thresh}")
         return False
