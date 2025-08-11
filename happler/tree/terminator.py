@@ -257,7 +257,7 @@ class BICTerminator(Terminator):
         else:
             bic, bf = computed_val
         if bf is None:
-            # if we have no parent results, we cannot compute BF
+            # if we have no parent results, we cannot compute delta BIC (aka BF)
             # tree-building should continue unless the BIC is just way too low
             if bic <= self.bic_thresh:
                 self.log.debug(f"Terminated with BIC {bic} <= {self.bic_thresh}")

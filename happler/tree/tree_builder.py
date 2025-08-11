@@ -483,6 +483,7 @@ class TreeBuilder:
             if parent_res is not None:
                 allele_gts = self.gens.data[:, best_var_idx].sum(axis=1)[:,np.newaxis]
                 # y ~ h_parent + z_child VS y ~ h_hap
+                # delta BIC = first minus second
                 hap_indep_effect = NodeResultsExtra.from_np(
                     AssocTestSimpleCovariates(covars=allele_gts, with_bic=True).run(
                         parent.data.sum(axis=1)[:,np.newaxis],

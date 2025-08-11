@@ -19,6 +19,9 @@ tswitch = {
 wildcard_constraints:
     switch="("+"|".join(tswitch.keys())+")"
 
+# if the pvar size is larger than 0.5 GB, just use the default memory instead
+rsrc_func = lambda x: max if .5 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000/1000 else min
+
 
 rule manhattan:
     """ run happler midway-through via a plink2 GWAS """
@@ -43,8 +46,8 @@ rule manhattan:
     resources:
         runtime=20,
         mem_mb=lambda wildcards, input: (
-            rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 0.8376777564760598 + 406.70450996958743)
-        ) if wildcards.switch == "extension-bic" else 2000,
+            rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 3.1342470426950246)
+        ) if str(wildcards.switch).startswith("extension") else 2000,
     log:
         logs + "/{switch}/manhattan",
     benchmark:
