@@ -336,6 +336,7 @@ rule metrics:
 
 
 create_glob_from_wildcards = lambda path, wildcards: re.sub(r"\{[^}]+\}", "*", expand(path, sim_mode="{"+switch_sim_mode[wildcards.switch].join(",")+"}", allow_missing=True))
+bic_thresh = lambda wildcards: (15,20)[str(wildcards.switch).startswith("extension")]
 
 
 rule midway:
@@ -350,12 +351,13 @@ rule midway:
         causal_hap = lambda wildcards: fill_out_globals_midway(wildcards, config["causal_hap"]),
         linears_glob = partial(linears_glob, method=fill_out_globals_midway),
         bic=lambda wildcards: "--kind bic " if str(wildcards.switch).endswith("bic") else "",
-        thresh=lambda wildcards: "--thresh 16" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
+        thresh=lambda wildcards: f"--thresh {bic_thresh(wildcards)}" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
     output:
         png=out + "/midway_summary.{switch}.pdf",
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
     resources:
-        runtime=7,
+        runtime=10,
+        mem_mb=2500,
     wildcard_constraints:
         switch="("+"|".join(switch_sim_mode.keys())+")"
     log:
@@ -383,12 +385,13 @@ rule midway_beta:
         causal_hap = lambda wildcards: fill_out_globals_midway_beta(wildcards, config["causal_hap"]),
         linears_glob = partial(linears_glob, method=fill_out_globals_midway_beta),
         bic=lambda wildcards: "--kind bic " if str(wildcards.switch).endswith("bic") else "",
-        thresh=lambda wildcards: "--thresh 16" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
+        thresh=lambda wildcards: f"--thresh {bic_thresh(wildcards)}" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
     output:
         png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
         metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
     resources:
-        runtime=7,
+        runtime=10,
+        mem_mb=2500,
     wildcard_constraints:
         switch="("+"|".join(switch_sim_mode.keys())+")"
     log:
@@ -535,12 +538,12 @@ rule midway_metrics:
         ),
     params:
         metrics = lambda wildcards: expand(rules.midway_beta.output.metrics, switch=wildcards.switch, allow_missing=True),
-        use_flex_axes = lambda wildcards: "--use-flex-axes-limits " if wildcards.switch == "interact" else "",
-        thresh=lambda wildcards: "--thresh 16" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
+        thresh=lambda wildcards: f"--thresh {bic_thresh(wildcards)}" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
     output:
         png=out + "/midway_summary_metrics.{switch}.pdf",
     resources:
-        runtime=7,
+        runtime=10,
+        mem_mb=2500,
     log:
         logs + "/midway_metrics.{switch}",
     benchmark:
@@ -548,7 +551,7 @@ rule midway_metrics:
     conda:
         "happler"
     shell:
-        "workflow/scripts/midway_summary_metrics.py {params.thresh} {params.use_flex_axes}-o {output.png} {params.metrics} &>{log}"
+        "workflow/scripts/midway_summary_metrics.py {params.thresh} -o {output.png} {params.metrics} &>{log}"
 
 
 rule finemap_metrics:
