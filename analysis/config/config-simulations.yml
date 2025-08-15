@@ -63,7 +63,7 @@ modes:
   max_af: 0.95
   # beta: [0.35]
   beta: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
-  alpha: [3]
+  alpha: [20]
   random: false # whether to also produce random haplotypes
   num_haps: [1, 2, 3, 4]
  run:

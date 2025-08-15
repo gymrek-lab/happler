@@ -67,11 +67,11 @@ rule run:
         pts=pheno,
         covar=config["covar"],
     params:
-        thresh=lambda wildcards: 3 if not hasattr(wildcards, "alpha") else wildcards.alpha,
+        thresh=lambda wildcards: 20 if not hasattr(wildcards, "alpha") else wildcards.alpha,
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
         covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else "",
         maf = check_config("min_maf", 0),
-        indep=lambda wildcards: 4 if not hasattr(wildcards, "indep_alpha") else wildcards.indep_alpha,
+        indep=lambda wildcards: 15 if not hasattr(wildcards, "indep_alpha") else wildcards.indep_alpha,
         max_signals=3,
         max_iterations=3,
         out_thresh=check_config("out_thresh", 5e-8),
