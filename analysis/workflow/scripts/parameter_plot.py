@@ -930,7 +930,7 @@ def main(
             maf=maf,
             observed_id=observed_id,
             causal_id=causal_id,
-            pheno=get_hap_fname(phenos, params[idx]),
+            pheno=get_hap_fname(phenos, params[idx]) if phenos is not None else None,
             log=log
         )
         for idx in range(len(params))
@@ -940,15 +940,15 @@ def main(
         ld_vals, ld_extras_idxs, ld_extras_bool, best_bf, causal_best_bf = all_ld_values
         best_bf = np.array(best_bf, dtype=object)
         causal_best_bf = np.array(causal_best_bf, dtype=object)
+        with open(output.with_suffix(".causal.pickle"), "wb") as f:
+            pickle.dump([causal_best_bf], f)
     else:
         ld_vals, ld_extras_idxs, ld_extras_bool = all_ld_values
         best_bf = None
+        causal_best_bf = None
     ld_vals = np.array(ld_vals, dtype=object)
     ld_extras_idxs = np.array(ld_extras_idxs, dtype=object)
     ld_extras_bool = np.array(ld_extras_bool, dtype=object)
-
-    with open(output.with_suffix(".causal.pickle"), "wb") as f:
-        pickle.dump([causal_best_bf], f)
     
 
     # extract fine-mapping metrics for the observed hap

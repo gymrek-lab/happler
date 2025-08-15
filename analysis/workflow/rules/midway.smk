@@ -46,7 +46,7 @@ rule manhattan:
     resources:
         runtime=20,
         mem_mb=lambda wildcards, input: (
-            rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 3.1342470426950246)
+            rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 3.1342470426950246 + 1000)
         ) if str(wildcards.switch).startswith("extension") else 2000,
     log:
         logs + "/{switch}/manhattan",
