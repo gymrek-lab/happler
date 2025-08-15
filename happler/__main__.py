@@ -319,16 +319,14 @@ def run(
     for haps in forest.run():
         if haps is None:
             continue
-        if len(haps.data) == 1:
-            hap = next(iter(haps.data.values()))
-            if hap.pval < log_out_thresh:
-                log.info(
-                    f"Ignoring haplotype with low log pval {hap.pval} < "
-                    f"{log_out_thresh}"
-                )
-                continue
         for hap in haps.data.values():
             if len(hap.variants) <= 1 and remove_snps:
+                continue
+            if hap.pval < log_out_thresh:
+                log.info(
+                    f"Ignoring haplotype {hap.id} with low log pval {hap.pval} < "
+                    f"{log_out_thresh}"
+                )
                 continue
             hap.id = f"H{hap_id}"
             haplotypes.data[hap.id] = hap
