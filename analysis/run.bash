@@ -34,7 +34,7 @@ if ! command -v 'snakemake' &>/dev/null && \
 	command -v 'conda' &>/dev/null && \
    [ "$CONDA_DEFAULT_ENV" != "snakemake" ] && \
    conda info --envs | grep "$CONDA_ROOT/snakemake" &>/dev/null; then
-        echo "Snakemake not detected. Attempting to switch to snakemake environment." >> "out/log"
+        echo "Snakemake not detected. Attempting to switch to snakemake environment." >> "$out_path/log"
         eval "$(conda shell.bash hook)"
         conda activate snakemake
 fi
