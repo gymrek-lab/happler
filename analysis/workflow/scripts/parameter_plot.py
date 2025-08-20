@@ -640,7 +640,7 @@ def group_by_rep(
         """Ensure val and mask shapes match before indexing."""
         val = np.asarray(val)
         indices = np.asarray(indices)
-        mask = np.asarray(mask)
+        mask = np.asarray(mask, dtype=bool)
         if val.shape != mask.shape:
             if val.size == 1:
                 val = np.full(mask.shape, val.item())
@@ -669,7 +669,7 @@ def group_by_rep(
                 curr_vals_causal = np.concatenate([
                     safe_index(val, indices, (indices == causal_idx) & curr_bool)
                     for val, indices, curr_bool in zip(curr_vals, curr_causal_idxs, curr_bools)
-                ])
+                ]).astype(float)
             except ValueError:
                 continue
             val_mean, val_sem = get_mean_std(curr_vals_causal)
@@ -681,7 +681,7 @@ def group_by_rep(
                 curr_metrics_causal = np.concatenate([
                     safe_index(val, indices, (indices == causal_idx) & curr_bool)
                     for val, indices, curr_bool in zip(curr_metrics, curr_causal_idxs, curr_bools)
-                ])
+                ]).astype(float)
                 metrics_mean, metrics_sem = get_metrics_mean_std(curr_metrics_causal)
                 subgrouped_metrics.append(metrics_mean)
                 subgrouped_metrics_sem.append(metrics_sem)
@@ -690,14 +690,14 @@ def group_by_rep(
                 curr_extra_causal = np.concatenate([
                     safe_index(val, indices, (indices == causal_idx) & curr_bool)
                     for val, indices, curr_bool in zip(curr_extra_vals, curr_causal_idxs, curr_bools)
-                ])
+                ]).astype(float)
                 subgrouped_extra.append(np.nanmean(curr_extra_causal))
 
             if curr_extra_vals_2 is not None:
                 curr_extra_causal_2 = np.concatenate([
                     safe_index(val, indices, (indices == causal_idx) & curr_bool)
                     for val, indices, curr_bool in zip(curr_extra_vals_2, curr_causal_idxs, curr_bools)
-                ])
+                ]).astype(float)
                 subgrouped_extra_2.append(np.nanmean(curr_extra_causal_2))
 
             # unmatched haps
@@ -707,7 +707,7 @@ def group_by_rep(
                         safe_index(val, indices, (indices == causal_idx) & ~curr_bool)[unmatched_idx]
                         for val, indices, curr_bool in zip(curr_vals, curr_causal_idxs, curr_bools)
                         if unmatched_idx < safe_index(val, indices, (indices == causal_idx) & ~curr_bool).shape[0]
-                    ])
+                    ]).astype(float)
                 except ValueError:
                     continue
                 val_mean, val_sem = get_mean_std(curr_vals_unmatched)
@@ -720,7 +720,7 @@ def group_by_rep(
                         safe_index(val, indices, (indices == causal_idx) & ~curr_bool)[unmatched_idx]
                         for val, indices, curr_bool in zip(curr_metrics, curr_causal_idxs, curr_bools)
                         if unmatched_idx < safe_index(val, indices, (indices == causal_idx) & ~curr_bool).shape[0]
-                    ])
+                    ]).astype(float)
                     metrics_mean, metrics_sem = get_metrics_mean_std(curr_metrics_unmatched)
                     subgrouped_metrics.append(metrics_mean)
                     subgrouped_metrics_sem.append(metrics_sem)
@@ -730,7 +730,7 @@ def group_by_rep(
                         safe_index(val, indices, (indices == causal_idx) & ~curr_bool)[unmatched_idx]
                         for val, indices, curr_bool in zip(curr_extra_vals, curr_causal_idxs, curr_bools)
                         if unmatched_idx < safe_index(val, indices, (indices == causal_idx) & ~curr_bool).shape[0]
-                    ])
+                    ]).astype(float)
                     subgrouped_extra.append(np.nanmean(curr_extra_unmatched))
 
                 if curr_extra_vals_2 is not None:
@@ -738,7 +738,7 @@ def group_by_rep(
                         safe_index(val, indices, (indices == causal_idx) & ~curr_bool)[unmatched_idx]
                         for val, indices, curr_bool in zip(curr_extra_vals_2, curr_causal_idxs, curr_bools)
                         if unmatched_idx < safe_index(val, indices, (indices == causal_idx) & ~curr_bool).shape[0]
-                    ])
+                    ]).astype(float)
                     subgrouped_extra_2.append(np.nanmean(curr_extra_unmatched_2))
 
         grouped_vals.append(np.array(subgrouped_vals, dtype=object))
