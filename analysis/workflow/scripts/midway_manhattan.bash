@@ -95,6 +95,7 @@ if [ "$condition" -eq 1 ]; then
     # output the parent and child nodes to a covariate file
     plink2 \
     --maf $maf \
+    --threads 1 \
     --nonfounders \
     --out "$out_prefix" \
     --export A ref-first \
@@ -105,6 +106,7 @@ if [ "$condition" -eq 1 ]; then
     # covariates in the model
     plink2 \
     --maf $maf \
+    --threads 1 \
     --nonfounders \
     --vif 10000000000 \
     --out "$out_prefix" \
@@ -120,6 +122,7 @@ if [ "$condition" -eq 1 ]; then
 else
     plink2 \
     --maf $maf \
+    --threads 1 \
     --nonfounders \
     --out "$out_prefix" \
     --pfile "$out_prefix" \
@@ -146,6 +149,7 @@ if [ "$condition" -eq 2 ] || [ "$condition" -eq 3 ] || [ "$condition" -eq 4 ] ||
     # get summary statistics for the parent haplotype
     plink2 \
     --maf $maf \
+    --threads 1 \
     --nonfounders \
     --variance-standardize \
     --out "$out_prefix".parent \
@@ -163,6 +167,7 @@ if [ "$condition" -eq 2 ] || [ "$condition" -eq 3 ] || [ "$condition" -eq 4 ] ||
         # output the child node to its own gts file
         plink2 \
         --maf $maf \
+        --threads 1 \
         --make-pgen \
         --snp $snp_id \
         --nonfounders \

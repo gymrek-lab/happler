@@ -4,7 +4,7 @@
 
 # tests/validate_linreg_methods.py > fake.tsv && \
 # ~/miniconda3/envs/plink2/bin/plink2 --glm omit-ref hide-covar --covar iid-only fake.covar \
-# --pheno iid-only fake.pheno --pfile fake --no-pheno --out fake &>/dev/null && \
+# --pheno iid-only fake.pheno --pfile fake --threads 1 --no-pheno --out fake &>/dev/null && \
 # diff -sy -W 67 <(sort -k1,1 fake.tsv | column -t) <(cut -f3,9,12 fake.bmi.glm.linear | sort -k1,1 | column -t)
 
 
