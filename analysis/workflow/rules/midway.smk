@@ -19,8 +19,8 @@ tswitch = {
 wildcard_constraints:
     switch="("+"|".join(tswitch.keys())+")"
 
-# if the pvar size is larger than 0.5 GB, just use the default memory instead
-rsrc_func = lambda x: max if .5 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000/1000 else min
+# if the pvar size is larger than 100 MB, just use the default memory instead
+rsrc_func = lambda x: max if 100 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000 else min
 
 
 rule manhattan:
