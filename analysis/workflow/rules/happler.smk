@@ -583,7 +583,7 @@ rule gwas:
         "plink2 --glm {params.covar} --variance-standardize --maf {params.maf} "
         "--nonfounders --pheno iid-only {input.pts} --pfile {params.in_prefix} "
         # "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} " # unnecessary b/c merge subsets by region already
-        "--out {params.out_prefix} --threads {threads} &>{log}"
+        "--out {params.out_prefix} --threads {threads} --memory {resources.mem_mb} &>{log}"
 
 
 rule manhattan:
