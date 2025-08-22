@@ -5,14 +5,14 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
 
-# # basic
-# python parse_logs_vs_bench.py --logs /path/to/snakemake_run.log
-
-# # if your benchmark paths in the log are relative to a project root:
-# python parse_logs_vs_bench.py --logs /path/to/snakemake_run.log --root /my/project/root
-
-# # multiple logs + export CSV
-# python parse_logs_vs_bench.py --logs log_a.txt log_b.txt --out bench_compare.csv
+# Usage
+# -----
+# Basic:
+#     python parse_logs_vs_bench.py --logs /path/to/snakemake_run.log
+# If your benchmark paths in the log are relative to a project root (default: ".")
+#     python parse_logs_vs_bench.py --logs /path/to/snakemake_run.log --root /my/project/root
+# Multiple logs + export to file
+# python parse_logs_vs_bench.py --logs log_a.txt log_b.txt --out bench_compare.tsv
 
 
 # ---------- Bench TSV reader ----------
