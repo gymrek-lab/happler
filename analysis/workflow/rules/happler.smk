@@ -77,13 +77,13 @@ rule run:
         out_thresh=check_config("out_thresh", 5e-8),
         keep_SNPs=lambda wildcards: "--remove-SNPs " if not hasattr(wildcards, "rep") else "",
     output:
-        hap=ensure(out + "/happler.hap", non_empty=True),
+        hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
         idx=out + "/happler.hap.gz.tbi",
         dot=out + "/happler.dot",
     resources:
         runtime=lambda wildcards, input: (
-            rsrc_func(input.gts)(45, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
+            rsrc_func(input.gts)(15, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
         ),
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
@@ -314,7 +314,7 @@ rule sv_ld:
 
 
 def merge_hps_input(wildcards):
-    if mode in ("happler", "ld_range"):
+    if mode in ("run", "ld_range"):
         if config["random"] is None:
             # include the hap that happler found
             return rules.transform.output

@@ -211,6 +211,7 @@ if mode == "ld_range":
     FINAL_OUTPUT = [rules.plots_params.output.png, rules.plots_metrics.output.png]
 elif mode == "run":
     checkpoint multiline:
+        """ obtain a list of the .hap files that have haplotypes with two or more alleles """
         input:
             hps = expand(
                 rules.happler_run.output.hap,
