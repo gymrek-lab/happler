@@ -54,7 +54,7 @@ rule sub_pheno:
 
 pheno = rules.sub_pheno.output.pheno if "{rep}" in out else config["pheno"]
 if mode in ("run", "midway"):
-    # if the pvar size is larger than 100 MB, just use the default memory instead
+    # if the pvar size is larger than 100 MB, just use the default memory instead (if it is lower)
     rsrc_func = lambda x: max if 100 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000 else min
 else:
     rsrc_func = lambda x: min
@@ -147,10 +147,11 @@ rule cond_linreg:
         png=out + "/cond_linreg.pdf",
     resources:
         runtime=lambda wildcards, input: (
-            rsrc_func(input.pgen)(50, 1.5 * Path(input.pvar).stat().st_size/1000 * (
+            rsrc_func(input.pgen)(5, 1.5 * Path(input.pvar).stat().st_size/1000 * (
                 0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
             ))
         ),
+        mem_mb=2500,
     log:
         logs + "/cond_linreg",
     benchmark:
@@ -300,6 +301,7 @@ rule sv_ld:
         ld=out + "/happler_svs.ld",
     resources:
         runtime=4,
+        mem_mb=4000,
     log:
         logs + "/sv_ld",
     benchmark:
@@ -407,7 +409,7 @@ rule finemapper:
         susie=out + "/{ex}clude/susie.rds",
     resources:
         runtime=lambda wildcards, input: (
-            rsrc_func(input.gt)(120, Path(input.gt_pvar).stat().st_size/1000 * 0.3)
+            rsrc_func(input.gt)(10, Path(input.gt_pvar).stat().st_size/1000 * 0.3)
         ),
         mem_mb = 8500,
     threads: 1,

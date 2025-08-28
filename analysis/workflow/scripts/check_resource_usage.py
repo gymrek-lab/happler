@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-import argparse
 import re
+import argparse
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
 import pandas as pd
 
 # Usage
 # -----
-# Basic:
-#     python parse_logs_vs_bench.py --logs /path/to/snakemake_run.log
+#     python workflow/scripts/check_resource_usage.py --logs log | column -t -s $'\t' | less
+# Also append to an existing file
+#     python workflow/scripts/check_resource_usage.py --logs log | tee -a bench.tsv | column -t -s $'\t' | less
 # If your benchmark paths in the log are relative to a project root (default: ".")
-#     python parse_logs_vs_bench.py --logs /path/to/snakemake_run.log --root /my/project/root
+#     python workflow/scripts/check_resource_usage.py --logs log --root /my/project/root
 # Multiple logs + export to file
-# python parse_logs_vs_bench.py --logs log_a.txt log_b.txt --out bench_compare.tsv
+#     python workflow/scripts/check_resource_usage.py --logs log_a.txt log_b.txt --out bench.tsv
 
 
 # ---------- Bench TSV reader ----------
@@ -210,7 +212,6 @@ def main():
 
     if args.out:
         df.to_csv(args.out, index=False, sep="\t")
-        print(f"\nWrote CSV: {args.out}")
 
 if __name__ == "__main__":
     main()
