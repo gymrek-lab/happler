@@ -7,7 +7,7 @@ import numpy as np
 
 from haptools.logging import getLogger
 from haptools.ld import pearson_corr_ld
-from haptools.data import Data, GenotypesPLINK
+from haptools.data import Data, GenotypesPLINK, GenotypesPLINKTR
 
 
 def corr(a, b):
@@ -79,6 +79,13 @@ def corr(a, b):
     help="Compute the actual correlation instead of a speedy estimate",
 )
 @click.option(
+    "--target-is-repeat",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="whether the target is a repeat instead of a hap"
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -101,6 +108,7 @@ def main(
     maf: float = None,
     hap_id: str = None,
     no_estimate: bool = False,
+    target_is_repeat: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -114,10 +122,15 @@ def main(
     log = getLogger("compute_pgen_ld", verbosity)
 
     log.info("Loading target genotypes")
-    target = GenotypesPLINK(fname=target, log=log)
-    target.read(variants=set((hap_id,)) if hap_id is not None else None)
-    target.check_missing()
-    target.check_biallelic()
+    if target_is_repeat:
+        target = GenotypesPLINKTR(fname=target, log=log, vcftype="hipstr")
+        target.read(variants=set((hap_id,)) if hap_id is not None else None)
+        target.check_missing(discard_also=True)
+    else:
+        target = GenotypesPLINK(fname=target, log=log)
+        target.read(variants=set((hap_id,)) if hap_id is not None else None)
+        target.check_missing()
+        target.check_biallelic()
 
     if hap_id is None:
         target.subset(variants=(target.variants["id"][0],), inplace=True)

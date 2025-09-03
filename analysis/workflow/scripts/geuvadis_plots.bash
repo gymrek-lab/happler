@@ -101,3 +101,80 @@ plt.savefig("pips_best_sv_ld.png")
 EOF
 ) | python
 echo "Created $out/pips_best_sv_ld.png"
+
+cd -
+# create STR LD plot
+# first, let's get a list of the STRs in the regions with haplotypes
+(
+  echo -ne "region\tgene\thap.id\tpip\t"
+  head -n1 data/geuvadis/mlamkin/Geuvadis_varlevel_corrected_significant_variants.with-end.tsv && \
+  ~/miniconda3/envs/htslib/bin/bedtools intersect -a <(
+    echo -e "chrom\tstart\tend\tgene\tpip" && cat "$out"/pips.tsv | sed 's+_+\t+;s+-+\t+;s+:+\t+g' | sort -k1,1V -k2,2n
+  ) -b data/geuvadis/mlamkin/Geuvadis_varlevel_corrected_significant_variants.with-end.tsv -wa -wb -loj | \
+  sed 's+\t+_+;s+\t+-+'
+) | awk -F'\t' '$2 == $8' | cut -f8 --complement > "$out"/STR_assocations.tsv
+echo "Created $out/STR_assocations.tsv"
+# now, let's compute LD for each region
+echo -e "hap\tpip\tpos\tid\tld\talleles" > "$out"/pips_str_ld.tsv
+while IFS= read -r line; do
+  str_id="$(echo "$line" | cut -f5,6 --output-delimiter ':')"
+  echo -ne "$(echo "$line" | cut -f1-3 --output-delimiter ':')\t$(echo "$line" | cut -f4)\t$(echo "$line" | cut -f6)\t$str_id\t"
+  echo -ne "$(workflow/scripts/compute_pgen_ld.py --verbosity WARNING --target-is-repeat --hap-id "$str_id" -o /dev/stdout "$out/$(echo "$line" | cut -f1)"/happler/run/"$(echo "$line" | cut -f2)"/happler.pgen data/geuvadis/mlamkin/all_Geuvadis_STRs.pgen | tail -n+2 | cut -f4)"
+  echo -e "\t$(grep -P '\t'"$str_id"'\t' data/geuvadis/mlamkin/all_Geuvadis_STRs.pvar | cut -f 4,5 --output-delimiter ,)"
+done < <(tail -n+2 "$out"/STR_assocations.tsv) >> "$out"/pips_str_ld.tsv
+echo "Created $out/pips_str_ld.tsv"
+(
+  head -n1 "$out/pips_str_ld.tsv"
+  tail -n+2 "$out/pips_str_ld.tsv" \
+    | awk -F'\t' -v OFS='\t' '{$5 = ($5 < 0) ? -$5 : $5; print}' \
+    | sort -t$'\t' -k1,1 -k5,5nr \
+    | awk -F'\t' -v OFS='\t' '!seen[$1]++ { print }'
+) > "$out/pips_best_str_ld.tsv"
+echo "Created $out/pips_best_str_ld.tsv"
+cd "$out"
+(
+  echo "a=["$(tail -n+2 pips_best_str_ld.tsv | cut -f2,5 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  cat <<'EOF'
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+data = np.array(a)
+plt.scatter(data[:,0], data[:,1])
+plt.xlim(-0.02, 1.02)
+plt.ylim(-0.02, 1.02)
+plt.axline([0, 0], [1, 1])
+plt.gca().xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator(2))
+plt.gca().yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator(2))
+plt.grid(True, which='both')
+plt.xlabel("Haplotype PIP")
+plt.ylabel("LD of Best STR")
+plt.savefig("pips_best_str_ld.png")
+
+EOF
+) | python
+echo "Created $out/pips_best_str_ld.png"
+# now, compare STR vs SV LD
+(
+  echo "a=["$(join -t $'\t' -j1 --header <(head -n1 pips_sv_ld.tsv; tail -n+2 pips_sv_ld.tsv | sed 's/.ld\t/:H0\t/;s+^H0/++' | sort -k1,1) <(head -n1 pips_best_str_ld.tsv; tail -n+2 pips_best_str_ld.tsv | sort -k1,1) | cut -f5,9 | tail -n+2 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  cat <<'EOF'
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+data = np.array(a)
+# plt.scatter(x, y)
+plt.scatter(data[:,0], data[:,1])
+plt.xlim(-0.02, 1.02)
+plt.ylim(-0.02, 1.02)
+plt.axline([0, 0], [1, 1])
+plt.gca().xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator(2))
+plt.gca().yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator(2))
+plt.grid(True, which='both')
+plt.xlabel("LD of best SV")
+plt.ylabel("LD of Best STR")
+plt.savefig("ld_str_vs_sv.png")
+
+EOF
+) | python
+echo "Created $out/ld_str_vs_sv.png"
