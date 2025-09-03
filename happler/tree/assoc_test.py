@@ -68,6 +68,42 @@ class NodeResultsExtraTScore(NodeResultsExtra):
     tscore: float
 
 
+@dataclass(frozen=True)
+class NodeResultsBIC:
+    """
+    The results of testing SNPs at a node in the tree
+
+    Attributes
+    ----------
+    bic : float
+        The best BIC among all of the SNPs
+    """
+
+    bic: float
+
+    def __getitem__(self, item):
+        """
+        Define a getter so that we can access elements like this:
+
+        ``obj['field_name']``
+
+        in addition to this:
+
+        ``obj.field_name``
+        """
+        return getattr(self, item)
+
+    def __repr__(self):
+        return (
+            "{" + ", ".join("{}={:.2e}".format(*i) for i in self.__dict__.items()) + "}"
+        )
+
+    @classmethod
+    def from_np(cls, np_mixed_arr_var: np.void) -> NodeResults:
+        class_attributes = cls.__dict__["__dataclass_fields__"].keys()
+        return cls(**dict(zip(class_attributes, np_mixed_arr_var)))
+
+
 # We declare this class to be a dataclass to automatically define __init__ and a few
 # other methods
 @dataclass
@@ -242,7 +278,7 @@ class AssocTestSimple(AssocTest):
         Returns
         -------
         tuple
-            The slope, p-value, and stderr obtained from the test. The delta BIC is
+            The slope, p-value, and stderr obtained from the test. The BIC is
             appended to the end if ``self.with_bic`` is True.
         """
         try:
@@ -318,7 +354,7 @@ class AssocTestSimpleSM(AssocTestSimple):
         Returns
         -------
         tuple
-            The slope, p-value, and stderr obtained from the test. The delta BIC is
+            The slope, p-value, and stderr obtained from the test. The BIC is
             appended to the end if ``self.with_bic`` is True.
         """
         res = self._get_sm_result(x, y)
@@ -338,9 +374,69 @@ class AssocTestSimpleSM(AssocTestSimple):
             return param, pval, stderr
 
 
-class AssocTestSimpleFastBIC(AssocTest):
-    # TODO: calculate only BIC in a quick, vectorized fashion without statsmodels
-    pass
+class AssocTestSimpleFastBIC(AssocTestSimpleSM):
+    """
+    Calculate only BIC in a quick, vectorized fashion without statsmodels
+    """
+
+    def __init__(self):
+        """
+        Override the parent's __init__
+        """
+        self.results_type = NodeResultsBIC
+
+    def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
+        """
+        Implement AssocTest for a simple, univariate OLS models y ~ 1 + X[:, j]
+
+        Does not use or import statsmodels at all
+
+        Parameters
+        ----------
+        X : npt.NDArray[np.float64]
+            The genotypes, with shape n x p. There are only two dimensions.
+            Each row is a sample and each column is a haplotype.
+        y : npt.NDArray[np.float64]
+            The phenotypes, with shape n x 1
+
+        Returns
+        -------
+        npt.NDArray[np.float64]
+            The results from testing each haplotype, with shape p x 1
+        """
+        X = self.standardize(X)
+
+        n, p = X.shape
+        nobs2 = n / 2.0
+
+        # Center X and y
+        xm = X.mean(axis=0)  # (p,)
+        ym = float(y.mean())  # scalar
+        xc = X - xm  # (n, p)
+        yc = y - ym  # (n, 1) will broadcast to (n, p)
+
+        # Vectorized simple OLS with intercept
+        sxx = np.sum(xc**2, axis=0)  # (p,)
+        sxy = np.sum(xc * yc, axis=0)  # (p,)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            b1 = np.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
+
+        # Residuals for each column's model: r = (y - ym) - b1 * (X - xm)
+        R = yc - xc * b1  # (n, p), broadcasted
+        ssr = np.sum(R**2, axis=0)  # (p,)
+
+        # statsmodels-style profile log-likelihood per column
+        # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
+        ll = -nobs2 * np.log(2 * np.pi) - nobs2 * np.log(ssr / n) - nobs2  # (p,)
+
+        # Number of parameters k: intercept + slope = 2
+        # If a column is constant (sxx == 0), slope is not identified -> treat as intercept-only (k=1)
+        k = np.where(sxx > 0, 2, 1)
+
+        # BIC per column
+        bic = -2 * ll + k * np.log(n)  # (p,)
+
+        return AssocResults(bic.astype([("bic", np.float64)]))
 
 
 class AssocTestSimpleCovariates(AssocTestSimpleSM):
@@ -403,7 +499,7 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
         Returns
         -------
         tuple
-            The slope, p-value, and stderr obtained from the test. The delta BIC is
+            The slope, p-value, and stderr obtained from the test. The BIC is
             appended to the end if ``self.with_bic`` is True.
         """
         if self.with_bic:
