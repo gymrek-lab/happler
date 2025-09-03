@@ -2,6 +2,7 @@ import re
 import sys
 from pathlib import Path
 from functools import partial
+from snakemake.io import glob_wildcards
 
 out = config["out"]
 logs = out + "/logs"
@@ -74,6 +75,7 @@ def agg_ld_range_metrics(wildcards):
             num_haps=config["mode_attrs"]["num_haps"],
             alpha=config["mode_attrs"]["alpha"],
             rep=range(config["mode_attrs"]["reps"]),
+            ex=("in",),
             **wildcards,
         )
     else:
@@ -81,6 +83,7 @@ def agg_ld_range_metrics(wildcards):
             config["happler_metrics"],
             beta=config["mode_attrs"]["beta"],
             num_haps=config["mode_attrs"]["num_haps"],
+            ex=("in",),
             **wildcards,
         )
 
@@ -93,25 +96,52 @@ switch_sim_mode = {
     "interact-bic": ("hap", "indep"),
     "pip-parent": ("hap", "parent"),
     "pip-interact": ("hap", "indep"),
+    "extension-bic": ("hap", "hap"),
+    "extension-tscore": ("hap", "hap"),
+}
+
+switch_ext_mode = {
+    "extension-bic": ("bic", "extension-bic"),
+    "extension-tscore": ("tscore", "extension-tscore"),
 }
 
 
 def agg_midway_linear(wildcards, beta: bool = False):
     """ return a list of midway linear files """
-    sim_modes = switch_sim_mode[wildcards.switch]
-    expand_partial = expand
-    if beta:
-        expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
+    if wildcards.switch.startswith("extension-"):
+        switches = switch_ext_mode[wildcards.switch]
+        expand_partial = expand
+        if beta:
+            expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
+        else:
+            expand_partial = partial(expand_partial, beta=wildcards.beta)
+        # make sure to remove 'switch' wildcard since we will be replacing it
+        wildcards = dict(wildcards)
+        del wildcards["switch"]
+        return expand_partial(
+            config["midway_linear"],
+            locus=config["loci"],
+            rep=range(config["mode_attrs"]["reps"]),
+            sim_mode=("hap",),
+            switch=switches,
+            **wildcards,
+            allow_missing=True,
+        )
     else:
-        expand_partial = partial(expand_partial, beta=wildcards.beta)
-    return expand_partial(
-        config["midway_linear"],
-        locus=config["loci"],
-        rep=range(config["mode_attrs"]["reps"]),
-        sim_mode=sim_modes,
-        **wildcards,
-        allow_missing=True,
-    )
+        sim_modes = switch_sim_mode[wildcards.switch]
+        expand_partial = expand
+        if beta:
+            expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
+        else:
+            expand_partial = partial(expand_partial, beta=wildcards.beta)
+        return expand_partial(
+            config["midway_linear"],
+            locus=config["loci"],
+            rep=range(config["mode_attrs"]["reps"]),
+            sim_mode=sim_modes,
+            **wildcards,
+            allow_missing=True,
+        )
 
 
 def agg_finemap(wildcards, beta: bool = False, also_exclude = False):
@@ -155,7 +185,20 @@ fill_out_globals = lambda wildcards, val: expand(
     allow_missing=True,
 )
 
+fill_out_globals_metrics = lambda wildcards, val: expand(
+    val,
+    locus=wildcards.locus,
+    sampsize=wildcards.sampsize,
+    ex=("in",),
+    allow_missing=True,
+)
+
 fill_out_globals_midway = lambda wildcards, val: expand(
+    val,
+    sampsize=wildcards.sampsize,
+    sim_mode=("hap",),
+    allow_missing=True,    
+) if wildcards.switch.startswith("extension-") else expand(
     val,
     sampsize=wildcards.sampsize,
     switch=wildcards.switch,
@@ -190,6 +233,42 @@ fill_out_globals_midway_beta = lambda wildcards, val: expand(
     allow_missing=True,
 )
 
+linears_glob = lambda wildcards, method = fill_out_globals_midway: (expand(
+    re.sub(
+        r"\{(?!switch\})[^}]+\}", "*",
+        method(wildcards, config["midway_linear"])[0],
+    ),
+    switch="{"+",".join(switch_ext_mode[wildcards.switch])+"}",
+    allow_missing=True,    
+) if wildcards.switch.startswith("extension-") else expand(
+    re.sub(
+        r"\{(?!sim_mode\})[^}]+\}", "*",
+        method(wildcards, config["midway_linear"])[0],
+    ),
+    sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
+    allow_missing=True,
+))[0]
+
+
+def make_brace_expanded_path(pattern, files):
+    """
+    Given a wildcarded pattern and a list of matching file paths,
+    return a new path with bash-style brace expansion for all wildcards
+    that have multiple values. Single-value wildcards are substituted directly.
+    """
+    wc = glob_wildcards(pattern, files=files)
+
+    for name in wc._fields:
+        values = sorted(set(getattr(wc, name))) # ensures reproducibility
+        if len(values) > 1:
+            replacement = "{" + ",".join(values) + "}"
+        else:
+            replacement = values[0]
+        pattern = pattern.replace(f"{{{name}}}", replacement)
+
+    return pattern
+
+
 rule params:
     """ check how wildcards affect the haplotypes output by happler """
     input:
@@ -201,10 +280,15 @@ rule params:
     params:
         observed_haps = lambda wildcards: fill_out_globals(wildcards, config["happler_hap"]),
         causal_hap = lambda wildcards: fill_out_globals(wildcards, config["causal_hap"]),
+        observed_haps_glob = lambda wildcards, input: make_brace_expanded_path(
+            fill_out_globals(wildcards, config["happler_hap"])[0],
+            agg_ld_range_obs(wildcards),
+        ),
     output:
         png=out + "/happler_params.png",
     resources:
         runtime=20,
+        mem_mb=2000,
     log:
         logs + "/plot_params",
     benchmark:
@@ -213,7 +297,7 @@ rule params:
         "happler"
     shell:
         "workflow/scripts/parameter_plot.py -o {output.png} "
-        "--order num_haps,beta,ld "
+        "--order num_haps,beta,ld -f <(ls -1 {params.observed_haps_glob}) "
         "{input.gts} {params.observed_haps} {params.causal_hap} &> {log}"
 
 
@@ -229,11 +313,16 @@ rule metrics:
     params:
         observed_haps = lambda wildcards: fill_out_globals(wildcards, config["happler_hap"]),
         causal_hap = lambda wildcards: fill_out_globals(wildcards, config["causal_hap"]),
-        metrics = lambda wildcards: fill_out_globals(wildcards, config["happler_metrics"]),
+        metrics = lambda wildcards: fill_out_globals_metrics(wildcards, config["happler_metrics"]),
+        observed_haps_glob = lambda wildcards, input: make_brace_expanded_path(
+            fill_out_globals(wildcards, config["happler_hap"])[0],
+            agg_ld_range_obs(wildcards),
+        ),
     output:
         png=out + "/finemapping_metrics.png",
     resources:
         runtime=20,
+        mem_mb=2000,
     log:
         logs + "/metrics",
     benchmark:
@@ -242,11 +331,12 @@ rule metrics:
         "happler"
     shell:
         "workflow/scripts/parameter_plot.py -o {output.png} -m {params.metrics} "
-        "--order num_haps,beta,ld "
+        "--order num_haps,beta,ld -f <(ls -1 {params.observed_haps_glob}) "
         "{input.gts} {params.observed_haps} {params.causal_hap} &> {log}"
 
 
 create_glob_from_wildcards = lambda path, wildcards: re.sub(r"\{[^}]+\}", "*", expand(path, sim_mode="{"+switch_sim_mode[wildcards.switch].join(",")+"}", allow_missing=True))
+bic_thresh = lambda wildcards: (15,20)[str(wildcards.switch).startswith("extension")]
 
 
 rule midway:
@@ -255,27 +345,21 @@ rule midway:
         linears=partial(agg_midway_linear, beta=True),
         snplists=agg_ld_range_causal,
     params:
-        case_type="sim_mode",
-        pos_type="hap",
+        case_type=lambda wildcards: "switch" if wildcards.switch.startswith("extension-") else "sim_mode",
+        pos_type=lambda wildcards: wildcards.switch[len("extension-"):] if wildcards.switch.startswith("extension-") else "hap",
         linears=lambda wildcards: fill_out_globals_midway(wildcards, config["midway_linear"]),
         causal_hap = lambda wildcards: fill_out_globals_midway(wildcards, config["causal_hap"]),
-        linears_glob = lambda wildcards: expand(
-            re.sub(
-                r"\{(?!sim_mode\})[^}]+\}", "*",
-                fill_out_globals_midway(wildcards, config["midway_linear"])[0],
-            ),
-            sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
-            allow_missing=True,
-        )[0],
-        bic=lambda wildcards: "--kind bic " if wildcards.switch in ("bic", "interact-bic") else "",
-        thresh=lambda wildcards: "--thresh 3 " if wildcards.switch in ("bic", "interact-bic") else "--thresh 0.05 ",
+        linears_glob = partial(linears_glob, method=fill_out_globals_midway),
+        bic=lambda wildcards: "--kind bic " if str(wildcards.switch).endswith("bic") else "",
+        thresh=lambda wildcards: f"--thresh {bic_thresh(wildcards)}" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
     output:
         png=out + "/midway_summary.{switch}.pdf",
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
     resources:
-        runtime=7,
+        runtime=10,
+        mem_mb=2500,
     wildcard_constraints:
-        switch="(interact|tscore|covariance|bic|interact-bic)"
+        switch="("+"|".join(switch_sim_mode.keys())+")"
     log:
         logs + "/midway.{switch}",
     benchmark:
@@ -285,7 +369,7 @@ rule midway:
     shell:
         "workflow/scripts/midway_manhattan_summary.py {params.bic}"
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
-        "-f <(ls -1 {params.linears_glob}) --color locus {params.thresh}"
+        "-f <(ls -1 {params.linears_glob}) --color locus {params.thresh} "
         "{params.linears} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
 
 
@@ -295,27 +379,21 @@ rule midway_beta:
         linears=agg_midway_linear,
         snplists=agg_ld_range_causal,
     params:
-        case_type="sim_mode",
-        pos_type="hap",
+        case_type=lambda wildcards: "switch" if wildcards.switch.startswith("extension-") else "sim_mode",
+        pos_type=lambda wildcards: wildcards.switch[len("extension-"):] if wildcards.switch.startswith("extension-") else "hap",
         linears=lambda wildcards: fill_out_globals_midway_beta(wildcards, config["midway_linear"]),
         causal_hap = lambda wildcards: fill_out_globals_midway_beta(wildcards, config["causal_hap"]),
-        linears_glob = lambda wildcards: expand(
-            re.sub(
-                r"\{(?!sim_mode\})[^}]+\}", "*",
-                fill_out_globals_midway_beta(wildcards, config["midway_linear"])[0],
-            ),
-            sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
-            allow_missing=True,
-        )[0],
-        bic=lambda wildcards: "--kind bic " if wildcards.switch in ("bic", "interact-bic") else "",
-        thresh=lambda wildcards: "--thresh 3 " if wildcards.switch in ("bic", "interact-bic") else "--thresh 0.05 ",
+        linears_glob = partial(linears_glob, method=fill_out_globals_midway_beta),
+        bic=lambda wildcards: "--kind bic " if str(wildcards.switch).endswith("bic") else "",
+        thresh=lambda wildcards: f"--thresh {bic_thresh(wildcards)}" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
     output:
         png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
         metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
     resources:
-        runtime=7,
+        runtime=10,
+        mem_mb=2500,
     wildcard_constraints:
-        switch="(interact|tscore|covariance|bic|interact-bic)"
+        switch="("+"|".join(switch_sim_mode.keys())+")"
     log:
         logs + "/beta_{beta}/midway.{switch}",
     benchmark:
@@ -325,7 +403,7 @@ rule midway_beta:
     shell:
         "workflow/scripts/midway_manhattan_summary.py {params.bic}"
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
-        "-f <(ls -1 {params.linears_glob}) --color locus {params.thresh}"
+        "-f <(ls -1 {params.linears_glob}) --color locus {params.thresh} "
         "{params.linears} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
 
 
@@ -347,7 +425,7 @@ rule finemap:
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
         )[0],
-        thresh=lambda wildcards: "--thresh 0.9 ",
+        thresh=lambda wildcards: "--thresh 0.9",
     output:
         png=out + "/midway_summary.{switch}.pdf",
         metrics=out+"/midway_summary_metrics.{switch}.tsv",
@@ -362,7 +440,7 @@ rule finemap:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py --kind pip {params.thresh}"
+        "workflow/scripts/midway_manhattan_summary.py --kind pip {params.thresh} "
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.finemaps_glob}) --color locus "
         "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
@@ -386,7 +464,7 @@ rule finemap_beta:
             sim_mode="{"+",".join(switch_sim_mode[wildcards.switch])+"}",
             allow_missing=True,
         )[0],
-        thresh=lambda wildcards: "--thresh 0.9 ",
+        thresh=lambda wildcards: "--thresh 0.9",
     output:
         png=out + "/beta_{beta}/midway_summary.{switch}.pdf",
         metrics=out+"/beta_{beta}/midway_summary_metrics.{switch}.tsv",
@@ -401,7 +479,7 @@ rule finemap_beta:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/midway_manhattan_summary.py --kind pip {params.thresh}"
+        "workflow/scripts/midway_manhattan_summary.py --kind pip {params.thresh} "
         "-o {output.png} --verbosity DEBUG --pos-type {params.pos_type} "
         "-f <(ls -1 {params.finemaps_glob}) --color locus "
         "{params.finemaps} {params.causal_hap} {params.case_type} >{output.metrics} 2>{log}"
@@ -460,11 +538,12 @@ rule midway_metrics:
         ),
     params:
         metrics = lambda wildcards: expand(rules.midway_beta.output.metrics, switch=wildcards.switch, allow_missing=True),
-        use_flex_axes = lambda wildcards: "--use-flex-axes-limits " if wildcards.switch == "interact" else "",
+        thresh=lambda wildcards: f"--thresh {bic_thresh(wildcards)}" if str(wildcards.switch).endswith("bic") else "--thresh 0.05",
     output:
         png=out + "/midway_summary_metrics.{switch}.pdf",
     resources:
-        runtime=7,
+        runtime=10,
+        mem_mb=2500,
     log:
         logs + "/midway_metrics.{switch}",
     benchmark:
@@ -472,7 +551,7 @@ rule midway_metrics:
     conda:
         "happler"
     shell:
-        "workflow/scripts/midway_summary_metrics.py {params.use_flex_axes}-o {output.png} {params.metrics} &>{log}"
+        "workflow/scripts/midway_summary_metrics.py {params.thresh} -o {output.png} {params.metrics} &>{log}"
 
 
 rule finemap_metrics:

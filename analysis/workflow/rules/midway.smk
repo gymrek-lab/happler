@@ -5,9 +5,6 @@ logs = out + "/logs"
 bench = out + "/bench"
 
 
-wildcard_constraints:
-    switch="(interact|tscore|covariance|bic|interact-bic)"
-
 # mapping from switch wildcard to integer for bash script
 tswitch = {
     "interact": 1,
@@ -15,7 +12,15 @@ tswitch = {
     "covariance": 3,
     "bic": 4,
     "interact-bic": 5,
+    "extension-bic": 6,
+    "extension-tscore": 7,
 }
+
+wildcard_constraints:
+    switch="("+"|".join(tswitch.keys())+")"
+
+# if the pvar size is larger than 100 MB, just use the default memory instead
+rsrc_func = lambda x: max if 100 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000 else min
 
 
 rule manhattan:
@@ -39,7 +44,10 @@ rule manhattan:
         transform_pvar=temp(out + "/{switch}/out.pvar"),
         transform_psam=temp(out + "/{switch}/out.psam"),
     resources:
-        runtime=10,
+        runtime=20,
+        mem_mb=lambda wildcards, input: (
+            rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 3.1342470426950246 + 1000)
+        ) if str(wildcards.switch).startswith("extension") else 2000,
     log:
         logs + "/{switch}/manhattan",
     benchmark:

@@ -36,6 +36,7 @@ rule plink2vcf:
         log=temp(out + "/unphased.log"),
     resources:
         runtime=20,
+    threads: 1
     log:
         logs + "/plink2vcf"
     benchmark:
@@ -45,8 +46,8 @@ rule plink2vcf:
     shell:
         "plink2 --pfile {params.pfile} --out {params.out} --from-bp {params.start} "
         "--to-bp {params.end} --chr {params.chrom} --snps-only 'just-acgt' "
-        "--export vcf bgz id-paste=iid &>{log} && "
-        "tabix -p vcf {output.vcf} &>>{log}"
+        "--threads {threads} --memory {resources.mem_mb} --export vcf bgz id-paste=iid"
+        " &>{log} && tabix -p vcf {output.vcf} &>>{log}"
 
 
 def phase_gt_input(wildcards):
@@ -159,7 +160,7 @@ rule vcf2plink:
         "../envs/default.yml"
     shell:
         "plink2 --nonfounders --vcf {input.vcf} --maf {params.maf} --geno 0 --make-pgen "
-        "--threads {threads}{params.samps} --out {params.prefix} &>{log}"
+        "--threads {threads} --memory {resources.mem_mb}{params.samps} --out {params.prefix} &>{log}"
 
 
 def subset_input():
@@ -195,6 +196,7 @@ rule subset:
         psam=out+"/subset/{sampsize}.psam",
         log=temp(out+"/subset/{sampsize}.log"),
     resources:
+        mem_mb=8000,
         runtime=12,
     threads: 2
     log:
@@ -204,8 +206,9 @@ rule subset:
     conda:
         "../envs/default.yml"
     shell:
-        "plink2 --allow-extra-chr --nonfounders --from-bp {params.start} --out {params.out} "
-        "--to-bp {params.end} --chr {params.chrom} --max-alleles 2 {params.maf} "
+        "plink2 --threads {threads} --memory {resources.mem_mb} --allow-extra-chr "
+        "--nonfounders --out {params.out} --max-alleles 2 {params.maf} "
+        "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} "
         "--keep <(grep -Ev '^#' {input.psam} | cut -f1 | shuf --random-source <("
         "openssl enc -aes-256-ctr -pass pass:42 -nosalt < /dev/zero 2>/dev/null"
         ") | head -n {params.sampsize}) --make-pgen --pfile {params.prefix} &>{log}"

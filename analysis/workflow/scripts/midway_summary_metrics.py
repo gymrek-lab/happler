@@ -57,6 +57,14 @@ def get_metrics(
     ),
 )
 @click.option(
+    "-t",
+    "--thresh",
+    type=float,
+    default=None,
+    show_default=None,
+    help="If provided, draw a red line at the significance threshold"
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -75,6 +83,7 @@ def get_metrics(
 def main(
     metrics_files: Path,
     use_flex_axes_limits: bool = False,
+    thresh: float = None,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -143,29 +152,52 @@ def main(
     log.info("Setting axes limits appropriately")
     max_fpr = max(metrics["FPR"])
     min_recall = min(metrics["Recall"])
-    max_alpha = max(metrics["Significance Threshold"])
+    min_alpha = min(metrics["Significance Threshold"])
+    # filter out any inf values before finding the max
+    max_alpha = max(filter(lambda x: x != float("inf"), metrics["Significance Threshold"]))
     min_auroc = min(metrics["AUROC"])
     min_ap = min(metrics["Average Precision"])
     if not use_flex_axes_limits:
-        if max_fpr > 0.05:
-            axs[0].set_ylim((-0.001, 0.051))
+        if max_fpr > 0.5:
+            axs[0].set_ylim((-0.001, 1.005))
+        elif max_fpr > 0.05:
+            axs[0].set_ylim((-0.001, 0.505))
         else:
             axs[0].set_ylim((-0.001, 0.051))
         axs[1].set_ylim((-0.001, 1.001))
         if max_alpha > 1:
-            axs[2].set_ylim((-2.005, 10.005))
+            if max_alpha > 30:
+                assert max_alpha < 60, f"Max threshold value = {max_alpha}"
+                if min_alpha < 0:
+                    axs[2].set_ylim((-2.005, 60.005))
+                elif min_alpha < 15:
+                    axs[2].set_ylim((-0.005, 60.005))
+                else:
+                    axs[2].set_ylim((14.995, 60.005))
+            elif max_alpha > 10:
+                if min_alpha < 0:
+                    axs[2].set_ylim((-2.005, 30.005))
+                elif min_alpha < 15:
+                    axs[2].set_ylim((-0.005, 30.005))
+                else:
+                    axs[2].set_ylim((14.995, 30.005))
+            else:
+                if min_alpha < 0:
+                    axs[2].set_ylim((-2.005, 10.005))
+                else:
+                    axs[2].set_ylim((-0.005, 10.005))
         elif max_alpha > 0.25:
             axs[2].set_ylim((-0.005, 1.005))
         else:
             axs[2].set_ylim((-0.005, 0.255))
         if min_auroc < 0.5:
-            axs[3].set_ylim((0.295, 1.005))
+            axs[3].set_ylim((-0.005, 1.005))
         elif min_auroc < 0.9:
             axs[3].set_ylim((0.495, 1.005))
         else:
             axs[3].set_ylim((0.895, 1.005))
         if min_ap < 0.5:
-            axs[4].set_ylim((0.295, 1.005))
+            axs[4].set_ylim((-0.005, 1.005))
         elif min_ap < 0.9:
             axs[4].set_ylim((0.495, 1.005))
         else:
@@ -177,6 +209,9 @@ def main(
     axs[2].set_ylabel("Best Threshold")
     axs[3].set_ylabel("AUROC")
     axs[4].set_ylabel("Average Precision")
+
+    if thresh is not None:
+        axs[2].axhline(thresh, color="red", lw=0.9)
 
     log.info("Writing figure")
     fig.supxlabel("Sample size")

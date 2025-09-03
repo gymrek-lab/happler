@@ -211,10 +211,13 @@ class TTestTerminator(Terminator):
 
 
 class BICTerminator(Terminator):
-    def __init__(self, thresh: float = 0.05, bic_thresh: float = 3, log: Logger = None):
+    def __init__(
+        self, bic_thresh: float = -float("inf"), bf_thresh: float = 20, log: Logger = None
+    ):
         super().__init__()
-        self.thresh = thresh
         self.bic_thresh = bic_thresh
+        # bf_thresh is the threshold on the delta BIC
+        self.bf_thresh = bf_thresh
         self.log = log or getLogger(self.__class__.__name__)
 
     def compute_val(
@@ -228,33 +231,11 @@ class BICTerminator(Terminator):
         parent_corr: float = 0,
         short_circuit: bool = True,
     ) -> tuple[float, float]:
-        stat = None
-        pval = None
+        bf = None
+        bic = results.data["bic"][best_idx]
         if parent_res:
-            # before we do any calculations, check whether the effect sizes have
-            # improved and return True if they haven't
-            if short_circuit and (
-                np.isnan(node_res.beta)
-                or (np.abs(node_res.beta) - np.abs(parent_res.beta)) <= 0
-            ):
-                # terminate if the effect sizes have gone in the opposite direction
-                self.log.debug("Terminated b/c effect size did not improve")
-                return True
-            stat = parent_res.bic - results.data["bic"]
-            # compute the bayes factor approximation from the delta BIC:
-            # https://easystats.github.io/bayestestR/reference/bic_to_bf.html
-            stat = np.exp(stat / 2)
-            stat = stat[best_idx]
-        else:
-            # parent_res = None when the parent node is the root node
-            pval = results.data["pval"]
-            # correct for multiple hypothesis testing
-            if self.corrector is not None:
-                # I dunno why, but this needs None as the first arg for some reason
-                pval = self.corrector.correct(None, pval, num_samps, len(pval))[best_idx]
-            else:
-                pval = pval[best_idx]
-        return pval, stat
+            bf = (parent_res.bic - results.data["bic"])[best_idx]
+        return bic, bf
 
     def check(
         self,
@@ -276,19 +257,18 @@ class BICTerminator(Terminator):
         if isinstance(computed_val, bool):
             return computed_val
         else:
-            pval, stat = computed_val
-        if stat is None:
-            # TODO: handle this case by using delta BIC to rank, instead?
-            if pval >= self.thresh:
-                self.log.debug(
-                    f"Terminated with delta BIC {stat} and p-value {pval} >= {self.thresh}"
-                )
+            bic, bf = computed_val
+        if bf is None:
+            # if we have no parent results, we cannot compute delta BIC (aka BF)
+            # tree-building should continue unless the BIC is just way too low
+            if bic <= self.bic_thresh:
+                self.log.debug(f"Terminated with BIC {bic} <= {self.bic_thresh}")
                 return True
-        else:
-            if stat < self.bic_thresh:
-                self.log.debug(
-                    f"Terminated with delta BIC {stat} < {self.thresh} and p-value {pval}"
-                )
-                return True
-        self.log.debug(f"Significant with delta BIC {stat} > {self.thresh}")
+            return False
+        elif bf < self.bf_thresh:
+            self.log.debug(
+                f"Terminated with delta BIC {bf} < {self.bf_thresh} and BIC {bic}"
+            )
+            return True
+        self.log.debug(f"Significant with delta BIC {bf} > {self.bf_thresh}")
         return False

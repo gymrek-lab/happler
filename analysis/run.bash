@@ -8,7 +8,7 @@
 #SBATCH --ntasks 1
 #SBATCH --cpus-per-task 1
 #SBATCH --time 0:30:00
-#SBATCH --mem 3G
+#SBATCH --mem 8G
 #SBATCH --output /dev/null
 #SBATCH --signal=B:SIGUSR1@5
 
@@ -34,7 +34,7 @@ if ! command -v 'snakemake' &>/dev/null && \
 	command -v 'conda' &>/dev/null && \
    [ "$CONDA_DEFAULT_ENV" != "snakemake" ] && \
    conda info --envs | grep "$CONDA_ROOT/snakemake" &>/dev/null; then
-        echo "Snakemake not detected. Attempting to switch to snakemake environment." >> "out/log"
+        echo "Snakemake not detected. Attempting to switch to snakemake environment." >> "$out_path/log"
         eval "$(conda shell.bash hook)"
         conda activate snakemake
 fi

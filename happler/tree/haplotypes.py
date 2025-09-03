@@ -94,6 +94,25 @@ class Haplotype:
         """
         return cls(((node, allele),), variant_genotypes)
 
+    @classmethod
+    def from_haptools_haplotype(
+        cls, haplotype: HaplotypeBase, variant_genotypes: GenotypesVCF
+    ) -> Haplotype:
+        """
+        Create a new haplotype from a haptools Haplotype and a GenotypesVCF object
+        """
+        variants = {vr.id: vr.allele for vr in haplotype.variants}
+        variant_genotypes.index(variants=True)
+        gts = variant_genotypes.subset(variants=tuple(variants.keys()))
+        nodes = tuple(
+            (
+                Variant.from_np(variant, variant_genotypes._var_idx[variant["id"]]),
+                list(variant["alleles"]).index(allele),
+            )
+            for variant, allele in zip(gts.variants, variants.values())
+        )
+        return cls(nodes, haplotype.transform(gts))
+
     def append(
         self, node: Variant, allele: int, variant_genotypes: npt.NDArray[bool]
     ) -> Haplotype:
@@ -108,7 +127,7 @@ class Haplotype:
             The allele associated with this node
         variant_genotypes : npt.NDArray[bool]
             A np array (with length n x 2, num_samples x num_chromosomes) denoting the
-            presence of this haplotype in each chromosome of each sample
+            presence of the new allele in each chromosome of each sample
 
         Returns
         -------
@@ -188,7 +207,7 @@ class HapplerVariant(VariantBase):
     _extras: tuple = field(
         repr=False,
         init=False,
-        default=(Extra("score", ".2f", "-log(pval) assigned to this variant"),),
+        default=(Extra("score", ".2f", "BIC assigned to this variant"),),
     )
 
 
@@ -289,7 +308,7 @@ class Haplotypes(HaplotypesBase):
                     end=node["variant"].pos + len(alleles[node["variant"].idx]),
                     id=node["variant"].id,
                     allele=alleles[node["variant"].idx],
-                    score=-np.log10(cls._handle_nan(node["results"], "pval")),
+                    score=cls._handle_nan(node["results"], "bic"),
                 )
                 for node in haplotype
             )

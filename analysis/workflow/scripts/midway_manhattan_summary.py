@@ -5,6 +5,7 @@ import warnings
 from pathlib import Path
 from decimal import Decimal
 from functools import partial
+from collections.abc import Callable
 
 import click
 import matplotlib
@@ -12,6 +13,7 @@ import numpy as np
 import pandas as pd
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from numpy.lib import recfunctions as rfn
 # this gets imported later down only if --pos-type is specified
 # from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score, precision_recall_fscore_support
 
@@ -135,7 +137,7 @@ def get_finemap_metrics(
         return null_val
     if not keep_hap_ids:
         # Remove the 'hap_id' column (index 0)
-        metrics = np.delete(metrics, 0, axis=1)
+        metrics = rfn.drop_fields(metrics, 'hap_id')
     return metrics
 
 
@@ -143,6 +145,7 @@ def get_pval(
     linear: Path,
     snp_id: str,
     bic: bool = False,
+    tsfm_func: Callable = None,
     log: logging.Logger = None
 ) -> float:
     """
@@ -167,11 +170,14 @@ def get_pval(
     """
     # load the linear file
     df = load_linear_file(linear)
-    pval = df[df.id == snp_id].iloc[0]["pval"]
-    if bic:
-        pval = math.log(pval)
+    # figure out which pval to extract from the linear file
+    # or just use the first one if there's only one
+    if len(df) == 1:
+        pval = df.pval[0]
     else:
-        pval = -np.log10(pval)
+        pval = df[df.id == snp_id].iloc[0]["pval"]
+    if tsfm_func is not None:
+        pval = tsfm_func(pval)
     return np.float64(pval)
 
 
@@ -434,12 +440,11 @@ def main(
         is_finemap_metric = True
 
     # if this is a pval, take the -log10 of it, otherwise take the ln of it
+    scatter_tsfm_label = ""
     if kind == "pval":
         tsfm_pval = lambda pval: -np.log10(pval) if pval != 0 else np.inf
         rvrs_tsfm = lambda pval: np.power(10, -pval)
-    elif bic:
-        tsfm_pval = lambda val: np.log(val) if val != 0 else -np.inf
-        rvrs_tsfm = lambda pval: np.power(10, pval)
+        scatter_tsfm_label = "-log10 "
     elif reverse:
         tsfm_pval = lambda val: -val
         rvrs_tsfm = lambda pval: -pval        
@@ -549,7 +554,7 @@ def main(
     if is_finemap_metric:
         get_val_method = partial(get_pip, target_metric=kind)
     else:
-        get_val_method = partial(get_pval, bic=bic)
+        get_val_method = partial(get_pval, bic=bic, tsfm_func=tsfm_pval)
     vals = np.array(
         [
             [
@@ -568,8 +573,7 @@ def main(
     # remove any rows that were nan or greater than max-val (which defaults to inf)
     if no_log10:
         if max_val == float("inf"):
-            if not bic:
-                max_val = 1
+            max_val = 1
         na_rows = np.isnan(vals).any(axis=1) | (rvrs_tsfm(vals) >= max_val).any(axis=1)
     else:
         na_rows = np.isnan(vals).any(axis=1) | (vals >= max_val).any(axis=1)
@@ -610,10 +614,7 @@ def main(
             fdr[np.isnan(fdr)] = 0
         # find the threshold (last index) where FDR <= 0.05
         thresh_idx = np.where(fdr <= 0.05)[0][-1]
-        if bic:
-            optimal_thresh = roc_threshold[thresh_idx]
-        else:
-            optimal_thresh = rvrs_tsfm(roc_threshold[thresh_idx])
+        optimal_thresh = rvrs_tsfm(roc_threshold[thresh_idx])
         final_metrics["Significance Threshold"] = optimal_thresh
         if thresh is not None:
             thresh_idx = np.argmax(roc_threshold < tsfm_pval(thresh))
@@ -621,14 +622,12 @@ def main(
             thresh = optimal_thresh
         roc_auc = auc(fpr, tpr)
         prc_ap = average_precision_score(y_true, y_score)
-        # Find the index where thresholds > log_thresh b/c prc_threshold increases from 0 to inf
-        prc_thresh_idx = np.argmax(prc_threshold > tsfm_pval(thresh))
-
-        # Ensure index is within bounds (prc_threshold is shorter with precision/recall than roc)
-        if prc_thresh_idx >= len(precision):
-            prc_thresh_idx = len(precision) - 1
+        # Align PRC threshold to correct precision/recall index
+        score_thresh = tsfm_pval(thresh) if not no_log10 else thresh
+        prc_thresh_idx = np.searchsorted(prc_threshold, score_thresh, side="right")
+        prc_thresh_idx = min(prc_thresh_idx, len(precision) - 1)
         final_metrics["AUROC"] = roc_auc
-        final_metrics["Average Precision"] = roc_auc
+        final_metrics["Average Precision"] = prc_ap
 
         # now, make the fig
         fig = plt.figure(figsize=(16, 6), layout='constrained')
@@ -664,10 +663,10 @@ def main(
         ax_prc.plot([0, 1], [0, 1], "--", color="orange")
         precision_thresh = precision[prc_thresh_idx]
         if precision_thresh != 0:
-            ax_prc.axline((0, precision_thresh), (precision_thresh, precision_thresh), color="red", lw=0.9)
+            ax_prc.axhline(precision_thresh, color="red", lw=0.9)
         recall_thresh = recall[prc_thresh_idx]
         if recall_thresh != 0:
-            ax_prc.axline((recall_thresh, 0), (recall_thresh, recall_thresh), color="red", lw=0.9)
+            ax_prc.axvline(recall_thresh, color="red", lw=0.9)
         ax_prc.set_xlim([-0.005, 1.005])
         ax_prc.set_ylim([-0.005, 1.005])
         ax_prc.set_ylabel('Precision')
@@ -708,16 +707,17 @@ def main(
             else:
                 threshold_type = ""
         fig.text(0.98, 0.98, f'{threshold_type} threshold: {thresh:.2f}', ha='right', va='top', fontsize=15)
+        fig.text(0.98, 0.95, f'Optimal threshold: {final_metrics["Significance Threshold"]:.2f}', ha='right', va='top', fontsize=15)
         if not no_log10 and not is_finemap_metric:
             thresh = tsfm_pval(thresh)
-    ax.set_xlabel(case_type + ": " + ax_labs[1])
-    ax.set_ylabel(case_type + ": " + ax_labs[0])
+    ax.set_xlabel(scatter_tsfm_label + case_type + ": " + ax_labs[1])
+    ax.set_ylabel(scatter_tsfm_label + case_type + ": " + ax_labs[0])
     ax.axline((0,0), (vals.max(), vals.max()), linestyle="--", color="orange")
     if thresh is not None and thresh != 0:
-        ax.axline((0,thresh), (thresh, thresh), color="red")
-        ax_histx.axline((thresh,0), (thresh, thresh), color="red")
-        ax.axline((thresh,0), (thresh, thresh), color="red")
-        ax_histy.axline((0,thresh), (thresh, thresh), color="red")
+        ax.axhline(thresh, color="red")
+        ax.axvline(thresh, color="red")
+        ax_histx.axvline(thresh, color="red")
+        ax_histy.axhline(thresh, color="red")
     ax_histy.spines['top'].set_visible(False)
     ax_histx.spines['top'].set_visible(False)
     ax_histy.spines['right'].set_visible(False)

@@ -5,4 +5,10 @@ from .variant import VariantType, Variant
 from .haplotypes import Haplotype, Haplotypes
 from .corrector import Corrector, BH, Bonferroni, BHSM
 from .terminator import Terminator, TTestTerminator, BICTerminator
-from .assoc_test import AssocTest, AssocTestSimple, NodeResults, NodeResultsExtra
+from .assoc_test import (
+    AssocTest,
+    AssocTestSimple,
+    AssocTestSimpleSM,
+    NodeResults,
+    NodeResultsExtra,
+)

@@ -162,7 +162,7 @@ def main(
         if mode == "bic":
             # parent node model: y ~ h_parent
             parent_res = NodeResultsExtra.from_np(
-                    AssocTestSimpleSM(with_bic=True).run(
+                AssocTestSimpleSM(with_bic=True).run(
                     parent_gts.data.sum(axis=2),
                     phen.data[:, 0],
                 ).data[0]
@@ -177,45 +177,18 @@ def main(
             parent_and_child_covar = data.GenotypesPLINK.merge_variants(
                 (parent_gts, child_gts), fname=None
             ).data.sum(axis=2)
-            if True:
-                # parent node model: y ~ h_parent + z_child
-                parent_res = NodeResultsExtra.from_np(
-                        AssocTestSimpleCovariates(covars=child_covar, with_bic=True).run(
-                        parent_gts.data.sum(axis=2),
-                        phen.data[:, 0],
-                    ).data[0]
-                )
-                # current node model: y ~ h_hap
-                results = AssocTestSimpleSM(with_bic=True).run(
-                    linear_gts.data.sum(axis=2),
-                    phen.data[:, 0],
-                )
-            elif False:
-                # parent node model: y ~ h_parent + z_child
-                parent_res = NodeResultsExtra.from_np(
-                        AssocTestSimpleCovariates(covars=child_covar, with_bic=True).run(
-                        parent_gts.data.sum(axis=2),
-                        phen.data[:, 0],
-                    ).data[0]
-                )
-                # current node model: y ~ h_hap + h_parent + z_child
-                results = AssocTestSimpleCovariates(covars=parent_and_child_covar, with_bic=True).run(
-                    linear_gts.data.sum(axis=2),
+            # parent node model: y ~ h_parent + z_child
+            parent_res = NodeResultsExtra.from_np(
+                AssocTestSimpleCovariates(covars=child_covar, with_bic=True).run(
+                    parent_gts.data.sum(axis=2),
                     phen.data[:, 0],
                 ).data[0]
-            elif False:
-                # parent node model: y ~ h_hap + h_parent + z_child
-                parent_res = NodeResultsExtra.from_np(
-                        AssocTestSimpleCovariates(covars=parent_and_child_covar, with_bic=True).run(
-                        linear_gts.data.sum(axis=2),
-                        phen.data[:, 0],
-                    ).data[0]
-                )
-                # current node model: y ~ h_hap
-                results = AssocTestSimpleSM(with_bic=True).run(
-                    linear_gts.data.sum(axis=2),
-                    phen.data[:, 0],
-                )
+            )
+            # current node model: y ~ h_hap
+            results = AssocTestSimpleSM(with_bic=True).run(
+                linear_gts.data.sum(axis=2),
+                phen.data[:, 0],
+            )
         node_res = NodeResultsExtra
         terminator = BICTerminator()
     else:
@@ -244,6 +217,8 @@ def main(
     ]
     bic = int(mode == "bic" or mode == "interact-bic")
     df["pval"] = np.array([(val[bic] if val != True else 1) for val in vals])
+    df["beta"] = results.data["beta"]
+    df["stderr"] = results.data["stderr"]
 
     if df["pval"].isna().any():
         raise ValueError("Some pvals were NA")

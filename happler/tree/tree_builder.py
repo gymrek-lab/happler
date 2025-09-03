@@ -12,14 +12,12 @@ from haptools.ld import pearson_corr_ld
 from .tree import Tree
 from .variant import Variant
 from .haplotypes import Haplotype
-from .terminator import Terminator, TTestTerminator
+from .terminator import Terminator, BICTerminator, TTestTerminator
 from .assoc_test import (
     AssocTest,
     NodeResults,
     NodeResultsExtra,
-    NodeResultsExtraTScore,
-    NodeResultsTScore,
-    AssocTestSimple,
+    AssocTestSimpleSM,
     AssocTestSimpleSMTScore,
     AssocTestSimpleCovariates,
 )
@@ -58,8 +56,8 @@ class TreeBuilder:
         genotypes: Genotypes,
         phenotypes: Phenotypes,
         maf: float = None,
-        method: AssocTest = AssocTestSimple(),
-        terminator: Terminator = TTestTerminator(),
+        method: AssocTest = AssocTestSimpleSM(with_bic=True),
+        terminator: Terminator = BICTerminator(),
         indep_thresh: float = 0.1,
         ld_prune_thresh: float = None,
         covariance_correction: float = True,
@@ -76,6 +74,8 @@ class TreeBuilder:
         self._split_method = self._find_split_rigid
         split_method = "rigid"
         self.ld_prune_thresh = ld_prune_thresh
+        # self.ranking_val = "bic" if isinstance(self.method, AssocTestSimpleSM) and self.method.with_bic else "pval"
+        self.ranking_val = "pval"
         # for now, let's comment this out because we want to try the rigid strategy
         # if self.ld_prune_thresh is not None:
         #     self._split_method = self._find_split_flexible
@@ -172,19 +172,19 @@ class TreeBuilder:
             # TODO: use a for-loop if we allow more than two branches per node
             sib_idx, sibling = sibs[0]
             if sib_idx in leaves:
-                sib_p = sibling["results"].pval
-                leaf_p = leaf["results"].pval
+                sib_p = sibling["results"].bic
+                leaf_p = leaf["results"].bic
                 if sib_p > leaf_p and not math.isclose(sib_p, leaf_p):
                     self.log.debug(
-                        f"Left leaf {leaf_var.id} unpruned since it has a better pval"
+                        f"Left leaf {leaf_var.id} unpruned since it has a better bic"
                     )
-                    # keep it if our p-value is better
+                    # keep it if our value is better
                     continue
                 elif math.isclose(sib_p, leaf_p) and leaf["results"].beta > 0:
                     self.log.debug(
                         f"Left leaf {leaf_var.id} unpruned since it's beta is positive"
                     )
-                    # also if the p-values are the same but our effect size is positive
+                    # also if the values are the same but our effect size is positive
                     continue
             # step 3: get the genotypes for the leaf node and its sibling
             leaf_gts = self.gens.data[:, leaf_var.idx, :] == leaf["allele"]
@@ -200,7 +200,7 @@ class TreeBuilder:
                 self.tree.remove_leaf_node(leaf_idx)
             else:
                 self.log.debug(f"Left leaf {leaf_var.id} (with LD {ld}) unpruned")
-        self.log.info(
+        self.log.debug(
             f"Pruned {count} leaves with LD > {self.ld_prune_thresh} with their siblings"
         )
 
@@ -247,7 +247,7 @@ class TreeBuilder:
         -------
         tuple[Variant, float]
             The variant that best fits under the parent node with the allele edge AND
-            the results (ex: beta, pval) of the haplotype association test after
+            the results (ex: beta, bic) of the haplotype association test after
             incorporating that variant
         """
         num_samps = len(self.gens.samples)
@@ -289,7 +289,7 @@ class TreeBuilder:
                     self.phens.data[:, 0],
                 )
                 # step 3: record the best p-value among all the SNPs with this allele
-                best_var_idx = results.data["pval"].argmin()
+                best_var_idx = results.data[self.ranking_val].argmin()
             node_res = self.results_type.from_np(results.data[best_var_idx])
             best_res_idx = best_var_idx
             num_tests = len(parent.nodes) + 1
@@ -304,34 +304,41 @@ class TreeBuilder:
                 if gt_idx > best_var_idx:
                     break
                 best_var_idx += 1
-            # step 5: retrieve the Variant with the best p-value
+            # step 5: retrieve the Variant with the best value
             best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
             self.log.debug("Chose variant {}".format(best_variant.id))
             # step 6: check whether we don't get a stronger effect by treating this variant
             # as independently causal
             if parent_res is not None:
-                allele_gts = (self.gens.data[:, best_var_idx] == allele).sum(axis=1)
-                cv_data = np.vstack((parent.data.sum(axis=1), allele_gts)).T
-                hap_indep_effect = (
-                    AssocTestSimpleCovariates(covars=cv_data)
+                allele_gts = (self.gens.data[:, best_var_idx] == allele).sum(axis=1)[
+                    :, np.newaxis
+                ]
+                # y ~ h_parent + z_child VS y ~ h_hap
+                hap_indep_effect = NodeResultsExtra.from_np(
+                    AssocTestSimpleCovariates(covars=allele_gts, with_bic=True)
                     .run(
-                        hap_matrix[:, best_res_idx][:, np.newaxis].sum(axis=1),
+                        parent.data.sum(axis=1)[:, np.newaxis],
                         self.phens.data[:, 0],
                     )
-                    .data["pval"][0]
+                    .data[0]
                 )
-                if hap_indep_effect > self.indep_thresh:
+                if BICTerminator(bf_thresh=self.indep_thresh).check(
+                    hap_indep_effect,
+                    node_res,
+                    results,
+                    best_res_idx,
+                    num_samps,
+                    num_tests,
+                ):
                     self.log.debug(
-                        "Terminating because the haplotype had a pval of"
-                        f" {hap_indep_effect} > {self.indep_thresh} in an additive model"
-                        " with the allele and parent"
+                        "Terminating because the hap had a BIC too similar to one with "
+                        "just the parent + child"
                     )
                     yield None, allele, node_res
                     continue
                 self.log.debug(
-                    f"The haplotype had a pval of {hap_indep_effect} <"
-                    f" {self.indep_thresh} in an additive model with the allele and"
-                    " parent"
+                    "The haplotype had a much better BIC than in an additive model "
+                    "with the allele and parent"
                 )
             # step 7: check if this allele is significant and whether we should terminate the branch
             self.log.debug(
@@ -339,10 +346,14 @@ class TreeBuilder:
                     best_variant.id, allele, parent_res, node_res
                 )
             )
-            args = [parent_res, node_res, results, best_res_idx, num_samps, num_tests]
-            if isinstance(self.terminator, TTestTerminator):
-                args.append(parent_corr)
-            if self.terminator.check(*args):
+            if self.terminator.check(
+                parent_res,
+                node_res,
+                results,
+                best_res_idx,
+                num_samps,
+                num_tests,
+            ):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res
@@ -368,7 +379,7 @@ class TreeBuilder:
         -------
         tuple[Variant, float]
             The variant that best fits under the parent node with the allele edge AND
-            the results (ex: beta, pval) of the haplotype association test after
+            the results (ex: beta, bic) of the haplotype association test after
             incorporating that variant
         """
         num_samps = len(self.gens.samples)
@@ -414,8 +425,8 @@ class TreeBuilder:
                     hap_mat_sum,
                     self.phens.data[:, 0],
                 )
-                # also, record the best p-value among all the SNPs with this allele
-                best_p_idx[allele] = results[allele].data["pval"].argmin()
+                # also record the best value among all the SNPs with this allele
+                best_p_idx[allele] = results[allele].data[self.ranking_val].argmin()
         # exit if neither of the alleles worked
         if not len(best_p_idx):
             return
@@ -426,7 +437,7 @@ class TreeBuilder:
             )
         else:
             best_allele = min(
-                best_p_idx, key=lambda a: results[a].data["pval"][best_p_idx[a]]
+                best_p_idx, key=lambda a: results[a].data[self.ranking_val][best_p_idx[a]]
             )
         best_var_idx = best_p_idx[best_allele]
         best_res_idx = {
@@ -449,7 +460,7 @@ class TreeBuilder:
             if gt_idx > best_var_idx:
                 break
             best_var_idx += 1
-        # step 5: retrieve the Variant with the best p-value
+        # step 5: retrieve the Variant with the best value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
         self.log.debug("Chose variant {}".format(best_variant.id))
         # step 6: check the MAFs of the haplotypes we created
@@ -469,52 +480,55 @@ class TreeBuilder:
         # iterate through all of the alleles of the best variant and check if they're
         # significant
         for allele in best_res_idx:
+            best_allele_idx = best_res_idx[best_allele]
+            best_results = results[allele].data[best_allele_idx]
+            node_res = self.results_type.from_np(best_results)
             # step 7: check whether we don't get a stronger effect by treating this variant
             # as independently causal
             if parent_res is not None:
-                allele_gts = self.gens.data[:, best_var_idx].sum(axis=1)
-                cv_data = np.vstack((parent.data.sum(axis=1), allele_gts)).T
-                tsfm = parent.transform(self.gens, allele, (best_var_idx,))
-                hap_indep_effect = (
-                    AssocTestSimpleCovariates(covars=cv_data)
-                    .run(tsfm.sum(axis=1), self.phens.data[:, 0])
-                    .data["pval"][0]
-                )
-                if hap_indep_effect > self.indep_thresh:
-                    self.log.debug(
-                        "Terminating because the haplotype had a pval of"
-                        f" {hap_indep_effect} > {self.indep_thresh} in an additive model with"
-                        f" the allele {allele} and parent"
+                allele_gts = self.gens.data[:, best_var_idx].sum(axis=1)[:, np.newaxis]
+                # y ~ h_parent + z_child VS y ~ h_hap
+                # delta BIC = first minus second
+                hap_indep_effect = NodeResultsExtra.from_np(
+                    AssocTestSimpleCovariates(covars=allele_gts, with_bic=True)
+                    .run(
+                        parent.data.sum(axis=1)[:, np.newaxis],
+                        self.phens.data[:, 0],
                     )
-                    yield None, allele, None
+                    .data[0]
+                )
+                if BICTerminator(bf_thresh=self.indep_thresh).check(
+                    hap_indep_effect,
+                    node_res,
+                    results[allele],
+                    best_allele_idx,
+                    num_samps,
+                    num_tests,
+                ):
+                    self.log.debug(
+                        "Terminating because the hap had a BIC too similar to one with "
+                        f"just the parent + child for allele {allele}"
+                    )
+                    yield None, allele, node_res
                     continue
                 self.log.debug(
-                    f"The haplotype had a pval of {hap_indep_effect} < {self.indep_thresh}"
-                    " in an additive model with the allele and parent"
+                    "The haplotype had a much better BIC than in an additive model "
+                    f"with the allele and parent for allele {allele}"
                 )
-            best_allele_idx = best_res_idx[best_allele]
-            best_results = results[allele].data[best_allele_idx]
-            best_parent_corr = parent_corr[allele]
-            if best_parent_corr is not None:
-                best_parent_corr = best_parent_corr[best_allele_idx]
-            node_res = self.results_type.from_np(best_results)
             # step 8: check whether we should terminate the branch
             self.log.debug(
                 "Testing variant {} / allele {} with parent_res {} and node_res {}".format(
                     best_variant.id, allele, parent_res, node_res
                 )
             )
-            args = [
+            if self.terminator.check(
                 parent_res,
                 node_res,
                 results[allele],
                 best_allele_idx,
                 num_samps,
                 num_tests,
-            ]
-            if isinstance(self.terminator, TTestTerminator):
-                args.append(best_parent_corr)
-            if self.terminator.check(*args):
+            ):
                 yield None, allele, node_res
                 continue
             yield best_variant, allele, node_res

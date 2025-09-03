@@ -14,7 +14,7 @@
 # required!
 # ref_panel: "/projects/ps-gymreklab/resources/datasets/snpstr/1kg.snp.str.chr{chr}.vcf.gz"
 # snp_panel: "/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
-snp_panel: "data/geuvadis/geuvadis_ensemble_phasing.pgen"
+snp_panel: "data/geuvadis/geuvadis_ensemble_phasing.maf0.1.pgen"
 # str_panel: "/tscc/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
 
 # Path to a list of samples to exclude from the analysis

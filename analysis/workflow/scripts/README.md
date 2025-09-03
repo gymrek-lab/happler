@@ -3,6 +3,9 @@ This directory contains various scripts used by the pipeline. However, you can u
 
 All python scripts implement the --help argument. For bash, awk, and R scripts, you can run `head <script>` to read about their usage.
 
+## [check_resource_usage.py](check_resource_usage.py)
+Using the log of a completed workflow run, compare existing memory and runtime allocations against benchmarked usage.
+
 ## [choose_different_ld.py](choose_different_ld.py)
 Choose haplotype alleles such that their SNPs have a range of strengths of LD with the causal haplotype.
 

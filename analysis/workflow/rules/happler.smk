@@ -24,6 +24,9 @@ def parse_locus(locus):
     start = locus.split("_")[1].split("-")[0]
     return chrom, start, end
 
+wildcard_constraints:
+    rep="\d+"
+
 
 rule sub_pheno:
     """
@@ -35,8 +38,6 @@ rule sub_pheno:
         rep=lambda wildcards: int(wildcards.rep)+2,
     output:
         pheno=out + "/phen.pheno",
-    wildcard_constraints:
-        rep="\d+"
     resources:
         runtime=7,
     threads: 1,
@@ -52,8 +53,11 @@ rule sub_pheno:
 
 
 pheno = rules.sub_pheno.output.pheno if "{rep}" in out else config["pheno"]
-# if the pvar size is larger than 0.5 GB, just use the default memory instead
-rsrc_func = lambda x: max if .5 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000/1000 else min
+if mode in ("run", "midway"):
+    # if the pvar size is larger than 100 MB, just use the default memory instead (if it is lower)
+    rsrc_func = lambda x: max if 100 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000 else min
+else:
+    rsrc_func = lambda x: min
 
 
 rule run:
@@ -63,28 +67,28 @@ rule run:
         pts=pheno,
         covar=config["covar"],
     params:
-        thresh=lambda wildcards: 0.05 if "alpha" not in wildcards else wildcards.alpha,
+        thresh=lambda wildcards: 20 if not hasattr(wildcards, "alpha") else wildcards.alpha,
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
         covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else "",
         maf = check_config("min_maf", 0),
-        indep=lambda wildcards: 0.05 if "indep_alpha" not in wildcards else wildcards.indep_alpha,
+        indep=lambda wildcards: 15 if not hasattr(wildcards, "indep_alpha") else wildcards.indep_alpha,
         max_signals=3,
         max_iterations=3,
         out_thresh=check_config("out_thresh", 5e-8),
-        keep_SNPs="--remove-SNPs " if not ("{rep}" in out) else "",
+        keep_SNPs=lambda wildcards: "--remove-SNPs " if not hasattr(wildcards, "rep") else "",
     output:
-        hap=ensure(out + "/happler.hap", non_empty=True),
+        hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
         idx=out + "/happler.hap.gz.tbi",
         dot=out + "/happler.dot",
     resources:
         runtime=lambda wildcards, input: (
-            rsrc_func(input.gts)(45, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
+            rsrc_func(input.gts)(15, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
         ),
         # slurm_partition="hotel",
         # slurm_extra="--qos=hotel",
         mem_mb=lambda wildcards, input: (
-            rsrc_func(input.gts)(2500, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
+            rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
         ),
     threads: 1
     log:
@@ -143,10 +147,11 @@ rule cond_linreg:
         png=out + "/cond_linreg.pdf",
     resources:
         runtime=lambda wildcards, input: (
-            rsrc_func(input.pgen)(50, 1.5 * Path(input.pvar).stat().st_size/1000 * (
+            rsrc_func(input.pgen)(5, 1.5 * Path(input.pvar).stat().st_size/1000 * (
                 0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
             ))
         ),
+        mem_mb=2500,
     log:
         logs + "/cond_linreg",
     benchmark:
@@ -296,6 +301,7 @@ rule sv_ld:
         ld=out + "/happler_svs.ld",
     resources:
         runtime=4,
+        mem_mb=4000,
     log:
         logs + "/sv_ld",
     benchmark:
@@ -310,7 +316,7 @@ rule sv_ld:
 
 
 def merge_hps_input(wildcards):
-    if mode == "happler":
+    if mode in ("run", "ld_range"):
         if config["random"] is None:
             # include the hap that happler found
             return rules.transform.output
@@ -403,7 +409,7 @@ rule finemapper:
         susie=out + "/{ex}clude/susie.rds",
     resources:
         runtime=lambda wildcards, input: (
-            rsrc_func(input.gt)(120, Path(input.gt_pvar).stat().st_size/1000 * 0.3)
+            rsrc_func(input.gt)(10, Path(input.gt_pvar).stat().st_size/1000 * 0.3)
         ),
         mem_mb = 8500,
     threads: 1,
@@ -457,8 +463,9 @@ rule metrics:
     output:
         metrics=out + "/{ex}clude/susie_metrics.tsv",
     resources:
-        runtime=10,
-    threads: 6,
+        runtime=30,
+        mem_mb = 8500,
+    threads: 1,
     log:
         logs + "/{ex}clude/metrics",
     benchmark:
@@ -578,7 +585,7 @@ rule gwas:
         "plink2 --glm {params.covar} --variance-standardize --maf {params.maf} "
         "--nonfounders --pheno iid-only {input.pts} --pfile {params.in_prefix} "
         # "--from-bp {params.start} --to-bp {params.end} --chr {params.chrom} " # unnecessary b/c merge subsets by region already
-        "--out {params.out_prefix} --threads {threads} &>{log}"
+        "--out {params.out_prefix} --threads {threads} --memory {resources.mem_mb} &>{log}"
 
 
 rule manhattan:

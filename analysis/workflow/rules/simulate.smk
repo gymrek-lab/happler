@@ -52,7 +52,7 @@ checkpoint create_hap_ld_range:
     output:
         hap=directory(out + "/create_ld_range")
     resources:
-        runtime=5,
+        runtime=25,
     log:
         logs + "/create_hap_ld_range",
     benchmark:
@@ -183,7 +183,7 @@ rule simphenotype:
     params:
         hap=simphenotype_params_hap,
         seed = 42,
-        reps = lambda wildcards: config["modes"]["ld_range"]["reps"],
+        reps = lambda wildcards: config["modes"][mode]["reps"] if "reps" in config["modes"][mode] else 1,
     output:
         pheno=out + "/{beta}.pheno",
     resources:

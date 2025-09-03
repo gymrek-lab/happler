@@ -92,7 +92,7 @@ def main():
     type=float,
     default=None,
     show_default="all haplotypes",
-    help="Only build haplotypes with a MAF above this threshold",
+    help="Only build haplotypes with an MAF above this threshold",
 )
 @click.option(
     "--phased",
@@ -120,18 +120,18 @@ def main():
     "-t",
     "--threshold",
     type=float,
-    default=0.05,
+    default=20,
     show_default=True,
     hidden=True,
-    help="The alpha threshold used to determine when to terminate tree building",
+    help="The delta BIC threshold used to determine when to terminate tree building",
 )
 @click.option(
     "--indep-thresh",
     type=float,
-    default=0.1,
+    default=15,
     show_default=True,
     hidden=True,
-    help="Threshold used to detect whether SNP and haplotype are independently causal",
+    help="Threshold used to detect whether SNP and haplotypes are independently causal",
 )
 @click.option(
     "--ld-prune-thresh",
@@ -155,35 +155,11 @@ def main():
     help="Output a tree in addition to the regular output.",
 )
 @click.option(
-    "--covars",
-    type=click.Path(exists=True, path_type=Path),
-    show_default="no covariates",
-    help="Any covariates to include in the model (as a PLINK2 .covar) file",
-)
-@click.option(
-    "--corrector",
-    type=click.Choice(["n", "b", "bh"]),
-    default="n",
-    show_default=True,
-    help=(
-        "Correct p-vals via either bonferroni (b), benjamini-hochberg (bh), or "
-        "no correction (n)"
-    ),
-)
-@click.option(
     "--remove-SNPs",
     is_flag=True,
     show_default=True,
     default=False,
     help="Remove haplotypes with only a single variant",
-)
-@click.option(
-    "--no-covariance-correction",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    hidden=True,
-    help="Do not perform any covariance corrections",
 )
 @click.option(
     "-o",
@@ -216,15 +192,12 @@ def run(
     phased: bool = False,
     max_signals: int = 1,
     max_iterations: int = 1,
-    threshold: float = 0.05,
+    threshold: float = 20,
     out_thresh: float = 5e-8,
-    indep_thresh: float = 0.1,
-    ld_prune_thresh: float = None,
+    indep_thresh: float = 15,
+    ld_prune_thresh: float = 0.95,
     show_tree: bool = False,
-    covars: Path = None,
-    corrector: str = "n",
     remove_snps: bool = False,
-    no_covariance_correction: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "INFO",
 ):
@@ -308,51 +281,21 @@ def run(
     # also reorder and subset samples in Phenotypes to match those in the Genotypes
     ph.subset(samples=tuple(gt.samples), names=(pheno,), inplace=True)
 
-    log.debug("Setting up tree builder settings")
-    if covars:
-        cv = data.Covariates(fname=covars, log=log)
-        cv.read(samples=set(gt.samples))
-        cv.subset(samples=gt.samples, inplace=True)
-        if len(cv.samples) < len(gt.samples):
-            diff = set(gt.samples) - set(ph.samples)
-            log.error(
-                f"The covariates file is missing {len(diff)} samples. Here are the"
-                f" first few: {list(diff)[:5]}"
-            )
-        test_method = tree.assoc_test.AssocTestSimpleCovariates(covars=cv.data)
-    else:
-        if ld_prune_thresh is None:
-            test_method = tree.assoc_test.AssocTestSimpleSM(with_bic=True)
-        else:
-            test_method = tree.assoc_test.AssocTestSimpleSMTScore(with_bic=True)
-    if corrector == "b":
-        log.debug("Using Bonferroni correction procedure")
-        corrector = tree.corrector.Bonferroni
-    elif corrector == "bh":
-        log.debug("Using Benjamini Hochberg correction procedure")
-        corrector = tree.corrector.BHSM
-    else:
-        if corrector == "n":
-            log.debug("Disabling corrections")
-        else:
-            log.warning("Couldn't interpret correction method. Disabling corrections")
-        corrector = None
+    test_method = tree.assoc_test.AssocTestSimpleSM(with_bic=True)
     log.debug(f"Using alpha threshold of {threshold}")
-    terminator = tree.terminator.TTestTerminator(
-        thresh=threshold,
-        corrector=corrector,
+    terminator = tree.terminator.BICTerminator(
+        bf_thresh=threshold,
         log=log,
     )
-    log.info("Running tree builder")
+    log.info("Creating tree and forest builders")
     hap_tree = tree.TreeBuilder(
         gt,
         ph,
         maf=maf,
-        method=test_method,
         terminator=terminator,
         indep_thresh=indep_thresh,
         ld_prune_thresh=ld_prune_thresh,
-        covariance_correction=not no_covariance_correction,
+        covariance_correction=False,
         log=log,
     )
     forest = tree.ForestBuilder(
@@ -361,7 +304,6 @@ def run(
         max_iterations=max_iterations,
         log=log,
     )
-    log.info("Outputting haplotypes")
     haplotypes = data.Haplotypes(
         fname=output,
         haplotype=tree.haplotypes.HapplerHaplotype,
@@ -373,19 +315,18 @@ def run(
     # merge the Haplotypes objects
     # TODO: use a method of the Haplotypes class
     log_out_thresh = -np.log10(out_thresh)
+    log.info("Generating haplotypes")
     for haps in forest.run():
         if haps is None:
             continue
-        if len(haps.data) == 1:
-            hap = next(iter(haps.data.values()))
-            if hap.pval < log_out_thresh:
-                log.info(
-                    f"Ignoring haplotype with low log pval {hap.pval} < "
-                    f"{log_out_thresh}"
-                )
-                continue
         for hap in haps.data.values():
             if len(hap.variants) <= 1 and remove_snps:
+                continue
+            if hap.pval < log_out_thresh:
+                log.info(
+                    f"Ignoring haplotype {hap.id} with low log pval {hap.pval} < "
+                    f"{log_out_thresh}"
+                )
                 continue
             hap.id = f"H{hap_id}"
             haplotypes.data[hap.id] = hap
