@@ -101,15 +101,13 @@ class Haplotype:
         """
         Create a new haplotype from a haptools Haplotype and a GenotypesVCF object
         """
-        variants = {
-            vr.id: vr.allele for vr in haplotype.variants
-        }
-        variant_genotypes.index(variants = True)
+        variants = {vr.id: vr.allele for vr in haplotype.variants}
+        variant_genotypes.index(variants=True)
         gts = variant_genotypes.subset(variants=tuple(variants.keys()))
         nodes = tuple(
             (
                 Variant.from_np(variant, variant_genotypes._var_idx[variant["id"]]),
-                list(variant["alleles"]).index(allele)
+                list(variant["alleles"]).index(allele),
             )
             for variant, allele in zip(gts.variants, variants.values())
         )

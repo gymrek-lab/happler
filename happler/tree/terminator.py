@@ -211,7 +211,9 @@ class TTestTerminator(Terminator):
 
 
 class BICTerminator(Terminator):
-    def __init__(self, bic_thresh: float = -float("inf"), bf_thresh: float = 20, log: Logger = None):
+    def __init__(
+        self, bic_thresh: float = -float("inf"), bf_thresh: float = 20, log: Logger = None
+    ):
         super().__init__()
         self.bic_thresh = bic_thresh
         # bf_thresh is the threshold on the delta BIC

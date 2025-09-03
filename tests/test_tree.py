@@ -223,16 +223,16 @@ def test_haplotype():
 
 
 def test_haplotype_from_haptools():
-    haplotype = list(Haplotypes.load(
-        DATADIR.joinpath("19_45401409-46401409_1000G.hap")
-    ).data.values())[0]
+    haplotype = list(
+        Haplotypes.load(DATADIR.joinpath("19_45401409-46401409_1000G.hap")).data.values()
+    )[0]
     variant_genotypes = GenotypesPLINK.load(
         DATADIR.joinpath("19_45401409-46401409_1000G.pgen")
     )
     hap = Haplotype.from_haptools_haplotype(haplotype, variant_genotypes)
     assert hap.nodes == (
-        (Variant(idx=831, id='rs1046282', pos=45910672), 1),
-        (Variant(idx=797, id='rs36046716', pos=45892145), 1),
+        (Variant(idx=831, id="rs1046282", pos=45910672), 1),
+        (Variant(idx=797, id="rs36046716", pos=45892145), 1),
     )
     assert hap.data.shape == (len(variant_genotypes.samples), 2)
 

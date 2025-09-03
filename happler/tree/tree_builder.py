@@ -310,13 +310,17 @@ class TreeBuilder:
             # step 6: check whether we don't get a stronger effect by treating this variant
             # as independently causal
             if parent_res is not None:
-                allele_gts = (self.gens.data[:, best_var_idx] == allele).sum(axis=1)[:,np.newaxis]
+                allele_gts = (self.gens.data[:, best_var_idx] == allele).sum(axis=1)[
+                    :, np.newaxis
+                ]
                 # y ~ h_parent + z_child VS y ~ h_hap
                 hap_indep_effect = NodeResultsExtra.from_np(
-                    AssocTestSimpleCovariates(covars=allele_gts, with_bic=True).run(
-                        parent.data.sum(axis=1)[:,np.newaxis],
+                    AssocTestSimpleCovariates(covars=allele_gts, with_bic=True)
+                    .run(
+                        parent.data.sum(axis=1)[:, np.newaxis],
                         self.phens.data[:, 0],
-                    ).data[0]
+                    )
+                    .data[0]
                 )
                 if BICTerminator(bf_thresh=self.indep_thresh).check(
                     hap_indep_effect,
@@ -482,14 +486,16 @@ class TreeBuilder:
             # step 7: check whether we don't get a stronger effect by treating this variant
             # as independently causal
             if parent_res is not None:
-                allele_gts = self.gens.data[:, best_var_idx].sum(axis=1)[:,np.newaxis]
+                allele_gts = self.gens.data[:, best_var_idx].sum(axis=1)[:, np.newaxis]
                 # y ~ h_parent + z_child VS y ~ h_hap
                 # delta BIC = first minus second
                 hap_indep_effect = NodeResultsExtra.from_np(
-                    AssocTestSimpleCovariates(covars=allele_gts, with_bic=True).run(
-                        parent.data.sum(axis=1)[:,np.newaxis],
+                    AssocTestSimpleCovariates(covars=allele_gts, with_bic=True)
+                    .run(
+                        parent.data.sum(axis=1)[:, np.newaxis],
                         self.phens.data[:, 0],
-                    ).data[0]
+                    )
+                    .data[0]
                 )
                 if BICTerminator(bf_thresh=self.indep_thresh).check(
                     hap_indep_effect,
