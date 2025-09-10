@@ -10,6 +10,7 @@ from .assoc_test import (
     AssocTestSimple,
     AssocTestSimpleSM,
     AssocTestSimpleFastBIC,
+    AssocTestSimpleSMTScore,
     NodeResults,
     NodeResultsBIC,
     NodeResultsExtra,

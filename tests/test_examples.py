@@ -8,12 +8,14 @@ import logging
 import numpy as np
 from logging import getLogger
 from click.testing import CliRunner
+from haptools.logging import getLogger
 from haptools.data import Genotypes, Phenotypes, Haplotypes
 
 from happler.__main__ import main
 from happler.tree import (
     TreeBuilder,
     AssocTestSimpleSM,
+    AssocTestSimpleSMTScore,
     TTestTerminator,
     BICTerminator,
     NodeResultsExtra,
@@ -142,15 +144,26 @@ def test_one_snp_not_causal():
             dtype=np.bool_,
         )
     )
-    phens = _create_fake_phens(np.ones(gens.data.sum(axis=2).shape))
+    phens = _create_fake_phens(np.random.normal(size=gens.data.sum(axis=2).shape))
 
     # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(gens, phens).run()
+    tree = TreeBuilder(
+        gens,
+        phens,
+        method=AssocTestSimpleSMTScore(with_bic=True),
+        terminator=TTestTerminator(thresh=0.05),
+    ).run()
     haps = tree.haplotypes()
 
     # check: did the output turn out how we expected?
     # no haplotypes!
     assert len(haps) == 0
+
+    # but now, if we use the regular tree builder, we should get two haplotypes
+    # containing each allele. These then get filtered out in __main__.py
+    tree = TreeBuilder(gens, phens).run()
+    haps = tree.haplotypes()
+    assert len(haps) == 2
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
@@ -362,19 +375,22 @@ def test_three_snps_one_branch_one_snp_not_causal():
     phens = _create_fake_phens(0.5 * (gts[:, 0] & gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(gens, phens, terminator=TTestTerminator(thresh=0.06)).run()
-    haps = _view_tree_haps(tree)
+    for builder in (TreeBuilder(gens, phens), TreeBuilder(
+        gens, phens, method=AssocTestSimpleSMTScore(with_bic=True), terminator=TTestTerminator(thresh=0.06)
+    )):
+        tree = builder.run()
+        haps = _view_tree_haps(tree)
 
-    # check: did the output turn out how we expected?
-    # one haplotype: with one SNP
-    assert len(haps) == 2
-    hap_lens = tuple(len(h) for h in haps)
-    assert 1 in hap_lens and 2 in hap_lens
-    assert len(haps[0]) == 1
-    assert haps[0][0] == ("snp0", 0)
-    assert len(haps[1]) == 2
-    assert haps[1][0] == ("snp0", 1)
-    assert haps[1][1] == ("snp1", 1)
+        # check: did the output turn out how we expected?
+        # one haplotype: with one SNP
+        assert len(haps) == 2
+        hap_lens = tuple(len(h) for h in haps)
+        assert 1 in hap_lens and 2 in hap_lens
+        assert len(haps[0]) == 1
+        assert haps[0][0] == ("snp0", 0)
+        assert len(haps[1]) == 2
+        assert haps[1][0] == ("snp0", 1)
+        assert haps[1][1] == ("snp1", 1)
 
 
 @pytest.mark.xfail(reason="not implemented yet")
@@ -578,19 +594,22 @@ def test_two_snps_two_branches_perfect_one_snp_not_causal():
     phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
-    tree = TreeBuilder(gens, phens, terminator=TTestTerminator(thresh=0.06)).run()
-    haps = _view_tree_haps(tree)
+    for builder in (TreeBuilder(gens, phens), TreeBuilder(
+        gens, phens, method=AssocTestSimpleSMTScore(with_bic=True), terminator=TTestTerminator(thresh=0.06)
+    )):
+        tree = builder.run()
+        haps = _view_tree_haps(tree)
 
-    # check: did the output turn out how we expected?
-    # two haplotypes: one with one SNP and the other with both
-    assert len(haps) == 2
-    hap_lens = tuple(len(h) for h in haps)
-    assert 1 in hap_lens and 2 in hap_lens
-    assert len(haps[0]) == 2
-    assert haps[0][0] == ("snp0", 0)
-    assert haps[0][1] == ("snp1", 0)
-    assert len(haps[1]) == 1
-    assert haps[1][0] == ("snp0", 1)
+        # check: did the output turn out how we expected?
+        # two haplotypes: one with one SNP and the other with both
+        assert len(haps) == 2
+        hap_lens = tuple(len(h) for h in haps)
+        assert 1 in hap_lens and 2 in hap_lens
+        assert len(haps[0]) == 2
+        assert haps[0][0] == ("snp0", 0)
+        assert haps[0][1] == ("snp1", 0)
+        assert len(haps[1]) == 1
+        assert haps[1][0] == ("snp0", 1)
 
 
 @pytest.mark.xfail(reason="not finished crafting this test yet")
@@ -666,7 +685,7 @@ def test_1000G_simulated_multihap(capfd):
     """
     gt_file = DATADIR / "19_45401409-46401409_1000G.pgen"
     pt_file = DATADIR / "19_45401409-46401409_1000G.multi.pheno"
-    hp_file = DATADIR / "19_45401409-46401409_1000G.multi.hap"
+    hp_file = DATADIR / "19_45401409-46401409_1000G.multi.exp.hap"
     out_hp_file = "test.hap"
 
     cmd = f"run --remove-SNPs --max-signals 3 --max-iterations 3 -o {out_hp_file} {gt_file} {pt_file}"

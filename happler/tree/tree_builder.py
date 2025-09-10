@@ -59,7 +59,7 @@ class TreeBuilder:
         maf: float = None,
         method: AssocTest = AssocTestSimpleFastBIC(),
         terminator: Terminator = BICTerminator(),
-        indep_thresh: float = 0.1,
+        indep_thresh: float = 15,
         ld_prune_thresh: float = None,
         covariance_correction: float = True,
         log: Logger = None,
@@ -182,9 +182,9 @@ class TreeBuilder:
                     )
                     # keep it if our value is better
                     continue
-                elif math.isclose(sib_p, leaf_p) and leaf["results"].beta > 0:
+                elif math.isclose(sib_p, leaf_p) and leaf["allele"] == 1:
                     self.log.debug(
-                        f"Left leaf {leaf_var.id} unpruned since it's beta is positive"
+                        f"Left leaf {leaf_var.id} unpruned since it's for the ALT allele"
                     )
                     # also if the values are the same but our effect size is positive
                     continue

@@ -277,15 +277,16 @@ def test_haplotypes_write():
     gts.samples = None
 
     # create a results object that all of the SNPs can share
-    res = NodeResultsExtra(beta=0.1, pval=0.1, stderr=0.1, bic=1)
+    res1 = NodeResultsExtra(beta=0.1, pval=0.1, stderr=0.1, bic=1)
+    res2 = NodeResultsExtra(beta=0.15, pval=0.1, stderr=0.1, bic=1)
 
     # create a tree composed of these nodes
     tree = Tree()
-    snp1_idx = tree.add_node(snp1, parent_idx=0, allele=0, results=res)
-    snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=1, results=res)
-    tree.add_node(snp3, parent_idx=snp2_idx, allele=1, results=res)
-    snp1_idx = tree.add_node(snp1, parent_idx=0, allele=1, results=res)
-    snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=0, results=res)
+    snp1_idx = tree.add_node(snp1, parent_idx=0, allele=0, results=res1)
+    snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=1, results=res1)
+    tree.add_node(snp3, parent_idx=snp2_idx, allele=1, results=res1)
+    snp1_idx = tree.add_node(snp1, parent_idx=0, allele=1, results=res2)
+    snp2_idx = tree.add_node(snp2, parent_idx=snp1_idx, allele=0, results=res2)
 
     # write the tree to a file
     fname = "test_write.haps"
@@ -302,7 +303,7 @@ def test_haplotypes_write():
             "#H\tpval\t.2f\t-log(pval) in linear model",
             "#V\tscore\t.2f\tBIC assigned to this variant",
             "H\t1\t1\t4\tH0\t0.10\t1.00",
-            "H\t1\t1\t3\tH1\t0.10\t1.00",
+            "H\t1\t1\t3\tH1\t0.15\t1.00",
             "V\tH0\t1\t2\tSNP1\tA\t1.00",
             "V\tH0\t2\t3\tSNP2\tC\t1.00",
             "V\tH0\t3\t4\tSNP3\tT\t1.00",

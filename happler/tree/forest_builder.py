@@ -57,6 +57,7 @@ class ForestBuilder:
                 None,
                 self.trees[tree_idx],
                 self.genotypes,
+                self.phenotypes,
                 self.log,
             )
             # increment tree_idx until it reaches the end
