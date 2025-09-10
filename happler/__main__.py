@@ -281,7 +281,8 @@ def run(
     # also reorder and subset samples in Phenotypes to match those in the Genotypes
     ph.subset(samples=tuple(gt.samples), names=(pheno,), inplace=True)
 
-    test_method = tree.assoc_test.AssocTestSimpleSM(with_bic=True)
+    test_method = tree.assoc_test.AssocTestSimpleSM()
+    test_method = tree.assoc_test.AssocTestSimpleFastBIC()
     log.debug(f"Using alpha threshold of {threshold}")
     terminator = tree.terminator.BICTerminator(
         bf_thresh=threshold,

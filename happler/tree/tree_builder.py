@@ -16,8 +16,9 @@ from .terminator import Terminator, BICTerminator, TTestTerminator
 from .assoc_test import (
     AssocTest,
     NodeResults,
+    NodeResultsBIC,
     NodeResultsExtra,
-    AssocTestSimpleSM,
+    AssocTestSimpleFastBIC,
     AssocTestSimpleSMTScore,
     AssocTestSimpleCovariates,
 )
@@ -56,7 +57,7 @@ class TreeBuilder:
         genotypes: Genotypes,
         phenotypes: Phenotypes,
         maf: float = None,
-        method: AssocTest = AssocTestSimpleSM(with_bic=True),
+        method: AssocTest = AssocTestSimpleFastBIC(),
         terminator: Terminator = BICTerminator(),
         indep_thresh: float = 0.1,
         ld_prune_thresh: float = None,
@@ -74,8 +75,9 @@ class TreeBuilder:
         self._split_method = self._find_split_rigid
         split_method = "rigid"
         self.ld_prune_thresh = ld_prune_thresh
-        # self.ranking_val = "bic" if isinstance(self.method, AssocTestSimpleSM) and self.method.with_bic else "pval"
-        self.ranking_val = "pval"
+        self.ranking_val = (
+            "bic" if isinstance(self.method, AssocTestSimpleFastBIC) else "pval"
+        )
         # for now, let's comment this out because we want to try the rigid strategy
         # if self.ld_prune_thresh is not None:
         #     self._split_method = self._find_split_flexible

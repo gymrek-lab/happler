@@ -404,7 +404,8 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         npt.NDArray[np.float64]
             The results from testing each haplotype, with shape p x 1
         """
-        X = self.standardize(X)
+        if len(y.shape) != 2:
+            y = y[:, np.newaxis]
 
         n, p = X.shape
         nobs2 = n / 2.0
@@ -510,6 +511,8 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
             t_score = 0
         else:
             cov = parent_corr * parent_res.stderr * stderr
+            if np.isnan(cov):
+                cov = 0
             std_err = np.sqrt((((stderr**2) + (parent_res.stderr**2)) / 2) - 2 * cov)
             t_score = (np.abs(beta) - np.abs(parent_res.beta)) / std_err
         if self.with_bic:
