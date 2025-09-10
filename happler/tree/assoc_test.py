@@ -407,35 +407,31 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         if len(y.shape) != 2:
             y = y[:, np.newaxis]
 
-        n, p = X.shape
+        n = X.shape[0]
         nobs2 = n / 2.0
+        log2pi = np.log(2 * np.pi)
 
         # Center X and y
-        xm = X.mean(axis=0)  # (p,)
-        ym = float(y.mean())  # scalar
-        xc = X - xm  # (n, p)
-        yc = y - ym  # (n, 1) will broadcast to (n, p)
+        xc = X - X.mean(axis=0)  # (n, p)
+        yc = y - float(y.mean())  # (n, 1) will broadcast to (n, p)
 
         # Vectorized simple OLS with intercept
         sxx = np.sum(xc**2, axis=0)  # (p,)
         sxy = np.sum(xc * yc, axis=0)  # (p,)
+
         with np.errstate(divide="ignore", invalid="ignore"):
             b1 = np.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
 
         # Residuals for each column's model: r = (y - ym) - b1 * (X - xm)
-        R = yc - xc * b1  # (n, p), broadcasted
-        ssr = np.sum(R**2, axis=0)  # (p,)
+        syy = float(np.sum(yc**2))  # scalar
+        ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
 
         # statsmodels-style profile log-likelihood per column
         # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
-        ll = -nobs2 * np.log(2 * np.pi) - nobs2 * np.log(ssr / n) - nobs2  # (p,)
+        ll = -nobs2 * (log2pi + np.log(ssr / n) + 1.0)  # (p,)
 
         # Number of parameters k: intercept + slope = 2
-        # If a column is constant (sxx == 0), slope is not identified -> treat as intercept-only (k=1)
-        k = np.where(sxx > 0, 2, 1)
-
-        # BIC per column
-        bic = -2 * ll + k * np.log(n)  # (p,)
+        bic = -2 * ll + 2 * np.log(n)  # (p,)
 
         return AssocResults(bic.astype([("bic", np.float64)]))
 
