@@ -85,7 +85,10 @@ def main():
     type=int,
     default=None,
     show_default="all variants",
-    help="If using a PGEN file, read genotypes in chunks of X variants; reduces memory",
+    help=(
+        "Perform memory intensive operations in chunks of X variants. "
+        "This reduces memory but at the cost of time."
+    ),
 )
 @click.option(
     "--maf",
@@ -282,7 +285,7 @@ def run(
     ph.subset(samples=tuple(gt.samples), names=(pheno,), inplace=True)
 
     test_method = tree.assoc_test.AssocTestSimpleSM()
-    test_method = tree.assoc_test.AssocTestSimpleFastBIC()
+    test_method = tree.assoc_test.AssocTestSimpleFastBIC(chunk_size=chunk_size)
     log.debug(f"Using alpha threshold of {threshold}")
     terminator = tree.terminator.BICTerminator(
         bf_thresh=threshold,
@@ -293,6 +296,7 @@ def run(
         gt,
         ph,
         maf=maf,
+        method=test_method,
         terminator=terminator,
         indep_thresh=indep_thresh,
         ld_prune_thresh=ld_prune_thresh,

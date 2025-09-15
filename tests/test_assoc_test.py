@@ -46,3 +46,8 @@ def test_bic_methods():
 
         res_fast = tester.run(gt, pt)
         np.testing.assert_allclose(res_sm.data["bic"], res_fast.data["bic"])
+
+        # and what if we use chunk_size ?
+        tester = AssocTestSimpleFastBIC(chunk_size=10)
+        res_fast = tester.run(gt, pt)
+        np.testing.assert_allclose(res_sm.data["bic"], res_fast.data["bic"])

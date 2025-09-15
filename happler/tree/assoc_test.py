@@ -379,17 +379,61 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
     Calculate only BIC in a quick, vectorized fashion without statsmodels
     """
 
-    def __init__(self):
+    def __init__(self, chunk_size: int = None):
         """
         Override the parent's __init__
         """
         self.results_type = NodeResultsBIC
+        self.chunk_size = chunk_size
+    
+    def perform_test(self, X: npt.NDArray[np.float64], yc: npt.NDArray[np.float64]) -> npt.NDArray:
+        """
+        Perform the test for a chunk of haplotypes
+
+        Parameters
+        ----------
+        X : npt.NDArray[np.uint8]
+            The genotypes with shape n x p
+        yc : npt.NDArray[np.float64]
+            The phenotypes, with shape n x 1
+            They are assumed to be centered already
+
+        Returns
+        -------
+        npt.NDArray[np.float64]
+            The resulting from testing this chunk of haplotypes, with shape p x 1
+        """
+        n = X.shape[0]
+        nobs2 = n / 2.0
+        log2pi = np.log(2 * np.pi)
+
+        # Center X and y
+        xc = X - X.mean(axis=0)  # (n, p)
+
+        # Vectorized simple OLS with intercept
+        sxx = np.sum(xc**2, axis=0)  # (p,)
+        sxy = np.sum(xc * yc, axis=0)  # (p,)
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            b1 = np.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
+
+        # Residuals for each column's model: r = (y - ym) - b1 * (X - xm)
+        syy = float(np.sum(yc**2))  # scalar
+        ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
+
+        # statsmodels-style profile log-likelihood per column
+        # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
+        with np.errstate(divide="ignore"):
+            ll = -nobs2 * (log2pi + np.log(ssr / n) + 1.0)  # (p,)
+
+        # Number of parameters k: intercept + slope = 2
+        return -2 * ll + 2 * np.log(n)  # (p,)
 
     def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
-        Implement AssocTest for a simple, univariate OLS models y ~ 1 + X[:, j]
+        Implement AssocTest for a simple, univariate OLS model: y ~ 1 + X[:, j]
 
-        Does not use or import statsmodels at all
+        Does not use statsmodels at all but replicates its behavior
 
         Parameters
         ----------
@@ -405,35 +449,24 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
             The results from testing each haplotype, with shape p x 1
         """
         if len(y.shape) != 2:
-            y = y[:, np.newaxis]
+            y = y[:, np.newaxis]  # (n, 1)
 
-        n = X.shape[0]
-        nobs2 = n / 2.0
-        log2pi = np.log(2 * np.pi)
+        yc = y - float(y.mean())  # (n, 1)
+        bic_vals = np.zeros((X.shape[1]), dtype=np.float64)  # (p, 1)
 
-        # Center X and y
-        xc = X - X.mean(axis=0)  # (n, p)
-        yc = y - float(y.mean())  # (n, 1) will broadcast to (n, p)
+        chunks = self.chunk_size
+        if chunks is None or chunks > len(bic_vals):
+            chunks = len(bic_vals)
 
-        # Vectorized simple OLS with intercept
-        sxx = np.sum(xc**2, axis=0)  # (p,)
-        sxy = np.sum(xc * yc, axis=0)  # (p,)
+        for start in range(0, len(bic_vals), chunks):
+            end = start + chunks
+            if end > len(bic_vals):
+                end = len(bic_vals)
+            size = end - start
 
-        with np.errstate(divide="ignore", invalid="ignore"):
-            b1 = np.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
+            bic_vals[start:end] = self.perform_test(X[:, start:end], yc)
 
-        # Residuals for each column's model: r = (y - ym) - b1 * (X - xm)
-        syy = float(np.sum(yc**2))  # scalar
-        ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
-
-        # statsmodels-style profile log-likelihood per column
-        # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
-        ll = -nobs2 * (log2pi + np.log(ssr / n) + 1.0)  # (p,)
-
-        # Number of parameters k: intercept + slope = 2
-        bic = -2 * ll + 2 * np.log(n)  # (p,)
-
-        return AssocResults(bic.astype([("bic", np.float64)]))
+        return AssocResults(bic_vals.astype([("bic", np.float64)]))
 
 
 class AssocTestSimpleCovariates(AssocTestSimpleSM):
