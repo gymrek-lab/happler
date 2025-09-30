@@ -235,12 +235,14 @@ def main(
     # figure out which params to use based on the subset file
     if subset is not None:
         with open(subset, "r") as f:
-	        subset = set(map(Path, f.read().splitlines()))
+            subset = set(map(Path, f.read().splitlines()))
         subset_mask = [
             get_hap_fname(haplotypes, params[idx]) in subset
             for idx in range(len(params))
         ]
         params = params[subset_mask]
+        if not len(params):
+            log.warning("All files were removed after subsetting")
 
     # compute explained variance for each haplotype and its SNPs
     # this 2D array should have two*2 columns: 1) the haplotype and 2) its SNPs
@@ -302,7 +304,7 @@ def main(
     f, (ax1, ax2) = plt.subplots(1, 2)
 
     with open(output.with_suffix(".pickle"), "wb") as picklef:
-        pickle.dump((explained_variances, rsquareds), picklef)
+        pickle.dump((params, explained_variances, rsquareds), picklef)
 
     ax1.scatter(explained_variances[:, 1], explained_variances[:, 0])
     ax1.axline([0, 0], [max_ev_val, max_ev_val])
