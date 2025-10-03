@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
+from datetime import datetime
 
 # Usage
 # -----
@@ -189,28 +190,38 @@ def determine_fail_reason(log_paths: List[Path]) -> str:
     return "other"
 
 
-def extract_jobid_and_node(log_paths: List[Path]) -> Tuple[Optional[str], Optional[str]]:
+def extract_jobid_node_submit(log_paths: List[Path]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
-    Extract SLURM job ID from filename and node name from log contents (line 'host: ...').
+    Extract SLURM job ID from filename, node name from 'host:' line,
+    and submission time (normalized to ISO) from the first '[...]' timestamp.
     """
     jobid = None
     node = None
+    submit_time = None
     for lp in log_paths:
         # Jobid from filename
         m = re.search(r"(\d+)\.log$", str(lp))
         if m:
             jobid = m.group(1)
-        # Node name from contents (host: ...)
+        # Parse contents
         if lp.exists():
             try:
                 with lp.open("r", encoding="utf-8", errors="ignore") as fh:
                     for line in fh:
+                        # Submission timestamp
+                        if line.startswith("[") and line.endswith("]\n") and submit_time is None:
+                            raw = line.strip("[]\n")
+                            try:
+                                dt = datetime.strptime(raw, "%a %b %d %H:%M:%S %Y")
+                                submit_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+                            except Exception:
+                                submit_time = raw  # fallback
+                        # Node
                         if line.lower().startswith("host:"):
                             node = line.split(":", 1)[1].strip()
-                            break
             except Exception:
                 continue
-    return jobid, node
+    return jobid, node, submit_time
 
 
 # ---------- Main ----------
@@ -269,7 +280,7 @@ def main():
         else:
             fail_reason = determine_fail_reason(job_log_paths)
 
-        jobid, node = extract_jobid_and_node(job_log_paths)
+        jobid, node, submit_time = extract_jobid_node_submit(job_log_paths)
 
         rows.append({
             "rule": e["rule"],
@@ -286,6 +297,7 @@ def main():
             "fail_reason": fail_reason,
             "jobid": jobid,
             "node": node,
+            "submit_time": submit_time,
         })
 
     df = pd.DataFrame(rows).sort_values(["rule", "benchmark_file"]).reset_index(drop=True)
