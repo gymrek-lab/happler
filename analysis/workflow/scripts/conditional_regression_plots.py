@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import re
 from pathlib import Path
 from logging import Logger
 
@@ -7,6 +8,7 @@ import matplotlib
 import numpy as np
 matplotlib.use('Agg')
 import numpy.typing as npt
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
 from haptools.logging import getLogger
@@ -70,19 +72,45 @@ def make_manhattan(
     else:
         ax.scatter(positions, pvals)
 
-def condition_on_variable(gts: Genotypes, pt: Phenotypes, covars: Genotypes = None):
+def regress_effect(pt: Phenotypes, covars: Genotypes = None):
     """
-    Compute explained variance for each SNP or haplotype in a set
-
-    The explained variance is beta^2 in a linear model y = bx + e when x and y have
-    been standardized to mean 0 and stdev 1
+    Regress out the effect(s) of the covariates on the phenotype
 
     Parameters
     ----------
     pt: Phenotypes
         A Phenotypes object with only a single phenotype
-    gts: Genotypes
+    covars: Genotypes, optional
+        The variables on which to condition the SNPs by encoding them as covariates
+
+    Returns
+    -------
+    Phenotypes
+        The new phenotype values
+    """
+    resids = Phenotypes(fname=None, log=pt.log)
+    resids.samples = pt.samples
+    resids.names = pt.names
+    if covars is None or not covars.data.shape[1]:
+        resids.data = pt.data.copy()
+    else:
+        resids.data = (
+            sm.OLS(pt.data, sm.add_constant(covars.data.sum(axis=2)))
+            .fit()
+            .resid[:, np.newaxis]
+        )
+    return resids
+
+def condition_on_variable(gts: npt.NDArray, pt: Phenotypes, covars: Genotypes = None):
+    """
+    Compute pvals for each SNP or haplotype in a set after conditioning on others
+
+    Parameters
+    ----------
+    gts: npt.NDArray
         The genotypes of all of the SNPs
+    pt: Phenotypes
+        A Phenotypes object with only a single phenotype
     covars: Genotypes, optional
         The variables on which to condition the SNPs by encoding them as covariates
 
@@ -95,7 +123,82 @@ def condition_on_variable(gts: Genotypes, pt: Phenotypes, covars: Genotypes = No
         assoc_test = AssocTestSimpleSM()
     else:
         assoc_test = AssocTestSimpleCovariates(covars=covars.data.sum(axis=2))
-    return assoc_test.run(gts.data.sum(axis=2), pt.data[:, 0]).data["pval"]
+    return assoc_test.run(gts.sum(axis=2), pt.data[:, 0]).data["pval"]
+
+def condition_on_variable_chunked(
+    gts: Genotypes,
+    pt: Phenotypes,
+    covars: Genotypes = None,
+    chunk_size: int = None,
+):
+    pvals = np.empty(gts.data.shape[1], dtype=object)
+
+    chunks = chunk_size
+    if chunks is None or chunks > len(pvals):
+        chunks = len(pvals)
+
+    for start in range(0, len(pvals), chunks):
+        end = start + chunks
+        if end > len(pvals):
+            end = len(pvals)
+        size = end - start
+
+        pvals[start:end] = condition_on_variable(gts.data[:, start:end], pt, covars)
+
+    return pvals
+
+def extract_snp_matrix(logfile: Path) -> npt.NDArray:
+
+    text = logfile.read_text().splitlines()
+    iterations = {}
+    current_iter = None
+    current_tree = None
+
+    for lineno, line in enumerate(text, start=1):
+        ls = line.strip()
+        # robustly find "Iteration X: tree Y" even if line is indented
+        m = re.search(r"Iteration\s+(\d+)\s*:\s*tree\s+(\d+)", ls, re.I)
+        if m:
+            current_iter, current_tree = map(int, m.groups())
+            continue
+
+        # find label lines (skip lines mentioning 'root')
+        if '[label="' in line and 'root' not in line:
+            # try to capture up to the literal backslash-n ("\\n") first
+            m2 = re.search(r'\[label="([^\\]+?)\\n', line)
+            if not m2:
+                # fallback: capture up to the next closing quote
+                m2 = re.search(r'\[label="([^"]+)"', line)
+            if not m2:
+                raise ValueError(f"Couldn't parse [label=...] on line {lineno}: {line!r}")
+            snp = m2.group(1)
+
+            if current_iter is None or current_tree is None:
+                raise ValueError(
+                    f"Found SNP label on line {lineno} but no preceding 'Iteration ...: tree ...' line."
+                )
+
+            # if there are multiple SNPs in a tree, just choose the first one
+            if current_iter not in iterations or current_tree not in iterations[current_iter]:
+                iterations.setdefault(current_iter, {})[current_tree] = snp
+
+    if not iterations:
+        return np.empty((0, 0), dtype=object)
+
+    # enforce same tree keys for every iteration
+    first_it = sorted(iterations.keys())[0]
+    expected_keys = sorted(iterations[first_it].keys())
+    for it in sorted(iterations.keys()):
+        keys = sorted(iterations[it].keys())
+        if keys != expected_keys:
+            raise ValueError(f"Inconsistent tree keys for iteration {it}: {keys} != {expected_keys}")
+
+    rows = []
+    for it in sorted(iterations.keys()):
+        row = [iterations[it][k] for k in expected_keys]
+        rows.append(row)
+
+    return np.array(rows, dtype=object)
 
 
 @click.command()
@@ -136,6 +239,27 @@ def condition_on_variable(gts: Genotypes, pt: Phenotypes, covars: Genotypes = No
     help="Whether to also depict the original Manhattan plot",
 )
 @click.option(
+    "-c",
+    "--chunk-size",
+    type=int,
+    default=None,
+    show_default="all variants",
+    help=(
+        "Perform reading/writing operations in chunks of X variants. "
+        "This reduces memory but at the cost of time."
+    ),
+)
+@click.option(
+    "--log-file",
+    type=Path,
+    default=None,
+    show_default="no extra plots",
+    help=(
+        "If provided, we will read trees from this happler log file and attempt to "
+        "plot them as additional rows in the conditional regression plot"
+    )
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -159,6 +283,8 @@ def main(
     region: str = None,
     maf: float = None,
     show_original: bool = False,
+    chunk_size: int = None,
+    log_file: Path = None,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -186,7 +312,7 @@ def main(
     gts = GenotypesVCF
     if genotypes.suffix == ".pgen":
         gts = GenotypesPLINK
-    gts = gts(genotypes, log=log)
+    gts = gts(genotypes, log=log, chunk_size=chunk_size)
     gts.read(region=region, samples=set(pts.samples))
     # we need phasing for transform (below)
     gts.check_phase()
@@ -201,10 +327,22 @@ def main(
     # get the haplotype genotypes
     hap_gt = hps.transform(gts)
 
-    # make the figure
-    # set all panels in the same row
-    figsize = (FIGSIZE*(len(variants)+2+show_original)/2.5, FIGSIZE)
-    fig, axs = plt.subplots(1, 2+len(variants)+show_original, sharey=True, figsize=figsize)
+    # read SNPs from the log file
+    other_alleles = np.array([], dtype=object)
+    if log_file is None:
+        # make the figure
+        # set all panels in the same row
+        figsize = (FIGSIZE*(len(variants)+2+show_original)/2.5, FIGSIZE)
+        fig, axs = plt.subplots(1, 2+len(variants)+show_original, sharey=True, figsize=figsize)
+    else:
+        other_alleles = extract_snp_matrix(log_file)
+
+        # make the figure
+        # set all panels in the same row
+        figsize = (FIGSIZE*(len(variants)+2+show_original)/2.5, FIGSIZE*other_alleles.shape[0])
+        fig, axs = plt.subplots(1+other_alleles.shape[0], 2+len(variants)+show_original, sharey=True, figsize=figsize)
+        all_axs = axs
+        axs = axs[0]
 
     # highlight alleles in red
     red_mask = np.zeros(len(gts.variants), dtype=np.bool_)
@@ -213,7 +351,12 @@ def main(
 
     log.info("Creating haplotype plot")
     # first, encode the haplotype as covariate
-    make_manhattan(axs[0], positions, condition_on_variable(gts, pts, hap_gt), red_mask)
+    make_manhattan(
+        axs[0],
+        positions,
+        condition_on_variable_chunked(gts, pts, hap_gt, chunk_size=chunk_size),
+        red_mask
+    )
     axs[0].set_title("Haplotype"+("s" if len(hap_gt.variants)-1 else ""))
     log.info("Creating haplotype alleles plot")
     # now, encode the haplotypes' alleles as separate covariates
@@ -222,7 +365,13 @@ def main(
     exclude = np.ones(len(gts.variants), dtype=np.bool_)
     for snp in variants:
         exclude[gts._var_idx[snp]] = False
-    make_manhattan(axs[1], positions, condition_on_variable(gts, pts, covars), red_mask, exclude)
+    make_manhattan(
+        axs[1],
+        positions,
+        condition_on_variable_chunked(gts, pts, covars, chunk_size=chunk_size),
+        red_mask,
+        exclude,
+    )
     # f-string expressions cannot include a backslash
     f_str_quotation_plural_agh = 's\'' if len(hap_gt.variants)-1 else '\'s'
     axs[1].set_title(f"Haplotype{f_str_quotation_plural_agh} Alleles")
@@ -232,7 +381,13 @@ def main(
         covars = gts.subset(variants=(variants[idx],))
         exclude = np.ones(len(gts.variants), dtype=np.bool_)
         exclude[gts._var_idx[variants[idx]]] = False
-        make_manhattan(axs[idx+2], positions, condition_on_variable(gts, pts, covars), red_mask, exclude)
+        make_manhattan(
+            axs[idx+2],
+            positions,
+            condition_on_variable_chunked(gts, pts, covars, chunk_size=chunk_size),
+            red_mask,
+            exclude,
+        )
         axs[idx+2].set_title(variants[idx])
     if show_original:
         log.info("Creating original manhattan plot")
@@ -247,12 +402,40 @@ def main(
         make_manhattan(
             axs[-1],
             new_gt.variants["pos"],
-            condition_on_variable(new_gt, pts),
+            condition_on_variable_chunked(new_gt, pts, chunk_size=chunk_size),
             red_mask,
             exclude_mask=None,
             orange_mask=orange_mask,
         )
         axs[-1].set_title("")
+    
+    if log_file is not None:
+        for iteration_idx in range(other_alleles.shape[0]):
+            for tree_idx in range(other_alleles.shape[1]):
+                if iteration_idx:
+                    # regress out all but the current tree from the last iteration
+                    covar_variants = other_alleles[iteration_idx-1].tolist()
+                    covar_variants.remove(other_alleles[iteration_idx-1, tree_idx])
+                else:
+                    # if this is the first iteration, we need to do special things
+                    covar_variants = other_alleles[0, :tree_idx].tolist()
+                # highlight the variant that we found in red
+                red_mask = np.zeros(len(gts.variants), dtype=np.bool_)
+                red_mask[gts._var_idx[other_alleles[iteration_idx, tree_idx]]] = True
+                # set title to indicate the variants that we are conditioning on
+                all_axs[iteration_idx+1, tree_idx].set_title("\n".join(covar_variants))
+                covars = gts.subset(variants=set(covar_variants))
+                resids = regress_effect(pts, covars)
+                make_manhattan(
+                    all_axs[iteration_idx+1, tree_idx],
+                    positions,
+                    condition_on_variable_chunked(gts, resids, chunk_size=chunk_size),
+                    exclude_mask=None,
+                    red_mask=red_mask,
+                    orange_mask=None,
+                )
+            for axes_idx in range(other_alleles.shape[1], all_axs.shape[1]):
+                all_axs[iteration_idx+1, axes_idx].remove()
 
     # now, tidy up and save the plot
     log.info("Writing out plot")
