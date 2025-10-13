@@ -53,7 +53,7 @@ def read_benchmark_metrics(bench_path: Path) -> Tuple[Optional[float], Optional[
             v = pd.to_numeric(df[cand], errors="coerce").max()
             if pd.notna(v):
                 v = float(v)
-                peak_rss_mb = v / 1000.0
+                peak_rss_mb = v
                 break
 
     elapsed_min = (elapsed_s / 60.0) if elapsed_s is not None else None
