@@ -3,7 +3,7 @@
 # arg1: The path to the "out" folder
 
 out="$1"
-
+geuvadis="$2"
 
 
 
@@ -22,8 +22,13 @@ while read hap; do grep '^H' $hap | wc -l; done < $out/multiline.txt | sort | un
 avg_num_alleles="$(for i in $(cat $out/multiline.txt); do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | awk '{ total += $1 } END { print total/NR }')"
 echo "Of those $num_regions, the average number of alleles in each haplotype is $avg_num_alleles."
 
-# now, let's make the variance_explained.png plot
-workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s "$out"/multiline.txt "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/geuvadis/phenos/{gene}.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
+if [ -n "$geuvadis" ]; then
+  # now, let's make the variance_explained.png plot
+  workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s "$out"/multiline.txt "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/geuvadis/phenos/{gene}.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
+else
+  # now, let's make the variance_explained.png plot
+  workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s "$out"/multiline.txt "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/ukb/phenos/{gene}.resid.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
+fi
 echo "Created $out/variance_explained.png"
 
 # now, let's make the pips.tsv file
@@ -71,17 +76,18 @@ echo "Created $out/hwe.png"
 for i in $(cat multiline.txt | sed 's/.hap$/.pvar/;s+out/++'); do plink2 --pfile ${i%.*} --mac 70 --make-pgen --out ${i%.*}-maf --freq &>/dev/null; done
 echo "$(grep 'Error: No variants remaining' */happler/run/*/happler-maf.log | cut -d '/' -f2,5 | wc -l) haplotypes had an MAC below 70."
 
-# create SV LD plot
-# first, copy all of the results over
-mkdir -p sv_ld/H0
-for i in */happler/run/*/happler_svs.ld; do region="$(echo "$i" | sed 's\/happler_svs.ld$\\;s+/happler/run/+\t+')"; cp "$i" sv_ld/H0/$(echo "$region" | cut -f1):$(echo "$region" | cut -f2).ld; done
-# now, collate the results
-{ echo -e 'file\tpip\tpos\tid\tld'; sort -gr -k2,2 pips.tsv | { while read -r line; do file="sv_ld/$(echo "$line" | cut -f1 | cut -f3 -d:)/$(echo "$line" | cut -f1 | cut -f-2 -d:).ld"; echo -en "$file"$'\t'; echo -en "$(echo "$line" | cut -f2)"$'\t'; awk -F $'\t' -v 'OFS=\t' '{print $2, $3, sqrt($4*$4);}' "$file" | sort -gr -k3,3 | head -n1; done } | sed 's/^.*sv_ld\///'; } > pips_sv_ld.tsv
-echo "Created $out/pips_sv_ld.tsv"
-# now, visualize all of the results
-(
-  echo "a=["$(tail -n+2 pips_sv_ld.tsv | cut -f2,5 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
-  cat <<'EOF'
+if [ -n "$geuvadis" ]; then
+  # create SV LD plot
+  # first, copy all of the results over
+  mkdir -p sv_ld/H0
+  for i in */happler/run/*/happler_svs.ld; do region="$(echo "$i" | sed 's\/happler_svs.ld$\\;s+/happler/run/+\t+')"; cp "$i" sv_ld/H0/$(echo "$region" | cut -f1):$(echo "$region" | cut -f2).ld; done
+  # now, collate the results
+  { echo -e 'file\tpip\tpos\tid\tld'; sort -gr -k2,2 pips.tsv | { while read -r line; do file="sv_ld/$(echo "$line" | cut -f1 | cut -f3 -d:)/$(echo "$line" | cut -f1 | cut -f-2 -d:).ld"; echo -en "$file"$'\t'; echo -en "$(echo "$line" | cut -f2)"$'\t'; awk -F $'\t' -v 'OFS=\t' '{print $2, $3, sqrt($4*$4);}' "$file" | sort -gr -k3,3 | head -n1; done } | sed 's/^.*sv_ld\///'; } > pips_sv_ld.tsv
+  echo "Created $out/pips_sv_ld.tsv"
+  # now, visualize all of the results
+  (
+    echo "a=["$(tail -n+2 pips_sv_ld.tsv | cut -f2,5 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+    cat <<'EOF'
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -100,41 +106,41 @@ plt.savefig("pips_best_sv_ld.png")
 
 EOF
 ) | python
-echo "Created $out/pips_best_sv_ld.png"
+  echo "Created $out/pips_best_sv_ld.png"
 
-cd -
-# create STR LD plot
-# first, let's get a list of the STRs in the regions with haplotypes
-(
-  echo -ne "region\tgene\thap.id\tpip\t"
-  head -n1 data/geuvadis/mlamkin/Geuvadis_varlevel_corrected_significant_variants.with-end.tsv && \
-  ~/miniconda3/envs/htslib/bin/bedtools intersect -a <(
-    echo -e "chrom\tstart\tend\tgene\tpip" && cat "$out"/pips.tsv | sed 's+_+\t+;s+-+\t+;s+:+\t+g' | sort -k1,1V -k2,2n
-  ) -b data/geuvadis/mlamkin/Geuvadis_varlevel_corrected_significant_variants.with-end.tsv -wa -wb -loj | \
-  sed 's+\t+_+;s+\t+-+'
-) | awk -F'\t' '$2 == $8' | cut -f8 --complement > "$out"/STR_assocations.tsv
-echo "Created $out/STR_assocations.tsv"
-# now, let's compute LD for each region
-echo -e "hap\tpip\tpos\tid\tld\talleles" > "$out"/pips_str_ld.tsv
-while IFS= read -r line; do
-  str_id="$(echo "$line" | cut -f5,6 --output-delimiter ':')"
-  echo -ne "$(echo "$line" | cut -f1-3 --output-delimiter ':')\t$(echo "$line" | cut -f4)\t$(echo "$line" | cut -f6)\t$str_id\t"
-  echo -ne "$(workflow/scripts/compute_pgen_ld.py --verbosity WARNING --target-is-repeat --hap-id "$str_id" -o /dev/stdout "$out/$(echo "$line" | cut -f1)"/happler/run/"$(echo "$line" | cut -f2)"/happler.pgen data/geuvadis/mlamkin/all_Geuvadis_STRs.pgen | tail -n+2 | cut -f4)"
-  echo -e "\t$(grep -P '\t'"$str_id"'\t' data/geuvadis/mlamkin/all_Geuvadis_STRs.pvar | cut -f 4,5 --output-delimiter ,)"
-done < <(tail -n+2 "$out"/STR_assocations.tsv) >> "$out"/pips_str_ld.tsv
-echo "Created $out/pips_str_ld.tsv"
-(
-  head -n1 "$out/pips_str_ld.tsv"
-  tail -n+2 "$out/pips_str_ld.tsv" \
-    | awk -F'\t' -v OFS='\t' '{$5 = ($5 < 0) ? -$5 : $5; print}' \
-    | sort -t$'\t' -k1,1 -k5,5nr \
-    | awk -F'\t' -v OFS='\t' '!seen[$1]++ { print }'
-) > "$out/pips_best_str_ld.tsv"
-echo "Created $out/pips_best_str_ld.tsv"
-cd "$out"
-(
-  echo "a=["$(tail -n+2 pips_best_str_ld.tsv | cut -f2,5 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
-  cat <<'EOF'
+  cd -
+  # create STR LD plot
+  # first, let's get a list of the STRs in the regions with haplotypes
+  (
+    echo -ne "region\tgene\thap.id\tpip\t"
+    head -n1 data/geuvadis/mlamkin/Geuvadis_varlevel_corrected_significant_variants.with-end.tsv && \
+    ~/miniconda3/envs/htslib/bin/bedtools intersect -a <(
+      echo -e "chrom\tstart\tend\tgene\tpip" && cat "$out"/pips.tsv | sed 's+_+\t+;s+-+\t+;s+:+\t+g' | sort -k1,1V -k2,2n
+    ) -b data/geuvadis/mlamkin/Geuvadis_varlevel_corrected_significant_variants.with-end.tsv -wa -wb -loj | \
+    sed 's+\t+_+;s+\t+-+'
+  ) | awk -F'\t' '$2 == $8' | cut -f8 --complement > "$out"/STR_assocations.tsv
+  echo "Created $out/STR_assocations.tsv"
+  # now, let's compute LD for each region
+  echo -e "hap\tpip\tpos\tid\tld\talleles" > "$out"/pips_str_ld.tsv
+  while IFS= read -r line; do
+    str_id="$(echo "$line" | cut -f5,6 --output-delimiter ':')"
+    echo -ne "$(echo "$line" | cut -f1-3 --output-delimiter ':')\t$(echo "$line" | cut -f4)\t$(echo "$line" | cut -f6)\t$str_id\t"
+    echo -ne "$(workflow/scripts/compute_pgen_ld.py --verbosity WARNING --target-is-repeat --hap-id "$str_id" -o /dev/stdout "$out/$(echo "$line" | cut -f1)"/happler/run/"$(echo "$line" | cut -f2)"/happler.pgen data/geuvadis/mlamkin/all_Geuvadis_STRs.pgen | tail -n+2 | cut -f4)"
+    echo -e "\t$(grep -P '\t'"$str_id"'\t' data/geuvadis/mlamkin/all_Geuvadis_STRs.pvar | cut -f 4,5 --output-delimiter ,)"
+  done < <(tail -n+2 "$out"/STR_assocations.tsv) >> "$out"/pips_str_ld.tsv
+  echo "Created $out/pips_str_ld.tsv"
+  (
+    head -n1 "$out/pips_str_ld.tsv"
+    tail -n+2 "$out/pips_str_ld.tsv" \
+      | awk -F'\t' -v OFS='\t' '{$5 = ($5 < 0) ? -$5 : $5; print}' \
+      | sort -t$'\t' -k1,1 -k5,5nr \
+      | awk -F'\t' -v OFS='\t' '!seen[$1]++ { print }'
+  ) > "$out/pips_best_str_ld.tsv"
+  echo "Created $out/pips_best_str_ld.tsv"
+  cd "$out"
+  (
+    echo "a=["$(tail -n+2 pips_best_str_ld.tsv | cut -f2,5 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+    cat <<'EOF'
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -153,11 +159,11 @@ plt.savefig("pips_best_str_ld.png")
 
 EOF
 ) | python
-echo "Created $out/pips_best_str_ld.png"
-# now, compare STR vs SV LD
-(
-  echo "a=["$(join -t $'\t' -j1 --header <(head -n1 pips_sv_ld.tsv; tail -n+2 pips_sv_ld.tsv | sed 's/.ld\t/:H0\t/;s+^H0/++' | sort -k1,1) <(head -n1 pips_best_str_ld.tsv; tail -n+2 pips_best_str_ld.tsv | sort -k1,1) | cut -f5,9 | tail -n+2 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
-  cat <<'EOF'
+  echo "Created $out/pips_best_str_ld.png"
+  # now, compare STR vs SV LD
+  (
+    echo "a=["$(join -t $'\t' -j1 --header <(head -n1 pips_sv_ld.tsv; tail -n+2 pips_sv_ld.tsv | sed 's/.ld\t/:H0\t/;s+^H0/++' | sort -k1,1) <(head -n1 pips_best_str_ld.tsv; tail -n+2 pips_best_str_ld.tsv | sort -k1,1) | cut -f5,9 | tail -n+2 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+    cat <<'EOF'
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -177,4 +183,5 @@ plt.savefig("ld_str_vs_sv.png")
 
 EOF
 ) | python
-echo "Created $out/ld_str_vs_sv.png"
+  echo "Created $out/ld_str_vs_sv.png";
+fi
