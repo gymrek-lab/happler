@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import re
+import copy
 from pathlib import Path
 from logging import Logger
 
@@ -12,6 +13,7 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
 from haptools.logging import getLogger
+from happler.tree import Haplotype as HapplerHaplotype
 from happler.tree.assoc_test import AssocTestSimpleSM, AssocTestSimpleCovariates
 from haptools.data import (
     Genotypes,
@@ -179,11 +181,15 @@ def extract_snp_matrix(logfile: Path) -> npt.NDArray:
                 )
 
             # if there are multiple SNPs in a tree, just choose the first one
-            if current_iter not in iterations or current_tree not in iterations[current_iter]:
-                iterations.setdefault(current_iter, {})[current_tree] = snp
+            iterations.setdefault(current_iter, {}).setdefault(current_tree, list()).append(snp)
 
     if not iterations:
         return np.empty((0, 0), dtype=object)
+
+    # remove duplicates in each entry but preserve order of first occurence
+    for iteration in iterations:
+        for tree in iterations[iteration]:
+            iterations[iteration][tree] = tuple(dict.fromkeys(iterations[iteration][tree]))
 
     # enforce same tree keys for every iteration
     first_it = sorted(iterations.keys())[0]
@@ -195,10 +201,26 @@ def extract_snp_matrix(logfile: Path) -> npt.NDArray:
 
     rows = []
     for it in sorted(iterations.keys()):
-        row = [iterations[it][k] for k in expected_keys]
+        # unwrap tuples with a single string but leave multi-element tuples untouched
+        row = [
+            iterations[it][k][0] if len(iterations[it][k]) == 1 else iterations[it][k]
+            for k in expected_keys
+        ]
         rows.append(row)
 
     return np.array(rows, dtype=object)
+
+
+def flatten_list_of_strings_and_tuples(mixed_list: list):
+    flattened_list = []
+
+    for item in mixed_list:
+        if isinstance(item, tuple):
+            flattened_list.extend(item)
+        else:
+            flattened_list.append(item)
+
+    return flattened_list
 
 
 @click.command()
@@ -335,6 +357,7 @@ def main(
         figsize = (FIGSIZE*(len(variants)+2+show_original)/2.5, FIGSIZE)
         fig, axs = plt.subplots(1, 2+len(variants)+show_original, sharey=True, figsize=figsize)
     else:
+        show_original = True
         other_alleles = extract_snp_matrix(log_file)
 
         # make the figure
@@ -408,34 +431,105 @@ def main(
             orange_mask=orange_mask,
         )
         axs[-1].set_title("")
-    
+
     if log_file is not None:
+        new_gt.index()
+        assert len(hps.data) == 1, "We can only handle one haplotype at a time"
+        hap_id = list(hps.data)[0]
+        hap_idx = new_gt._var_idx[hap_id]
+        flat_other_alleles = other_alleles.flatten()
         for iteration_idx in range(other_alleles.shape[0]):
+            covar_variants_for_hap = None
             for tree_idx in range(other_alleles.shape[1]):
+                # set up some useful variables for later
+                curr_ax = all_axs[iteration_idx+1, tree_idx]
+                curr_flat_other_allele_idx = iteration_idx*other_alleles.shape[1] + tree_idx
+                start_flat_other_allele_idx = 0
                 if iteration_idx:
-                    # regress out all but the current tree from the last iteration
-                    covar_variants = other_alleles[iteration_idx-1].tolist()
-                    covar_variants.remove(other_alleles[iteration_idx-1, tree_idx])
+                    start_flat_other_allele_idx = curr_flat_other_allele_idx - other_alleles.shape[1] + 1
+                covar_variants = flat_other_alleles[start_flat_other_allele_idx:curr_flat_other_allele_idx].tolist()
+                variant_found = other_alleles[iteration_idx, tree_idx]
+                orange_mask = None
+                exclude_mask = None
+                red_mask = np.zeros(len(new_gt.variants), dtype=np.bool_)
+                # did happler find a single SNP or a haplotype in this tree?
+                if isinstance(variant_found, tuple):
+                    covar_variants_for_hap = covar_variants
+                    # verify that the haplotype matches the one that was provided
+                    assert sorted(variant_found) == sorted(variants), "Encountered a haplotype which was not in the .hap file"
+                    # highlight the haplotype that we found in the tree as orange
+                    orange_mask = np.zeros(len(new_gt.variants), dtype=np.bool_)
+                    orange_mask[hap_idx] = True
+                    # now, also highlight the individual alleles
+                    for hap_snp in variant_found:
+                        red_mask[new_gt._var_idx[hap_snp]] = True
+                    variant_found = hap_id
                 else:
-                    # if this is the first iteration, we need to do special things
-                    covar_variants = other_alleles[0, :tree_idx].tolist()
-                # highlight the variant that we found in red
-                red_mask = np.zeros(len(gts.variants), dtype=np.bool_)
-                red_mask[gts._var_idx[other_alleles[iteration_idx, tree_idx]]] = True
-                # set title to indicate the variants that we are conditioning on
-                all_axs[iteration_idx+1, tree_idx].set_title("\n".join(covar_variants))
-                covars = gts.subset(variants=set(covar_variants))
-                resids = regress_effect(pts, covars)
+                    # exclude the haplotype from plotting
+                    exclude_mask = np.ones(len(new_gt.variants), dtype=np.bool_)
+                    exclude_mask[hap_idx] = False
+                    # highlight the variant that we found in the tree as red
+                    red_mask[new_gt._var_idx[variant_found]] = True
+                # is one of the covar_variants a haplotype?
+                has_hap = [isinstance(item, tuple) for item in covar_variants]
+                if sum(has_hap):
+                    try:
+                        assert variants in covar_variants
+                    except:
+                        assert variants[::-1] in covar_variants
+                        covar_variants[covar_variants.index(variants[::-1])] = hap_id
+                    else:
+                        covar_variants[covar_variants.index(variants)] = hap_id
+                # now we can finally regress things out
+                if covar_variants:
+                    # set title to indicate the variants that we are conditioning on
+                    curr_ax.set_title("\n".join(covar_variants))
+                    covars = new_gt.subset(variants=set(covar_variants))
+                    resids = regress_effect(pts, covars)
+                else:
+                    resids = pts
+                curr_ax.text(.5,.96, variant_found, fontsize=9, horizontalalignment='center', transform=curr_ax.transAxes)
                 make_manhattan(
-                    all_axs[iteration_idx+1, tree_idx],
-                    positions,
-                    condition_on_variable_chunked(gts, resids, chunk_size=chunk_size),
+                    curr_ax,
+                    new_gt.variants["pos"],
+                    condition_on_variable_chunked(new_gt, resids, chunk_size=chunk_size),
+                    exclude_mask=exclude_mask,
+                    red_mask=red_mask,
+                    orange_mask=orange_mask,
+                )
+            for axes_idx in range(all_axs.shape[1]-1, other_alleles.shape[1]-1, -1):
+                curr_ax = all_axs[iteration_idx+1, axes_idx]
+                if covar_variants_for_hap is None or axes_idx != (all_axs.shape[1] - 1):
+                    curr_ax.remove()
+                    continue
+                # If this is the last axis and we saw a haplotype, let's make a midway plot
+                assert len(variants) == 2, "This will only work for a haplotype with two alleles"
+                curr_ax.set_title(f"midway {hap_id}:\n"+"\n".join(covar_variants_for_hap))
+                covars = gts.subset(variants=set(covar_variants_for_hap))
+                resids = regress_effect(pts, covars)
+                # now, transform all of the SNPs by the haplotype up until the target_variant
+                gts_tsfm = Genotypes(fname=None, log=log)
+                haptools_haplotype = copy.deepcopy(list(hps.data.values())[0])
+                target_variant = haptools_haplotype.variants[-1]
+                target_allele = gts.variants[gts._var_idx[target_variant.id]]["alleles"][0]
+                target_allele = int(target_variant.allele != target_allele)
+                haptools_haplotype.variants = haptools_haplotype.variants[:-1]
+                hp = HapplerHaplotype.from_haptools_haplotype(haptools_haplotype, gts)
+                gts_tsfm.variants = np.delete(gts.variants, hp.node_indices)
+                gts_tsfm.samples = gts.samples
+                gts_tsfm.data = hp.transform(gts, target_allele)
+                gts_tsfm.index()
+                # also make a red mask for the variant
+                red_mask = np.zeros(len(gts_tsfm.variants), dtype=np.bool_)
+                red_mask[gts_tsfm._var_idx[target_variant.id]] = True
+                make_manhattan(
+                    curr_ax,
+                    gts_tsfm.variants["pos"],
+                    condition_on_variable_chunked(gts_tsfm, resids, chunk_size=chunk_size),
                     exclude_mask=None,
                     red_mask=red_mask,
                     orange_mask=None,
                 )
-            for axes_idx in range(other_alleles.shape[1], all_axs.shape[1]):
-                all_axs[iteration_idx+1, axes_idx].remove()
 
     # now, tidy up and save the plot
     log.info("Writing out plot")
