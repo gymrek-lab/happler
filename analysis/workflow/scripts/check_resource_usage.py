@@ -23,7 +23,6 @@ def read_benchmark_metrics(bench_path: Path) -> Tuple[Optional[float], Optional[
     """
     Return (peak_rss_mb, elapsed_min) from a Snakemake benchmark TSV.
     - Tries several common column names.
-    - Assumes RSS is KB if the value is large (converts to MB).
     - If multiple rows exist (retries), uses the max per metric.
     """
     if not bench_path.exists():
@@ -54,7 +53,7 @@ def read_benchmark_metrics(bench_path: Path) -> Tuple[Optional[float], Optional[
             v = pd.to_numeric(df[cand], errors="coerce").max()
             if pd.notna(v):
                 v = float(v)
-                peak_rss_mb = v / 1024.0 if v > 8192 else v  # heuristic: large => KB
+                peak_rss_mb = v / 1000.0
                 break
 
     elapsed_min = (elapsed_s / 60.0) if elapsed_s is not None else None
