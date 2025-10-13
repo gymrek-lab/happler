@@ -33,6 +33,17 @@ from haptools.data import GenotypesPLINK
     help="Whether to use the variants in file2 to replace those in file1",
 )
 @click.option(
+    "-c",
+    "--chunk-size",
+    type=int,
+    default=None,
+    show_default="all variants",
+    help=(
+        "Perform reading/writing operations in chunks of X variants. "
+        "This reduces memory but at the cost of time."
+    ),
+)
+@click.option(
     "-v",
     "--verbosity",
     type=click.Choice(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
@@ -47,6 +58,7 @@ def main(
     region: str = None,
     maf: float = None,
     replace: bool = True,
+    chunk_size: int = None,
     verbosity: str = "DEBUG",
 ):
     """
@@ -76,8 +88,8 @@ def main(
     log = getLogger("merge_plink", verbosity)
 
     log.info("Loading genotypes from both files")
-    gts1 = GenotypesPLINK(fname=file1, log=log)
-    gts2 = GenotypesPLINK(fname=file2, log=log)
+    gts1 = GenotypesPLINK(fname=file1, chunk_size=chunk_size, log=log)
+    gts2 = GenotypesPLINK(fname=file2, chunk_size=chunk_size, log=log)
 
     gts1.read(region=region)
     gts2.read(region=region)
