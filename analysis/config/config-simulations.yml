@@ -78,7 +78,7 @@ mode: ld_range
 
 # Discard rare variants with a MAF below this number
 # Defaults to 0 if not specified
-min_maf: 0.05
+min_maf: 0.05 # cannot be lowered to 0.01 unless the input data is recreated
 
 # Sample sizes to use
 # sample_size: [777, 800, 1600, 2400, 3200]
