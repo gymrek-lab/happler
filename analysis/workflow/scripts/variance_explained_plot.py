@@ -307,23 +307,23 @@ def main(
     with open(output.with_suffix(".pickle"), "wb") as picklef:
         pickle.dump((params, explained_variances, rsquareds), picklef)
 
-    ax1.scatter(explained_variances[:, 1], explained_variances[:, 0])
-    ax1.axline([0, 0], [max_ev_val, max_ev_val])
     with open(output.with_suffix(".tsv"), 'w', newline='') as tsvfile:
         tsv_writer = csv.writer(tsvfile, delimiter='\t')
         tsv_writer.writerow(["locus", "hap_exp_var", "alleles_exp_var", "hap_r2", "alleles_r2", "hap_over_alleles_r2"])
         for i in range(explained_variances.shape[0]):
             tsv_writer.writerow([params[i]["locus"]+":"+params[i]["gene"], explained_variances[i, 0], explained_variances[i, 1], rsquareds[i, 0], rsquareds[i, 1], rsquareds[i,0]/rsquareds[i,1]])
 
+    ax1.scatter(explained_variances[:, 0], explained_variances[:, 0]/explained_variances[:, 1])
+    ax1.axline([0, 1], [max_ev_val, 1])
     ax1.set_title("Variance Explained")
-    ax1.set_xlabel("Haplotype's SNPs")
-    ax1.set_ylabel("Haplotype")
+    ax1.set_xlabel("Haplotype")
+    ax1.set_ylabel("Haplotype / Haplotype's SNPs")
 
-    ax2.scatter(rsquareds[:, 1], rsquareds[:, 0])
-    ax2.axline([0, 0], [max_r2_val, max_r2_val])
+    ax2.scatter(rsquareds[:, 0], rsquareds[:, 0]/rsquareds[:, 1])
+    ax2.axline([0, 1], [max_r2_val, 1])
     ax2.set_title("R-Squared")
-    ax2.set_xlabel("Haplotype's SNPs")
-    ax2.set_ylabel("Haplotype")
+    ax2.set_xlabel("Haplotype")
+    ax2.set_ylabel("Haplotype / Haplotype's SNPs")
 
     f.set_size_inches(10, 5)
     plt.tight_layout()
