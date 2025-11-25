@@ -11,23 +11,25 @@ geuvadis="$2"
 ############################################## MAIN PROGRAM ########################################
 
 # first, create the multiline.txt file, which lists all .hap files with substantial haplotypes
-while read hap; do ls "$out/$(echo "$hap" | cut -f1)/happler/run/$(echo "$hap" | cut -f2)/happler.hap"; done < $out/multiline.tsv > $out/multiline.txt
+while read hap; do ls "out/$(echo "$hap" | cut -f1)/happler/run/$(echo "$hap" | cut -f2)/happler.hap"; done < $out/multiline.tsv > $out/multiline.txt
+multiline_files = "$(cat "$out"/multiline.txt | ( [ "$out" == "out" ] && cat || sed 's+out/+'"$out"'/+'))"
 
 # let's report a few statistics
 num_tot_regions="$(ls -d $out/*_*-* | wc -l)"
-num_regions="$(cat $out/multiline.txt | wc -l)"
+num_regions="$(echo "$multiline_files" | wc -l)"
 echo "Out of $num_tot_regions regions, $num_regions has at least one haplotype with more than one variant."
 echo "Of those $num_regions, here is a breakdown of the number of haplotypes each region had:"
-while read hap; do grep '^H' $hap | wc -l; done < $out/multiline.txt | sort | uniq -c
-avg_num_alleles="$(for i in $(cat $out/multiline.txt); do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | awk '{ total += $1 } END { print total/NR }')"
+while read hap; do grep '^H' $hap | wc -l; done < <(echo "$multiline_files") | sort | uniq -c
+echo "Of those $num_regions, here is a breakdown of the number of alleles in each haplotype:"
+avg_num_alleles="$(for i in $multiline_files; do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | tee >(sort | uniq -c 1>&2) | awk '{ total += $1 } END { print total/NR }')"
 echo "Of those $num_regions, the average number of alleles in each haplotype is $avg_num_alleles."
 
 if [ -n "$geuvadis" ]; then
   # now, let's make the variance_explained.png plot
-  workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s "$out"/multiline.txt "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/geuvadis/phenos/{gene}.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
+  workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/geuvadis/phenos/{gene}.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
 else
   # now, let's make the variance_explained.png plot
-  workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s "$out"/multiline.txt "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/ukb/phenos/{gene}.resid.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
+  workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/ukb/phenos/{gene}.resid.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
 fi
 echo "Created $out/variance_explained.png"
 
@@ -56,6 +58,22 @@ EOF
 ) | python
 echo "Created $out/hap_pips.png"
 
+# let's make a plot to show the haplotype PIPs vs best SuSiE PIPs when the hap is excluded
+(
+  echo 'a=['$(for i in $(cat multiline.txt | sed 's+happler.hap$+exclude/susie_pips.tsv+;s+out/++'); do echo "$(awk '$1 == "H0"' "$(echo "$i" | sed 's/exclude/include/')" | cut -f2),$(awk '(NR==1) || ($2 > max){max=$2; rec=$0} END{if (NR) print rec}' "$i" | cut -f2)"; done | sed 's/^/(/;s/$/)/' | paste -s -d,)']'
+  cat <<'EOF'
+import numpy as np
+import matplotlib.pyplot as plt
+data = np.array(a)
+plt.scatter(data[:,1], data[:,0]/data[:,1])
+plt.axline([0, 1], [1, 1])
+plt.xlabel("Best SNP PIP (when haplotype is excluded)")
+plt.ylabel("Haplotype PIP / Best SNP PIP")
+plt.savefig("in_vs_ex_pips.png")
+EOF
+) | python
+echo "Created $out/in_vs_ex_pips.png"
+
 # now, let's check the HWE of the haplotypes
 for i in $(cat multiline.txt | sed 's/.hap$/.pvar/;s+out/++'); do plink2 --pfile ${i%.*} --hardy --out ${i%.*}-hwe &>/dev/null; done
 (
@@ -75,6 +93,20 @@ echo "Created $out/hwe.png"
 # now, let's threshold by MAC and create a histogram
 for i in $(cat multiline.txt | sed 's/.hap$/.pvar/;s+out/++'); do plink2 --pfile ${i%.*} --mac 70 --make-pgen --out ${i%.*}-maf --freq &>/dev/null; done
 echo "$(grep 'Error: No variants remaining' */happler/run/*/happler-maf.log | cut -d '/' -f2,5 | wc -l) haplotypes had an MAC below 70."
+(
+  echo 'a=['$(cat */happler/run/*/happler-maf.afreq | grep -Ev '^#' | cut -f 5 | paste -s -d,)']'
+  cat <<'EOF'
+import numpy as np
+import matplotlib.pyplot as plt
+data = np.array(a)
+data = np.min(np.array([data, 1-data]), axis=0)
+binwidth = 0.025
+plt.hist(data, bins=np.arange(min(data), max(data) + binwidth, binwidth))
+plt.title("Haplotype MAFs")
+plt.savefig("mafs.png")
+EOF
+) | python
+echo "Created $out/mafs.png"
 
 if [ -n "$geuvadis" ]; then
   # create SV LD plot
@@ -184,4 +216,28 @@ plt.savefig("ld_str_vs_sv.png")
 EOF
 ) | python
   echo "Created $out/ld_str_vs_sv.png";
+fi
+
+# let's make a plot to show runtime and memory usage
+if [ ! -n "$geuvadis" ]; then
+(
+  echo "a=["$(for i in */happler/run/*/bench/run; do echo "$(wc -l "$(echo "$i" | sed 's+happler/.*$+genotypes/snps.pvar+')" | cut -f1 -d' ')","$(cut -f1,3 --output-delimiter , "$i" | tail -n1)"; done | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
+  cat <<'EOF'
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+data = np.array(a)
+fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(6.5,3))
+axes[0].scatter(data[:, 0], data[:, 1]/60)
+axes[0].set_xlabel("Number of variants in locus")
+axes[0].set_ylabel("Happler Runtime (mins)")
+axes[1].scatter(data[:, 0], data[:, 2]/1000)
+axes[1].set_xlabel("Number of variants in locus")
+axes[1].set_ylabel("Happler Max Memory (GB)")
+plt.tight_layout()
+plt.savefig("bench.png")
+EOF
+) | python
+echo "Created $out/bench.png"
 fi
