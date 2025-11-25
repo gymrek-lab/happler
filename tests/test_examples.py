@@ -14,6 +14,7 @@ from haptools.data import Genotypes, Phenotypes, Haplotypes
 from happler.__main__ import main
 from happler.tree import (
     TreeBuilder,
+    ForestBuilder,
     AssocTestSimpleSM,
     AssocTestSimpleSMTScore,
     TTestTerminator,
@@ -24,7 +25,7 @@ from happler.tree import (
 DATADIR = Path(__file__).parent.joinpath("data")
 
 
-def _create_fake_gens(data) -> Genotypes:
+def _create_fake_gens(data, with_alleles: bool = False) -> Genotypes:
     """
     Create a fake Genotypes object for testing purposes
 
@@ -40,15 +41,27 @@ def _create_fake_gens(data) -> Genotypes:
     """
     gens = Genotypes(fname=None)
     gens.samples = tuple("samp" + str(i) for i in range(data.shape[0]))
-    gens.variants = np.array(
-        [("snp" + str(i), "chr0", i, 0.75) for i in range(data.shape[1])],
-        dtype=[
-            ("id", "U50"),
-            ("chrom", "U10"),
-            ("pos", np.uint),
-            ("aaf", np.float64),
-        ],
-    )
+    if with_alleles:
+        gens.variants = np.array(
+            [("snp" + str(i), "chr0", i, 0.75, ("A", "T")) for i in range(data.shape[1])],
+            dtype=[
+                ("id", "U50"),
+                ("chrom", "U10"),
+                ("pos", np.uint),
+                ("aaf", np.float64),
+                ("alleles", object)
+            ],
+        )
+    else:
+        gens.variants = np.array(
+            [("snp" + str(i), "chr0", i, 0.75) for i in range(data.shape[1])],
+            dtype=[
+                ("id", "U50"),
+                ("chrom", "U10"),
+                ("pos", np.uint),
+                ("aaf", np.float64),
+            ],
+        )
     gens.data = data
     return gens
 
@@ -199,7 +212,6 @@ def test_two_snps_single_association():
     assert haps[1][0] == ("snp0", 1)
 
 
-@pytest.mark.xfail(reason="not implemented yet")
 def test_two_snps_independent_perfect():
     """
     Two independent causal SNPs with perfect phenotype associations
@@ -207,19 +219,43 @@ def test_two_snps_independent_perfect():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
     gens = _create_fake_gens(
-        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_)
+        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_),
+        with_alleles=True,
     )
     gts = gens.data.sum(axis=2)
     phens = _create_fake_phens(gts[:, 0] * 0.5 + gts[:, 1] * 0.5)
 
     # run the treebuilder and extract the haplotypes
-    builder = TreeBuilder(gens, phens)
-    builder.run()
-    tree = builder.tree
-    haps = tree.haplotypes()
+    builder = TreeBuilder(gens, phens, ld_prune_thresh=0.9)
+    tree = builder.run()
+    haps = _view_tree_haps(tree)
 
-    # TODO: we need to handle this case, somehow
-    assert False
+    # our hap should only contain a single SNP
+    assert len(haps) == 1
+    assert len(haps[0]) == 1
+    assert haps[0][0] == ("snp0", 1)
+
+    # now, let's try to build a forest of trees
+    builder = TreeBuilder(gens, phens, ld_prune_thresh=0.9)
+    forest = ForestBuilder(
+        builder,
+        num_bins=3,
+        max_iterations=3,
+    )
+    haps = forest.run()
+
+    # we should retrieve one hap for each tree and one allele in each hap
+    # TODO: create a check to see if any of the returned haplotypes are the same
+    assert len(haps) == 3
+    assert len(haps[0]) == 1
+    assert len(haps[0].data.values()) == 1
+    assert len(list(haps[0].data.values())[0]) == 1
+    assert len(haps[1]) == 1
+    assert len(haps[1].data.values()) == 1
+    assert len(list(haps[1].data.values())[0]) == 1
+    assert len(haps[2]) == 1
+    assert len(haps[2].data.values()) == 1
+    assert len(list(haps[2].data.values())[0]) == 1
 
 
 def test_two_snps_one_branch_perfect():
