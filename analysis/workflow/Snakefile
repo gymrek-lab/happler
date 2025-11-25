@@ -254,7 +254,7 @@ elif mode == "run":
             expand(
                 files, zip, trait=multiline_traits, locus=multiline_locus,
                 allow_missing=True,
-            ), ex=("in",), allow_missing=True,
+            ), ex=("in","ex"), allow_missing=True,
         )
 
     rule all:
