@@ -467,7 +467,7 @@ def main(
     if color is not None and color != "not.causal":
         assert color in params.keys()
     dtypes = {k: "U30" for k in params.keys()}
-    log.debug(f"Extracted paramter values {tuple(dtypes.keys())}")
+    log.debug(f"Extracted parameter values {tuple(dtypes.keys())}")
     # convert the dictionary to a numpy mixed dtype array
     params = np.array(list(zip(*params.values())), dtype=list(dtypes.items()))
     params.sort()
@@ -700,7 +700,7 @@ def main(
     if thresh is not None:
         threshold_type = "P-value"
         if bic:
-            threshold_type = "Bayes factor"
+            threshold_type = "Delta BIC"
         elif is_finemap_metric:
             if kind == "pip":
                 threshold_type = "PIP"

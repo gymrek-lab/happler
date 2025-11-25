@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import pickle
 import logging
 import warnings
 from pathlib import Path
@@ -128,6 +129,9 @@ def main(
         )
         for idx in range(len(params))
     ])
+
+    with open(output.with_suffix(".pickle"), "wb") as f:
+        pickle.dump({"params":params, "metrics":metrics}, f)
 
     log.info("Creating plots")
     fig, axs = plt.subplots(

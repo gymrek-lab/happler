@@ -681,7 +681,7 @@ def group_by_rep(
                 curr_metrics_causal = np.concatenate([
                     safe_index(val, indices, (indices == causal_idx) & curr_bool)
                     for val, indices, curr_bool in zip(curr_metrics, curr_causal_idxs, curr_bools)
-                ]).astype(float)
+                ])
                 metrics_mean, metrics_sem = get_metrics_mean_std(curr_metrics_causal)
                 subgrouped_metrics.append(metrics_mean)
                 subgrouped_metrics_sem.append(metrics_sem)
@@ -720,7 +720,7 @@ def group_by_rep(
                         safe_index(val, indices, (indices == causal_idx) & ~curr_bool)[unmatched_idx]
                         for val, indices, curr_bool in zip(curr_metrics, curr_causal_idxs, curr_bools)
                         if unmatched_idx < safe_index(val, indices, (indices == causal_idx) & ~curr_bool).shape[0]
-                    ]).astype(float)
+                    ])
                     metrics_mean, metrics_sem = get_metrics_mean_std(curr_metrics_unmatched)
                     subgrouped_metrics.append(metrics_mean)
                     subgrouped_metrics_sem.append(metrics_sem)
@@ -822,13 +822,6 @@ def group_by_rep(
     help="Hide the observed haps that have no causal hap match",
 )
 @click.option(
-    "--pickle-out",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Save the output as a pickle file as well",
-)
-@click.option(
     "--order",
     type=str,
     default=None,
@@ -870,7 +863,6 @@ def main(
     observed_id: str = None,
     causal_id: str = None,
     hide_extras: bool = False,
-    pickle_out: bool = False,
     order: str = None,
     phenos: bool = False,
     output: Path = Path("/dev/stdout"),
@@ -959,7 +951,7 @@ def main(
                 log=log
             )
             for idx in range(len(params))
-        ], dtype=object)
+        ])
         params, ld_vals, ld_sem, ld_extras_bool, metrics_vals, metrics_vals_sem, best_bf_grouped, causal_best_bf_grouped = group_by_rep(
             params, ld_vals, ld_extras_idxs, ld_extras_bool, metrics, extra_vals=best_bf, extra_vals_2=causal_best_bf,
         )
@@ -976,12 +968,11 @@ def main(
         )
     del dtypes["rep"]
 
-    if pickle_out:
-        with open(output.with_suffix(".pickle"), "wb") as f:
-            if metrics is not None:
-                pickle.dump([params, ld_vals, ld_sem, ld_extras_bool, metrics, best_bf_grouped, causal_best_bf_grouped], f)
-            else:
-                pickle.dump([params, ld_vals, ld_sem, ld_extras_bool, best_bf_grouped, causal_best_bf_grouped], f)
+    with open(output.with_suffix(".pickle"), "wb") as f:
+        if metrics is not None:
+            pickle.dump([params, ld_vals, ld_sem, ld_extras_bool, metrics, best_bf_grouped, causal_best_bf_grouped], f)
+        else:
+            pickle.dump([params, ld_vals, ld_sem, ld_extras_bool, best_bf_grouped, causal_best_bf_grouped], f)
 
     diff_dtype = remove_same_valued_columns(params).dtype
     if use_metric is None:

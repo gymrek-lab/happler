@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import csv
 import pickle
 from pathlib import Path
 from logging import Logger
@@ -308,6 +309,12 @@ def main(
 
     ax1.scatter(explained_variances[:, 1], explained_variances[:, 0])
     ax1.axline([0, 0], [max_ev_val, max_ev_val])
+    with open(output.with_suffix(".tsv"), 'w', newline='') as tsvfile:
+        tsv_writer = csv.writer(tsvfile, delimiter='\t')
+        tsv_writer.writerow(["locus", "hap_exp_var", "alleles_exp_var", "hap_r2", "alleles_r2", "hap_over_alleles_r2"])
+        for i in range(explained_variances.shape[0]):
+            tsv_writer.writerow([params[i]["locus"]+":"+params[i]["gene"], explained_variances[i, 0], explained_variances[i, 1], rsquareds[i, 0], rsquareds[i, 1], rsquareds[i,0]/rsquareds[i,1]])
+
     ax1.set_title("Variance Explained")
     ax1.set_xlabel("Haplotype's SNPs")
     ax1.set_ylabel("Haplotype")
