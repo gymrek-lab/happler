@@ -7,9 +7,9 @@ from snakemake.utils import min_version
 min_version("8.12.0")
 
 
-# IMPORT CONFIG VARIABLES
-configfile: "config/config.yml"
-
+# if --configfile was not specified, import the default config file
+if not ("modes" in config and "locus" in config and "snp_panel" in config):
+    configfile: "config/config.yml"
 
 def check_config(value, default=False, place=config, as_set=False):
     """return true if config value exists and is true"""
@@ -20,7 +20,6 @@ def check_config(value, default=False, place=config, as_set=False):
 # handle defaults
 config["out"] = check_config("out", "out")
 config["min_maf"] = check_config("min_maf", 0)
-config["exclude_causal"] = check_config("exclude_causal", False, as_set=True)
 mode = config["mode"]
 # handle locus
 if mode == "run":
@@ -48,8 +47,6 @@ elif Path(config["locus"]).exists() and Path(config["locus"]).suffix == ".bed":
     locus_traits, locus = list(zip(*locus_file))
 else:
     locus = config["locus"].replace(":", "_")
-# convert the exclude_causal var into a dict for later
-exclude_causal = {("in", "ex")[val]: val for val in config["exclude_causal"]}
 # remove any trailing slashes in directories
 orig_out = str(Path(config["out"]))
 config["out"] = str(Path(config["out"])) + "/{locus}"

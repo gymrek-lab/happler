@@ -63,10 +63,3 @@ min_maf: 0.1
 
 # A threshold on the pvalues of the haplotypes
 out_thresh: 5e-6
-
-# Whether to include the causal variant in the set of genotypes provided to the
-# finemapping methods. Set this to true if you're interested in seeing how the
-# methods perform when the causal variant is absent from the data.
-# Defaults to false if not specified
-# You can also provide a list of booleans, if you want to test both values
-exclude_causal: [true, false]
