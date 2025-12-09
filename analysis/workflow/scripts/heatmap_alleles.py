@@ -156,7 +156,7 @@ def plot_hap_label_table(ax, hps, hps_vars, ref_alleles):
     show_default=True,
     help=(
         "The path to a .hap file containing haplotypes simulated to be causal. "
-        "These will be added to the plot and highlited differently."
+        "These will be added to the plot and highlighted differently."
     ),
 )
 @click.option(

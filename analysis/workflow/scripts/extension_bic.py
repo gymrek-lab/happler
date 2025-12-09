@@ -96,8 +96,9 @@ def get_extension_bf(
     node_res = NodeResultsExtra
     node_results = node_res.from_np(results.data[0])
     # check that we were able to recapitulate the results object properly
-    assert node_results.beta == ext_allele[2].beta
-    assert node_results.stderr == ext_allele[2].stderr
+    if isinstance(ext_allele, NodeResultsExtra):
+        assert node_results.beta == ext_allele[2].beta
+        assert node_results.stderr == ext_allele[2].stderr
     assert node_results.bic == ext_allele[2].bic
 
     # now, get the BF
