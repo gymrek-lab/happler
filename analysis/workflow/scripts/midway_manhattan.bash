@@ -56,7 +56,7 @@ grep -m1 -P "\t"$snp_id"\t" "${pgen_file%.pgen}.pvar" >/dev/null || {
 }
 
 # now, determine whether the child SNP appears in the haplotype by its REF (0) or ALT (1) allele
-allele=$(grep "$(grep -m1 -P '^V\t'"$hap_id"'\t.*\t'"$snp_id"'\t' "$hap_file" | cut -f5,6)" "${pgen_file%.pgen}.pvar" | wc -l)
+allele=$(grep "$(grep -m1 -P '^V\t'"$hap_id"'\t.*\t'"$snp_id"'\t' "$hap_file" | cut -f5,6 | sed 's/$/\t/')" "${pgen_file%.pgen}.pvar" | wc -l)
 allele=$(expr 1 - $allele)
 
 # use --mac 1 if maf is 0
