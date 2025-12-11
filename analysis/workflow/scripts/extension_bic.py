@@ -99,7 +99,7 @@ def get_extension_bf(
     if isinstance(ext_allele, NodeResultsExtra):
         assert node_results.beta == ext_allele[2].beta
         assert node_results.stderr == ext_allele[2].stderr
-    assert node_results.bic == ext_allele[2].bic
+    np.testing.assert_almost_equal(node_results.bic, ext_allele[2].bic)
 
     # now, get the BF
     val = terminator.compute_val(
