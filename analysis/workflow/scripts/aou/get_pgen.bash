@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 region="$1"
+pop="${2:-EUR_WHITE}"
 
 export GCS_REQUESTER_PAYS_PROJECT="${GOOGLE_PROJECT}"
 export GCS_OAUTH_TOKEN="$(gcloud auth application-default print-access-token)"
@@ -23,7 +24,8 @@ cd ..
 bcftools merge --no-index -O z -o "$out_prefix".bcf -l <(ls "$out_prefix"/*.bcf)
 # note that we skip --maf bc the input is already filtered
 plink2 --out "$out_prefix" --nonfounders --bcf "$out_prefix".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
-gsutil cp "$out_prefix".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/
+gsutil cp "$out_prefix".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/ALL_SAMPLES/
 
-
-gsutil cp ${WORKSPACE_BUCKET}/samples/EUR_WHITE.csv .
+gsutil cp ${WORKSPACE_BUCKET}/samples/"$pop".csv .
+plink2 --keep <(cut -f1 -d, "$pop".csv | tail -n+2) --out "$out_prefix"."$pop" --pfile "$out_prefix"
+gsutil cp "$out_prefix"."$pop".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/"$pop"/
