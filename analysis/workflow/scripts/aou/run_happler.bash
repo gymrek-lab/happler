@@ -8,15 +8,17 @@ mkdir -p happler_results
 
 happler run \
 -t 20 \
+--maf MAF \
 --show-tree \
 --remove-SNPs \
 --out-thresh 20 \
 --max-signals 3 \
+--chunk-size 500 \
 --verbosity DEBUG \
 --indep-thresh 15 \
 --max-iterations 3 \
 -o happler_results/"$region.$pop.hap" \
 --discard-multiallelic \
-pgens/"$region.$pop.pgen" phenos/"$pheno.residuals.pheno" &>"$region.$pop".log
+pgens/"$region.$pop.pgen" phenos/"$pheno.residuals.pheno" &>happler_results/"$region.$pop".log
 
 haptools index -o happler_results/"$region.$pop".hap.gz happler_results/"$region.$pop.hap"
