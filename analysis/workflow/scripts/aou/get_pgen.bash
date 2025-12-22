@@ -30,14 +30,3 @@ gsutil cp "$out_prefix".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/ALL_SAMP
 gsutil cp ${WORKSPACE_BUCKET}/samples/"$pop".csv .
 plink2 --keep <(cut -f1 -d, "$pop".csv | tail -n+2) --out "$out_prefix"."$pop" --pfile "$out_prefix"
 gsutil cp "$out_prefix"."$pop".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/"$pop"/
-
-exit
-# to process phenotypes as well
-mkdir -p phenos
-gsutil -u "$GOOGLE_PROJECT" cat "$CDR_DIR/wgs/short_read/snpindel/aux/ancestry/ancestry_preds.tsv" | cut -f1,4 |  sed 's/\[/\t/;s/\]/\t/;s/, /\t/g' | tail -n+2 | { echo -ne "#IID\t\t"; read -r head; seq 1 "$(echo "$head" | cut -f 3- | awk -F $'\t' '{print NF; exit}')" | sed 's/^/PC/' | paste -s -d$'\t'; echo "$head"; cut --complement -f17; } | cut --complement -f2 > phenos/AOU_PCS.covar
-for pheno in platelet_count_new_phenocovar ldl_cholesterol_phenocovar; do
-    gsutil cp ${WORKSPACE_BUCKET}/phenotypes/$pheno.csv phenos/$pheno.csv
-    cut -f-2 -d, --output-delimiter $'\t' phenos/$pheno.csv | { echo -e "#IID\tpheno"; tail -n+2; } > phenos/$pheno.og.pheno
-    cut -f 1,3- -d, --output-delimiter $'\t' phenos/$pheno.csv | { read -r head; echo "$head" | sed 's/person_id/#IID/'; cat; } > phenos/$pheno.og.covar
-    happler/analysis/workflow/scripts/residuals.py -o phenos/$pheno.residuals.pheno -e <(cut -f-11 phenos/AOU_PCS.covar) phenos/$pheno.og.pheno phenos/$pheno.og.covar
-done
