@@ -49,7 +49,7 @@ def _create_fake_gens(data, with_alleles: bool = False) -> Genotypes:
                 ("chrom", "U10"),
                 ("pos", np.uint),
                 ("aaf", np.float64),
-                ("alleles", object)
+                ("alleles", object),
             ],
         )
     else:
@@ -219,7 +219,9 @@ def test_two_snps_independent_perfect():
     """
     split_list_in_half = lambda pair: [pair[:2], pair[2:]]
     gens = _create_fake_gens(
-        np.array(list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_),
+        np.array(
+            list(map(split_list_in_half, product([0, 1], repeat=4))), dtype=np.bool_
+        ),
         with_alleles=True,
     )
     gts = gens.data.sum(axis=2)
@@ -411,9 +413,15 @@ def test_three_snps_one_branch_one_snp_not_causal():
     phens = _create_fake_phens(0.5 * (gts[:, 0] & gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
-    for builder in (TreeBuilder(gens, phens), TreeBuilder(
-        gens, phens, method=AssocTestSimpleSMTScore(with_bic=True), terminator=TTestTerminator(thresh=0.06)
-    )):
+    for builder in (
+        TreeBuilder(gens, phens),
+        TreeBuilder(
+            gens,
+            phens,
+            method=AssocTestSimpleSMTScore(with_bic=True),
+            terminator=TTestTerminator(thresh=0.06),
+        ),
+    ):
         tree = builder.run()
         haps = _view_tree_haps(tree)
 
@@ -630,9 +638,15 @@ def test_two_snps_two_branches_perfect_one_snp_not_causal():
     phens = _create_fake_phens(0.5 * (gts[:, 0] | gts[:, 1]).sum(axis=1))
 
     # run the treebuilder and extract the haplotypes
-    for builder in (TreeBuilder(gens, phens), TreeBuilder(
-        gens, phens, method=AssocTestSimpleSMTScore(with_bic=True), terminator=TTestTerminator(thresh=0.06)
-    )):
+    for builder in (
+        TreeBuilder(gens, phens),
+        TreeBuilder(
+            gens,
+            phens,
+            method=AssocTestSimpleSMTScore(with_bic=True),
+            terminator=TTestTerminator(thresh=0.06),
+        ),
+    ):
         tree = builder.run()
         haps = _view_tree_haps(tree)
 

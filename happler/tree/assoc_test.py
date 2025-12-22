@@ -385,8 +385,10 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         """
         self.results_type = NodeResultsBIC
         self.chunk_size = chunk_size
-    
-    def perform_test(self, X: npt.NDArray[np.float64], yc: npt.NDArray[np.float64]) -> npt.NDArray:
+
+    def perform_test(
+        self, X: npt.NDArray[np.float64], yc: npt.NDArray[np.float64]
+    ) -> npt.NDArray:
         """
         Perform the test for a chunk of haplotypes
 

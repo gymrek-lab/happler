@@ -262,7 +262,12 @@ class Haplotypes(HaplotypesBase):
 
     @classmethod
     def from_tree(
-        cls, fname: Path | str, tree: Tree, gts: GenotypesVCF, pts: Phenotypes = None, log: Logger = None
+        cls,
+        fname: Path | str,
+        tree: Tree,
+        gts: GenotypesVCF,
+        pts: Phenotypes = None,
+        log: Logger = None,
     ) -> Haplotypes:
         """
         Create a Haplotypes object from a Tree object and a Genotypes object
@@ -299,8 +304,8 @@ class Haplotypes(HaplotypesBase):
                 start=0,  # this is filled out later
                 end=0,  # this is filled out later
                 id=hap_id,
-                beta=0, # this is filled out later
-                pval=1, # this is filled out later
+                beta=0,  # this is filled out later
+                pval=1,  # this is filled out later
             )
             alleles = {
                 node["variant"].idx: gts.variants[node["variant"].idx]["alleles"][
