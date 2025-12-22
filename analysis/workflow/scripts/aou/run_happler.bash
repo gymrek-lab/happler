@@ -4,8 +4,7 @@ region="${1:-1_108475598-110283922}"
 pop="${2:-EUR_WHITE}"
 pheno="${3:-ldl_cholesterol_phenocovar}"
 
-mkdir -p happler
-cd happler
+mkdir -p happler_results
 
 happler run \
 -t 20 \
@@ -16,8 +15,8 @@ happler run \
 --verbosity DEBUG \
 --indep-thresh 15 \
 --max-iterations 3 \
--o "$region.$pop.hap" \
+-o happler_results/"$region.$pop.hap" \
 --discard-multiallelic \
 pgens/"$region.$pop.pgen" phenos/"$pheno.residuals.pheno" &>"$region.$pop".log
 
-haptools index -o "$region.$pop".hap.gz "$region.$pop.hap"
+haptools index -o happler_results/"$region.$pop".hap.gz happler_results/"$region.$pop.hap"
