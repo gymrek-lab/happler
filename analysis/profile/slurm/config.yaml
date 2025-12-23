@@ -6,8 +6,8 @@ shadow-prefix: /tscc/lustre/ddn/scratch/$USER
 
 executor: slurm
 default-resources:
-    slurm_account: ddp268
-    slurm_partition: condo
+    slurm_account: htl149
+    slurm_partition: hotel
     runtime: 30
     nodes: 1
-    slurm_extra: "'--qos=condo'"
+    slurm_extra: "'--qos=hotel'"

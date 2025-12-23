@@ -16,8 +16,9 @@ from .terminator import Terminator, BICTerminator, TTestTerminator
 from .assoc_test import (
     AssocTest,
     NodeResults,
+    NodeResultsBIC,
     NodeResultsExtra,
-    AssocTestSimpleSM,
+    AssocTestSimpleFastBIC,
     AssocTestSimpleSMTScore,
     AssocTestSimpleCovariates,
 )
@@ -56,9 +57,9 @@ class TreeBuilder:
         genotypes: Genotypes,
         phenotypes: Phenotypes,
         maf: float = None,
-        method: AssocTest = AssocTestSimpleSM(with_bic=True),
+        method: AssocTest = AssocTestSimpleFastBIC(),
         terminator: Terminator = BICTerminator(),
-        indep_thresh: float = 0.1,
+        indep_thresh: float = 15,
         ld_prune_thresh: float = None,
         covariance_correction: float = True,
         log: Logger = None,
@@ -74,8 +75,9 @@ class TreeBuilder:
         self._split_method = self._find_split_rigid
         split_method = "rigid"
         self.ld_prune_thresh = ld_prune_thresh
-        # self.ranking_val = "bic" if isinstance(self.method, AssocTestSimpleSM) and self.method.with_bic else "pval"
-        self.ranking_val = "pval"
+        self.ranking_val = (
+            "bic" if isinstance(self.method, AssocTestSimpleFastBIC) else "pval"
+        )
         # for now, let's comment this out because we want to try the rigid strategy
         # if self.ld_prune_thresh is not None:
         #     self._split_method = self._find_split_flexible
@@ -135,17 +137,19 @@ class TreeBuilder:
             )
         )
         # find the variant-allele pairs that give the best haplotype
-        for variant, allele, results in self._split_method(parent_hap, parent_res):
-            if variant is None:
-                # there were no significant variants!
-                continue
-            new_node_idx = self.tree.add_node(variant, parent_idx, allele, results)
-            if self.log.getEffectiveLevel() == logging.DEBUG:
-                self.log.debug(self.tree.dot())
-            # create a new Haplotype with the variant-allele pair added
-            variant_gts = self.gens.data[:, variant.idx, :2] == allele
-            new_parent_hap = parent_hap.append(variant, allele, variant_gts)
-            self._create_tree(new_parent_hap, new_node_idx, results)
+        vals = self._split_method(parent_hap, parent_res)
+        if vals is not None:
+            for variant, allele, results in vals:
+                if variant is None:
+                    # there were no significant variants!
+                    continue
+                new_node_idx = self.tree.add_node(variant, parent_idx, allele, results)
+                if self.log.getEffectiveLevel() == logging.DEBUG:
+                    self.log.debug(self.tree.dot())
+                # create a new Haplotype with the variant-allele pair added
+                variant_gts = self.gens.data[:, variant.idx, :2] == allele
+                new_parent_hap = parent_hap.append(variant, allele, variant_gts)
+                self._create_tree(new_parent_hap, new_node_idx, results)
 
     def prune_tree(self, from_root: bool = True):
         """
@@ -180,9 +184,9 @@ class TreeBuilder:
                     )
                     # keep it if our value is better
                     continue
-                elif math.isclose(sib_p, leaf_p) and leaf["results"].beta > 0:
+                elif math.isclose(sib_p, leaf_p) and leaf["allele"] == 1:
                     self.log.debug(
-                        f"Left leaf {leaf_var.id} unpruned since it's beta is positive"
+                        f"Left leaf {leaf_var.id} unpruned since it's for the ALT allele"
                     )
                     # also if the values are the same but our effect size is positive
                     continue
@@ -250,6 +254,7 @@ class TreeBuilder:
             the results (ex: beta, bic) of the haplotype association test after
             incorporating that variant
         """
+        final_to_return = []
         num_samps = len(self.gens.samples)
         # iterate through the two possible alleles and try all SNPs with that allele
         alleles = (0, 1)
@@ -264,9 +269,9 @@ class TreeBuilder:
             hap_matrix = hap_matrix[:, maf_mask]
             if hap_matrix.shape[1] == 0:
                 # if there weren't any genotypes left, just return None
-                yield None, allele, None
+                final_to_return.append((None, allele, None))
                 continue
-            hap_mat_sum = hap_matrix.sum(axis=2)
+            hap_mat_sum = hap_matrix.sum(axis=2, dtype=np.uint8)
             parent_corr = None
             # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
@@ -334,7 +339,7 @@ class TreeBuilder:
                         "Terminating because the hap had a BIC too similar to one with "
                         "just the parent + child"
                     )
-                    yield None, allele, node_res
+                    final_to_return.append((None, allele, node_res))
                     continue
                 self.log.debug(
                     "The haplotype had a much better BIC than in an additive model "
@@ -354,9 +359,10 @@ class TreeBuilder:
                 num_samps,
                 num_tests,
             ):
-                yield None, allele, node_res
+                final_to_return.append((None, allele, node_res))
                 continue
-            yield best_variant, allele, node_res
+            final_to_return.append((best_variant, allele, node_res))
+        return final_to_return
 
     def _find_split_rigid(
         self, parent: Haplotype, parent_res: NodeResults = None
@@ -382,6 +388,7 @@ class TreeBuilder:
             the results (ex: beta, bic) of the haplotype association test after
             incorporating that variant
         """
+        final_to_return = []
         num_samps = len(self.gens.samples)
         results = {}
         best_p_idx = {}
@@ -397,12 +404,16 @@ class TreeBuilder:
                 self.log.debug(
                     f"Considering {len(maf_mask[allele])} variants for allele {allele}"
                 )
-            hap_matrix = hap_matrix[:, maf_mask[allele]]
-            if hap_matrix.shape[1] == 0:
+            # check if we actually need to filter at all
+            # If not, it's better to avoid it bc this can create a copy of the array!
+            if maf_mask[allele].shape[0] == 0:
                 # if there weren't any genotypes left, just return None
-                yield None, allele, None
+                final_to_return.append((None, allele, None))
                 continue
-            hap_mat_sum = hap_matrix.sum(axis=2)
+            elif maf_mask[allele].shape[0] < hap_matrix.shape[1]:
+                hap_mat_sum = hap_matrix[:, maf_mask[allele]].sum(axis=2, dtype=np.uint8)
+            else:
+                hap_mat_sum = hap_matrix.sum(axis=2, dtype=np.uint8)
             parent_corr[allele] = None
             # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
@@ -475,7 +486,7 @@ class TreeBuilder:
                 f"Ignoring variant {best_variant.id} / allele {int(not best_allele)}, "
                 "since it results in a haplotype with low MAF"
             )
-            yield None, allele, None
+            final_to_return.append((None, allele, None))
             del best_res_idx[int(not best_allele)]
         # iterate through all of the alleles of the best variant and check if they're
         # significant
@@ -509,7 +520,7 @@ class TreeBuilder:
                         "Terminating because the hap had a BIC too similar to one with "
                         f"just the parent + child for allele {allele}"
                     )
-                    yield None, allele, node_res
+                    final_to_return.append((None, allele, node_res))
                     continue
                 self.log.debug(
                     "The haplotype had a much better BIC than in an additive model "
@@ -529,6 +540,7 @@ class TreeBuilder:
                 num_samps,
                 num_tests,
             ):
-                yield None, allele, node_res
+                final_to_return.append((None, allele, node_res))
                 continue
-            yield best_variant, allele, node_res
+            final_to_return.append((best_variant, allele, node_res))
+        return final_to_return

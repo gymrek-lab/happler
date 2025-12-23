@@ -92,6 +92,16 @@ def main(
         # Plot box and whisker plot for each genotype value
         axs[hp_idx].boxplot(grouped_phenos, labels=gt_vals)
         axs[hp_idx].set_xlabel(gts.variants["id"][hp_idx])
+        nobs = [len(i) for i in grouped_phenos]
+        for tick, label in zip(gt_vals, axs[hp_idx].get_xticklabels()):
+            axs[hp_idx].text(
+                gt_vals[tick] + 1,
+                axs[hp_idx].get_ylim()[1] * 1.02, # y position (near the top of the plot)
+                nobs[tick],
+                horizontalalignment='center',
+                size='small',
+                color='k',
+            )
 
     fig.supylabel("Phenotype")
     fig.tight_layout()

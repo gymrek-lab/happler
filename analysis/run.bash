@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #SBATCH --export ALL
-#SBATCH --partition condo
-#SBATCH --account ddp268
-#SBATCH --qos condo
+#SBATCH --partition hotel
+#SBATCH --account htl149
+#SBATCH --qos hotel
 #SBATCH --job-name happler-smk
 #SBATCH --nodes 1
 #SBATCH --ntasks 1

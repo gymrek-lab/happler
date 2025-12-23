@@ -56,7 +56,7 @@ grep -m1 -P "\t"$snp_id"\t" "${pgen_file%.pgen}.pvar" >/dev/null || {
 }
 
 # now, determine whether the child SNP appears in the haplotype by its REF (0) or ALT (1) allele
-allele=$(grep "$(grep -m1 -P '^V\t'"$hap_id"'\t.*\t'"$snp_id"'\t' "$hap_file" | cut -f5,6)" "${pgen_file%.pgen}.pvar" | wc -l)
+allele=$(grep "$(grep -m1 -P '^V\t'"$hap_id"'\t.*\t'"$snp_id"'\t' "$hap_file" | cut -f5,6 | sed 's/$/\t/')" "${pgen_file%.pgen}.pvar" | wc -l)
 allele=$(expr 1 - $allele)
 
 # use --mac 1 if maf is 0
@@ -91,50 +91,52 @@ grep -m1 -P "\t"$snp_id"\t" "$out_prefix".pvar >/dev/null || {
 }
 
 # step 2: use plink2 to obtain p-values for a manhattan plot
-if [ "$condition" -eq 1 ]; then
-    # output the parent and child nodes to a covariate file
-    plink2 \
-    --maf $maf \
-    --threads 1 \
-    --nonfounders \
-    --out "$out_prefix" \
-    --export A ref-first \
-    --pfile "${pgen_file%.pgen}" \
-    --snps $parent_snp_id $snp_id
-    { echo -n "#"; cut -f 2,7- "$out_prefix".raw; } > "$out_prefix".covar
-    # get summary stats for the hap and incorporate the parent and child nodes as
-    # covariates in the model
-    plink2 \
-    --maf $maf \
-    --threads 1 \
-    --nonfounders \
-    --vif 10000000000 \
-    --out "$out_prefix" \
-    --pfile "$out_prefix" \
-    --variance-standardize \
-    --max-corr 0.9999999999 \
-    --glm no-x-sex hide-covar \
-    --no-input-missing-phenotype \
-    --pheno iid-only "$pheno_file" \
-    --covar 'iid-only' "$out_prefix".covar
+if [ "$condition" -ne 6 ] && [ "$condition" -ne 7 ]; then
+    if [ "$condition" -eq 1 ]; then
+        # output the parent and child nodes to a covariate file
+        plink2 \
+        --maf $maf \
+        --threads 1 \
+        --nonfounders \
+        --out "$out_prefix" \
+        --export A ref-first \
+        --pfile "${pgen_file%.pgen}" \
+        --snps $parent_snp_id $snp_id
+        { echo -n "#"; cut -f 2,7- "$out_prefix".raw; } > "$out_prefix".covar
+        # get summary stats for the hap and incorporate the parent and child nodes as
+        # covariates in the model
+        plink2 \
+        --maf $maf \
+        --threads 1 \
+        --nonfounders \
+        --vif 10000000000 \
+        --out "$out_prefix" \
+        --pfile "$out_prefix" \
+        --variance-standardize \
+        --max-corr 0.9999999999 \
+        --glm no-x-sex hide-covar \
+        --no-input-missing-phenotype \
+        --pheno iid-only "$pheno_file" \
+        --covar 'iid-only' "$out_prefix".covar
 
-    last_arg="-a 0.05"
-else
-    plink2 \
-    --maf $maf \
-    --threads 1 \
-    --nonfounders \
-    --out "$out_prefix" \
-    --pfile "$out_prefix" \
-    --variance-standardize \
-    --no-input-missing-phenotype \
-    --pheno iid-only "$pheno_file" \
-    --glm no-x-sex allow-no-covars
+        last_arg="-a 0.05"
+    else
+        plink2 \
+        --maf $maf \
+        --threads 1 \
+        --nonfounders \
+        --out "$out_prefix" \
+        --pfile "$out_prefix" \
+        --variance-standardize \
+        --no-input-missing-phenotype \
+        --pheno iid-only "$pheno_file" \
+        --glm no-x-sex allow-no-covars
 
-    last_arg="-a $(grep -P '^V\t.*\t'"$parent_snp_id"'\t' "$hap_file" | cut -f7)"
+        last_arg="-a $(grep -P '^V\t.*\t'"$parent_snp_id"'\t' "$hap_file" | cut -f7)"
+    fi
+
+    linear_file="$(ls -1 "$out_prefix".*.glm.linear | grep -v 'out\.parent\..*\.glm\.linear' | tail -n1)"
 fi
-
-linear_file="$(ls -1 "$out_prefix".*.glm.linear | grep -v 'out\.parent\..*\.glm\.linear' | tail -n1)"
 
 if [ "$condition" -eq 2 ] || [ "$condition" -eq 3 ] || [ "$condition" -eq 4 ] || [ "$condition" -eq 5 ]; then
     # first, get the parent haplotype as a PGEN file

@@ -10,14 +10,16 @@ import numpy.typing as npt
 from haptools.data import (
     Extra,
     Genotypes,
+    Phenotypes,
     GenotypesVCF,
     Variant as VariantBase,
     Haplotype as HaplotypeBase,
     Haplotypes as HaplotypesBase,
 )
 
-from .tree import Tree
 from .variant import Variant
+from .tree import Tree, NodeResults
+from .assoc_test import AssocTestSimpleSM
 
 
 class Haplotype:
@@ -260,7 +262,12 @@ class Haplotypes(HaplotypesBase):
 
     @classmethod
     def from_tree(
-        cls, fname: Path | str, tree: Tree, gts: GenotypesVCF, log: Logger = None
+        cls,
+        fname: Path | str,
+        tree: Tree,
+        gts: GenotypesVCF,
+        pts: Phenotypes = None,
+        log: Logger = None,
     ) -> Haplotypes:
         """
         Create a Haplotypes object from a Tree object and a Genotypes object
@@ -273,6 +280,9 @@ class Haplotypes(HaplotypesBase):
             The Tree object containing the haplotypes to encode within a Haplotypes obj
         gts : GenotypesVCF
             The genotypes from which the tree was constructed
+        pts: Phenotypes
+            The phenotypes with which these haplotypes were built. If not provided,
+            the results won't be recomputed
         log : Logger, optional
             The log parameter for the Haplotypes object
 
@@ -285,16 +295,17 @@ class Haplotypes(HaplotypesBase):
             fname=fname, haplotype=HapplerHaplotype, variant=HapplerVariant, log=log
         )
         haps.data = {}
+        results = {}
         for hap_idx, haplotype in enumerate(tree.haplotypes()):
             hap_id = "H" + str(hap_idx)
-            results = haplotype[-1]["results"]
+            results[hap_idx] = haplotype[-1]["results"]
             haps.data[hap_id] = HapplerHaplotype(
                 chrom=gts.variants[haplotype[0]["variant"].idx]["chrom"],
                 start=0,  # this is filled out later
                 end=0,  # this is filled out later
                 id=hap_id,
-                beta=results["beta"],
-                pval=-np.log10(results["pval"]),
+                beta=0,  # this is filled out later
+                pval=1,  # this is filled out later
             )
             alleles = {
                 node["variant"].idx: gts.variants[node["variant"].idx]["alleles"][
@@ -312,6 +323,14 @@ class Haplotypes(HaplotypesBase):
                 )
                 for node in haplotype
             )
+            # now, fill out the info we neglected to fill out at the beginning
             haps.data[hap_id].start = min(n.start for n in haps.data[hap_id].variants)
             haps.data[hap_id].end = max(n.end for n in haps.data[hap_id].variants)
+        # recompute beta and pval with the original phenotypes instead of the regressed ones
+        if pts is not None:
+            haps_gts = haps.transform(gts).data.sum(axis=2)
+            results = AssocTestSimpleSM(with_bic=True).run(haps_gts, pts.data).data
+        for hap_idx, hap_id in enumerate(haps.data.keys()):
+            haps.data[hap_id].beta = results[hap_idx]["beta"]
+            haps.data[hap_id].pval = -np.log10(results[hap_idx]["pval"])
         return haps

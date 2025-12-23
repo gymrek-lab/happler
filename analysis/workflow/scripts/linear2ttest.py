@@ -137,7 +137,7 @@ def main(
         child_gts = data.GenotypesPLINK.load(child_gts)
         # reorder to match
         child_gts.subset(variants=tuple(child_gts.variants["id"]), inplace=True)
-        child_stds = child_gts.data.sum(axis=2).std(axis=0)
+        # child_stds = child_gts.data.sum(axis=2).std(axis=0)
 
     log.info("Adjusting betas and stderrs")
     df["beta"] = df["beta"] * linear_stds

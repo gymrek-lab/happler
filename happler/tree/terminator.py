@@ -259,13 +259,10 @@ class BICTerminator(Terminator):
         else:
             bic, bf = computed_val
         if bf is None:
-            # if we have no parent results, we cannot compute delta BIC (aka BF)
-            # tree-building should continue unless the BIC is just way too low
-            if bic <= self.bic_thresh:
-                self.log.debug(f"Terminated with BIC {bic} <= {self.bic_thresh}")
-                return True
+            # if we have no parent results, we cannot compute delta BIC (aka bf)
+            # Tree-building should just continue
             return False
-        elif bf < self.bf_thresh:
+        elif bf < self.bf_thresh or np.isnan(bf):
             self.log.debug(
                 f"Terminated with delta BIC {bf} < {self.bf_thresh} and BIC {bic}"
             )

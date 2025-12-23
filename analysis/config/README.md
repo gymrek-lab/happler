@@ -6,10 +6,10 @@ In order to run the pipeline on your own data, you must specify inputs and optio
     If there are multiple, per-chromosome VCFs, just specify one path but replace the contig name in the file name with `{chr}`.
 
     The VCF(s) must be sorted and indexed (with a `.tbi` file in the same directory). In additition, the varaint IDs of each STR in the VCF must have 'STR_' prepended.
-2. `samples` (str) - The path to a 1000G samples TSV file
+2. `exclude_samples` (str) - The path to a 1000G samples TSV file
 
     You can get this file by clicking "Download the list" [here](https://www.internationalgenome.org/data-portal/sample).
-3. `loci` (list of dict) - A list of loci to simulate
+3. `locus` (str) - A list of loci to simulate
 
 	Each locus dictionary has the following key-value pairs for SNP loci, a chosen STR, and a chosen SNP (only if this is preferred over a random SNP):
 	  - `locus` (str) - composed of a contig name, a colon, the start position, a dash, and the end position of the locus
@@ -19,15 +19,11 @@ In order to run the pipeline on your own data, you must specify inputs and optio
 1. `mode` (str) - Whether to run the simulation framework for a SNP ("snp") or an STR ("str")
 
     You can also provide a list of strings intead of a single string, if you want the pipeline to do multiple modes at once.
-2. `superpop` (str) - The 1000G superpopulation code that should be used
-
-    Please provide a three letter code, corresponding to the symbol in the samples file. This will default to EUR (aka european ancestry), if not specified.
 3. `min_maf` (float) - The pipeline will discard rare SNPs with an MAF below this number
 
 	This will default to 0 if not specified, but we recommend a value of at least 0.1
 4. `beta` (float) - The strength of association between the chosen STR or SNP and the simulated phenotype
 
 	This will default to 0.1 if not specified. You can also provide a list of floats intead of a single float, if you want the pipeline to try a number of different values.
-5. `exclude_causal` (bool) - Whether to include the causal variant in the genotypes provided to the finemapping methods
 
 	Set this to true if you're interested in seeing how finemapping methods perform when the causal variant is absent from the data. This will default to false if not specified. You can also provide a list of booleans instead of a single boolean, if you want the pipeline to try a number of different values.s

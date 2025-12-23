@@ -9,6 +9,9 @@ from .assoc_test import (
     AssocTest,
     AssocTestSimple,
     AssocTestSimpleSM,
+    AssocTestSimpleFastBIC,
+    AssocTestSimpleSMTScore,
     NodeResults,
+    NodeResultsBIC,
     NodeResultsExtra,
 )

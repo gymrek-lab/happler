@@ -76,20 +76,21 @@ rule run:
         max_iterations=3,
         out_thresh=check_config("out_thresh", 5e-8),
         keep_SNPs=lambda wildcards: "--remove-SNPs " if not hasattr(wildcards, "rep") else "",
+        chunk_size="--chunk-size 1000",
     output:
         hap=out + "/happler.hap",
         gz=out + "/happler.hap.gz",
         idx=out + "/happler.hap.gz.tbi",
         dot=out + "/happler.dot",
     resources:
-        runtime=lambda wildcards, input: (
-            rsrc_func(input.gts)(15, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
-        ),
-        # slurm_partition="hotel",
-        # slurm_extra="--qos=hotel",
-        mem_mb=lambda wildcards, input: (
-            rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
-        ),
+        # runtime=lambda wildcards, input: (
+        #     rsrc_func(input.gts)(15, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
+        # ),
+        # mem_mb=lambda wildcards, input: (
+        #     rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
+        # ),
+        runtime=250,
+        mem_mb=70000,
     threads: 1
     log:
         logs + "/run",
@@ -102,8 +103,9 @@ rule run:
         "--max-signals {params.max_signals} --max-iterations {params.max_iterations} "
         "--discard-multiallelic --region {params.region} {params.keep_SNPs}"
         "{params.covar}--indep-thresh {params.indep} -t {params.thresh} "
-        "--out-thresh {params.out_thresh} --show-tree {input.gts} {input.pts} &>{log}"
-        " && haptools index -o {output.gz} {output.hap} &>>{log}"
+        "{params.chunk_size} --out-thresh {params.out_thresh} --show-tree "
+        "{input.gts} {input.pts} &>{log} && "
+        "haptools index -o {output.gz} {output.hap} &>>{log}"
 
 
 rule tree:
@@ -143,15 +145,18 @@ rule cond_linreg:
     params:
         maf = check_config("min_maf", 0),
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        chunk_size="--chunk-size 500",
     output:
         png=out + "/cond_linreg.pdf",
     resources:
-        runtime=lambda wildcards, input: (
-            rsrc_func(input.pgen)(5, 1.5 * Path(input.pvar).stat().st_size/1000 * (
-                0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
-            ))
-        ),
-        mem_mb=2500,
+        # runtime=lambda wildcards, input: (
+        #     rsrc_func(input.pgen)(5, 1.5 * Path(input.pvar).stat().st_size/1000 * (
+        #         0.2400978997329614 + get_num_variants(input.hap) * 0.045194464826048095
+        #     ))
+        # ),
+        # mem_mb=2500,
+        runtime=120,
+        mem_mb=35000,
     log:
         logs + "/cond_linreg",
     benchmark:
@@ -160,7 +165,7 @@ rule cond_linreg:
         "happler"
     shell:
         "workflow/scripts/conditional_regression_plots.py --verbosity DEBUG "
-        "--show-original --region {params.region} -o {output.png} "
+        "--show-original {params.chunk_size} --region {params.region} -o {output.png} "
         "--maf {params.maf} {input.pgen} {input.pts} {input.hap} &>{log}"
 
 
@@ -355,15 +360,17 @@ rule merge:
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
         maf = check_config("min_maf", 0),
+        chunk_size="--chunk-size 1000",
     output:
         pgen=temp(out + "/{ex}clude/merged.pgen"),
         pvar=temp(out + "/{ex}clude/merged.pvar"),
         psam=temp(out + "/{ex}clude/merged.psam"),
     resources:
-        runtime=lambda wildcards, input: (
-            rsrc_func(input.gts)(10, Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844)
-        ),
-        mem_mb = 6000,
+        # runtime=lambda wildcards, input: (
+        #     rsrc_func(input.gts)(10, Path(input.gts_pvar).stat().st_size/1000 * 0.05652315368728583 + 2.0888654705656844)
+        # ),
+        runtime=40,
+        mem_mb = 30000,
     log:
         logs + "/{ex}clude/merge",
     benchmark:
@@ -371,8 +378,9 @@ rule merge:
     conda:
         "happler"
     shell:
-        "workflow/scripts/merge_plink.py --region {params.region} --maf {params.maf} "
-        "--verbosity DEBUG {input.gts} {input.hps} {output.pgen} &> {log}"
+        "workflow/scripts/merge_plink.py {params.chunk_size} --region {params.region} "
+        "--maf {params.maf} --verbosity DEBUG {input.gts} {input.hps} {output.pgen} "
+        "&> {log}"
 
 
 def finemapper_input(wildcards):
@@ -411,7 +419,7 @@ rule finemapper:
         runtime=lambda wildcards, input: (
             rsrc_func(input.gt)(10, Path(input.gt_pvar).stat().st_size/1000 * 0.3)
         ),
-        mem_mb = 8500,
+        mem_mb = 65000,
     threads: 1,
     log:
         logs + "/{ex}clude/finemapper",
@@ -515,6 +523,7 @@ rule results:
         # susie_eff_pdf=temp(out + "/susie_eff.pdf"),
     resources:
         runtime=10,
+        mem_mb=50000,
     log:
         logs + "/{ex}clude/results",
     benchmark:

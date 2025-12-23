@@ -78,15 +78,11 @@ mode: ld_range
 
 # Discard rare variants with a MAF below this number
 # Defaults to 0 if not specified
-min_maf: 0.05
+min_maf: 0.05 # cannot be lowered to 0.01 unless the input data is recreated
 
 # Sample sizes to use
 # sample_size: [777, 800, 1600, 2400, 3200]
 sample_size: [800, 1600, 2400, 3200]
 
-# Whether to include the causal variant in the set of genotypes provided to the
-# finemapping methods. Set this to true if you're interested in seeing how the
-# methods perform when the causal variant is absent from the data.
-# Defaults to false if not specified
-# You can also provide a list of booleans, if you want to test both values
-exclude_causal: [true, false]
+# A threshold on the pvalues of the haplotypes
+out_thresh: 5e-8
