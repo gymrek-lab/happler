@@ -1,4 +1,5 @@
 from __future__ import annotations
+from logging import getLogger
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from decimal import Decimal, getcontext
@@ -190,7 +191,9 @@ class AssocTest(ABC):
             An approximate, higher precision p-value for the provided t statistic
         """
         if df < 1000:
-            log.warning("You need a larger sample size to approximate this p-value")
+            getLogger().warning(
+                "You need a larger sample size to approximate this p-value"
+            )
         log10_pval = stats.norm.logsf(np.abs(t_stat)) / np.log(10) + np.log10(2)
         # set the desired precision
         getcontext().prec = precision
