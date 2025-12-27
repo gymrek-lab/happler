@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 region="$1"
-pop="${2:-EUR_WHITE}"
 
 export GCS_REQUESTER_PAYS_PROJECT="${GOOGLE_PROJECT}"
 export GCS_OAUTH_TOKEN="$(gcloud auth application-default print-access-token)"
@@ -17,16 +16,22 @@ CDR_DIR="gs://fc-aou-datasets-controlled/v7"
 batches="$(gsutil ls "$VCF_DIR" | grep -oP '(?<=BATCH)\d+' | sort -n)"
 cd "$out_prefix"
 for batch in $batches; do
-    bcftools view -O z -o "$batch".bcf -r "$region" "$(echo "$VCF_DIR" | sed 's/*/'"$batch"'/')"
+    bcftools view -O b -o "$batch".bcf -r "$region" "$(echo "$VCF_DIR" | sed 's/*/'"$batch"'/')"
 #    plink2 --out "$batch" --nonfounders --bcf "$batch".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
 done
 
 cd ..   
-bcftools merge --no-index -O z -o "$out_prefix".bcf -l <(ls "$out_prefix"/*.bcf)
+bcftools merge --no-index -O z -o "$out_prefix".vcf.bgz -l <(ls "$out_prefix"/*.bcf)
+
+# now, let's use hail to filter the GT data
+workflow/scripts/aou/hail_qc_EUR_AFR.py "$out_prefix".qc.vcf.bgz "$out_prefix".vcf.gz
+
 # note that we skip --maf bc the input is already filtered
-plink2 --out "$out_prefix" --nonfounders --bcf "$out_prefix".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
+plink2 --out "$out_prefix" --nonfounders --vcf "$out_prefix".qc.vcf.bgz --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
 gsutil cp "$out_prefix".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/ALL_SAMPLES/
 
-gsutil cp ${WORKSPACE_BUCKET}/samples/"$pop".csv .
-plink2 --keep <(cut -f1 -d, "$pop".csv | tail -n+2) --out "$out_prefix"."$pop" --pfile "$out_prefix"
-gsutil cp "$out_prefix"."$pop".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/"$pop"/
+for EUR_WHITE AFR_BLACK; do
+    gsutil cp ${WORKSPACE_BUCKET}/samples/"$pop".csv .
+    plink2 --keep <(cut -f1 -d, "$pop".csv | tail -n+2) --out "$out_prefix"."$pop" --pfile "$out_prefix"
+    gsutil cp "$out_prefix"."$pop".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/"$pop"/
+done
