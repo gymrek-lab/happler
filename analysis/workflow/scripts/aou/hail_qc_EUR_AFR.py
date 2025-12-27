@@ -167,8 +167,8 @@ def main():
     args = parser.parse_args()
 
     runner = HailRunner(
-        Path(args.output),
         Path(args.genotypes),
+        Path(args.output),
         Path(args.samples_file_dir) if args.samples_file_dir is not None else None,
         sample_call_rate=args.sample_call_rate,
         variant_call_rate=args.variant_call_rate,
