@@ -1,4 +1,4 @@
-#!/usr/env/bin python
+#!/usr/bin/env bash
 """
 My own hail QC script for filtering phased GTs
 Adapted from https://github.com/CAST-genomics/cast-workflows/blob/0e9f9a6e/gwas/aou/hail_runner_EUR_AFR.py
