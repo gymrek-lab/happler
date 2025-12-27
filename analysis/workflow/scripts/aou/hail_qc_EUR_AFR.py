@@ -40,14 +40,13 @@ class HailRunner:
         self.gwas = None
         self.data = None
         self.method = "hail"
-        self.setup()
 
     def run(self):
         # Set up hail
-        hl.init(default_reference="GRCh38")
+        hl.default_reference("GRCh38")
 
         # Load genotypes
-        mt = hl.import_vcf(self.gts)
+        mt = hl.import_vcf(str(self.gts))
 
         if self.samples_file_dir is None:
             os.system(
@@ -132,7 +131,7 @@ class HailRunner:
         self.data = data
 
         # write data out
-        hl.export_vcf(self.data, self.output)
+        hl.export_vcf(self.data, str(self.output))
 
 
 def main():
