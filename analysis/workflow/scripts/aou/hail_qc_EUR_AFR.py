@@ -65,7 +65,7 @@ class HailRunner:
         eur_tbl = hl.Table.from_pandas(pd.DataFrame(eur_sample_ids), key="person_id")
         afr_tbl = hl.Table.from_pandas(pd.DataFrame(afr_sample_ids), key="person_id")
         pheno = pd.read_csv(self.pts, sep="\t")
-        pheno.rename(columns={"#IID": "person_id"})
+        pheno.rename(columns={"#IID": "person_id"}, inplace=True)
         ids = pd.DataFrame(pheno["person_id"].apply(str))
         sample_tbl = hl.Table.from_pandas(ids, key="person_id")
 
