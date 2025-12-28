@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 region="$1"
+pheno="$2"
 
 export GCS_REQUESTER_PAYS_PROJECT="${GOOGLE_PROJECT}"
 export GCS_OAUTH_TOKEN="$(gcloud auth application-default print-access-token)"
@@ -24,7 +25,7 @@ cd ..
 bcftools merge --no-index -O z -o "$out_prefix".vcf.bgz -l <(ls "$out_prefix"/*.bcf)
 
 # now, let's use hail to filter the GT data
-../happler/analysis/workflow/scripts/aou/hail_qc_EUR_AFR.py "$out_prefix".qc.vcf.bgz "$out_prefix".vcf.gz
+../happler/analysis/workflow/scripts/aou/hail_qc_EUR_AFR.py "$out_prefix".vcf.bgz "$pheno"
 
 # note that we skip --maf bc the input is already filtered
 plink2 --out "$out_prefix" --nonfounders --vcf "$out_prefix".qc.vcf.bgz --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"

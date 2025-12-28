@@ -21,6 +21,7 @@ class HailRunner:
     def __init__(
         self,
         gts: Path,
+        pts: Path,
         output: Path,
         sample_files_dir: Path = None,
         sample_call_rate: float = 0.9,
@@ -30,6 +31,7 @@ class HailRunner:
         GQ: float = 20,
     ):
         self.gts = gts
+        self.pts = pts
         self.output = output
         self.samples_file_dir = sample_files_dir
         self.sample_call_rate = sample_call_rate
@@ -62,7 +64,9 @@ class HailRunner:
         afr_sample_ids = pd.read_csv(samps_dir / "AFR_BLACK.csv")["person_id"].astype(str)
         eur_tbl = hl.Table.from_pandas(pd.DataFrame(eur_sample_ids), key="person_id")
         afr_tbl = hl.Table.from_pandas(pd.DataFrame(afr_sample_ids), key="person_id")
-        ids = pd.DataFrame(self.ptcovar["person_id"])
+        pheno = pd.read_csv(self.pts, sep="\t")
+        pheno.rename(columns={"#IID": "person_id"})
+        ids = pd.DataFrame(pheno["person_id"].apply(str))
         sample_tbl = hl.Table.from_pandas(ids, key="person_id")
 
         data = mt.filter_cols(
@@ -136,12 +140,17 @@ class HailRunner:
 
 def main():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument("output", help="path to output file")
-    parser.add_argument("genotypes", help="path to genotypes .vcf.bgz file")
+    parser.add_argument("genotypes", type=Path, help="path to genotypes .vcf.bgz file")
+    parser.add_argument("phenotypes", type=Path, help="path to phenotypes .pheno file")
+    parser.add_argument(
+        "-o", "--output",
+        help="path to output file",
+        default=None, # defaults to args.genotypes but with a .qc.vcf.bgz ending
+    )
     parser.add_argument(
         "--samples-file-dir",
         help="Path to EUR_WHITE.csv and AFR_BLACK.csv files",
-        default=None,
+        default=".",
     )
     parser.add_argument(
         "--sample-call-rate",
@@ -166,9 +175,18 @@ def main():
     )
     args = parser.parse_args()
 
+    assert args.genotypes.suffixes[-2:] == [".vcf", ".bgz"]
+    assert args.phenotypes.suffix == ".pheno"
+    if args.output is None:
+        args.output = args.genotypes.with_suffix("").with_suffix("").with_suffix(".qc.vcf.bgz")
+    else:
+        args.output = Path(args.output)
+        assert args.output.suffixes[-2:] == [".vcf", ".bgz"]
+
     runner = HailRunner(
-        Path(args.genotypes),
-        Path(args.output),
+        args.genotypes,
+        args.phenotypes,
+        args.output,
         Path(args.samples_file_dir) if args.samples_file_dir is not None else None,
         sample_call_rate=args.sample_call_rate,
         variant_call_rate=args.variant_call_rate,
