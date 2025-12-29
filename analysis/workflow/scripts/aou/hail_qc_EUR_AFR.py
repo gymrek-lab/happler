@@ -79,8 +79,6 @@ class HailRunner:
         data = data.filter_rows(hl.len(data.alleles) == 2)
 
         # Genotype QC
-        data = data.annotate_entries(FT=hl.coalesce(data.FT, "PASS"))
-        data = data.filter_entries(data.FT == "PASS")
         data = data.filter_entries(data.GQ >= self.GQ)  # 20
 
         # Run variant_qc separately for each group
@@ -116,8 +114,6 @@ class HailRunner:
         )
 
         # now filter samples to given cohort
-        # ids = pd.DataFrame(self.ptcovar['person_id'])
-        # sample_tbl = hl.Table.from_pandas(ids, key="person_id")
         data = data.filter_cols(hl.is_defined(sample_tbl[data.s]))
 
         # sample QC
