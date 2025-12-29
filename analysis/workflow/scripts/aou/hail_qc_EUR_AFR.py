@@ -28,7 +28,6 @@ class HailRunner:
         variant_call_rate: float = 0.9,
         MAF: float = 0.01,
         HWE: float = 1e-100,
-        GQ: float = 20,
     ):
         self.gts = gts
         self.pts = pts
@@ -38,7 +37,6 @@ class HailRunner:
         self.variant_call_rate = variant_call_rate
         self.MAF = MAF
         self.HWE = HWE
-        self.GQ = GQ
         self.gwas = None
         self.data = None
         self.method = "hail"
@@ -78,8 +76,8 @@ class HailRunner:
         # filter multiallelics
         data = data.filter_rows(hl.len(data.alleles) == 2)
 
-        # Genotype QC
-        data = data.filter_entries(data.GQ >= self.GQ)  # 20
+        # Genotype QC: removed bc this data is phased
+        # data = data.filter_entries(data.GQ >= self.GQ)  # 20
 
         # Run variant_qc separately for each group
         data = data.annotate_cols(
@@ -166,9 +164,6 @@ def main():
     parser.add_argument(
         "--HWE", help="Apply HWE p-value cutoff QC", type=float, default=1e-100
     )
-    parser.add_argument(
-        "--GQ", help="Apply minimun genotype score QC", type=int, default=20
-    )
     args = parser.parse_args()
 
     assert args.genotypes.suffixes[-2:] == [".vcf", ".bgz"]
@@ -188,7 +183,6 @@ def main():
         variant_call_rate=args.variant_call_rate,
         MAF=args.MAF,
         HWE=args.HWE,
-        GQ=args.GQ,
     )
     runner.run()
 
