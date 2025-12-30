@@ -19,6 +19,6 @@ happler run \
 --max-iterations 3 \
 -o happler_results/"$region.$pop.hap" \
 --discard-multiallelic \
-pgens/"$region.$pop.pgen" phenos/"$pheno.residuals.pheno" &>happler_results/"$region.$pop".log
+pgens/"$region.$pop.qc.pgen" phenos/"$pheno.residuals.pheno" &>happler_results/"$region.$pop".log
 
 haptools index -o happler_results/"$region.$pop".hap.gz happler_results/"$region.$pop.hap"
