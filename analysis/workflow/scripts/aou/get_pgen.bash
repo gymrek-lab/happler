@@ -28,11 +28,11 @@ bcftools merge --no-index -O z -o "$out_prefix".vcf.bgz -l <(ls "$out_prefix"/*.
 ../happler/analysis/workflow/scripts/aou/hail_qc_EUR_AFR.py "$out_prefix".vcf.bgz "$pheno"
 
 # note that we skip --maf bc the input is already filtered
-plink2 --out "$out_prefix" --nonfounders --vcf "$out_prefix".qc.vcf.bgz --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
-gsutil cp "$out_prefix".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/ALL_SAMPLES/
+plink2 --out "$out_prefix".qc --nonfounders --vcf "$out_prefix".qc.vcf.bgz --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
+gsutil cp "$out_prefix".qc.p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/ALL_SAMPLES/
 
 for EUR_WHITE AFR_BLACK; do
     gsutil cp ${WORKSPACE_BUCKET}/samples/"$pop".csv .
-    plink2 --keep <(cut -f1 -d, "$pop".csv | tail -n+2) --out "$out_prefix"."$pop" --pfile "$out_prefix"
-    gsutil cp "$out_prefix"."$pop".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/"$pop"/
+    plink2 --keep <(cut -f1 -d, "$pop".csv | tail -n+2) --out "$out_prefix"."$pop".qc --pfile "$out_prefix".qc --make-pgen
+    gsutil cp "$out_prefix"."$pop".qc.p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/"$pop"/
 done
