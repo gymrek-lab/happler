@@ -8,6 +8,7 @@ mkdir -p happler_results
 
 happler run \
 -t 20 \
+--maf 0.01 \
 --show-tree \
 --remove-SNPs \
 --out-thresh 20 \
