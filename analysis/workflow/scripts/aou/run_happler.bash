@@ -8,7 +8,6 @@ mkdir -p happler_results
 
 happler run \
 -t 20 \
---maf MAF \
 --show-tree \
 --remove-SNPs \
 --out-thresh 20 \
@@ -21,4 +20,4 @@ happler run \
 --discard-multiallelic \
 pgens/"$region.$pop.qc.pgen" phenos/"$pheno.residuals.pheno" &>happler_results/"$region.$pop".log
 
-haptools index -o happler_results/"$region.$pop".hap.gz happler_results/"$region.$pop.hap"
+haptools index -o happler_results/"$region.$pop".hap.gz happler_results/"$region.$pop.hap" &>>happler_results/"$region.$pop".log
