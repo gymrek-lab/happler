@@ -43,6 +43,7 @@ class HailRunner:
 
     def run(self):
         # Set up hail
+        hl.init(worker_memory="highmem", spark_conf={'spark.driver.memory': '15g'})
         hl.default_reference("GRCh38")
 
         # Load genotypes
