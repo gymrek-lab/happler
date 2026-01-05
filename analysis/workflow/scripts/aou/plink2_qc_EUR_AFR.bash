@@ -64,32 +64,44 @@ if [ -z "$OUTPUT" ]; then
 fi
 
 # Ensure required inputs exist
-test -f "$GENOTYPES" || { echo "Genotypes file $GENOTYPES not found"; exit 1; }
-test -f "$PHENOTYPES" || { echo "Phenotype file $PHENOTYPES not found"; exit 1; }
+if [ ! -f "$GENOTYPES" ]; then
+    echo "Genotypes file $GENOTYPES not found" >&2
+    exit 1
+fi
+if [ ! -f "$PHENOTYPES" ]; then
+    echo "Phenotype file $PHENOTYPES not found" >&2
+    exit 1
+fi
 
 # Ensure the presence of sample cohort files
 EUR_FILE="${SAMPLES_DIR}/EUR_WHITE.csv"
 AFR_FILE="${SAMPLES_DIR}/AFR_BLACK.csv"
-test -f "$EUR_FILE" || { echo "EUR cohort file ${EUR_FILE} not found"; exit 1; }
-test -f "$AFR_FILE" || { echo "AFR cohort file ${AFR_FILE} not found"; exit 1; }
+if [ ! -f "$EUR_FILE" ]; then
+    echo "EUR cohort file ${EUR_FILE} not found" >&2
+    exit 1
+fi
+if [ ! -f "$AFR_FILE" ]; then
+    echo "AFR cohort file ${AFR_FILE} not found" >&2
+    exit 1
+fi
 
-# Step 1: Compute HWE and AF in the EUR cohort
-plink2 --pfile "${GENOTYPES%.pgen}" --freq --hardy --out eur_stats \
---keep <(cut -d, -f1 "$EUR_FILE" | tail -n+2) --nonfounders
+# Step 1: Compute HWE and AF for the EUR cohort
+plink2 --pfile "${GENOTYPES%.pgen}" --keep <(cut -d, -f1 "$EUR_FILE" | tail -n+2) \
+       --freq --hardy --out eur_stats --nonfounders
 
 # Extract EUR variants passing the criteria
 awk -v maf="$MAF" -v hwe="$HWE" '$5 >= maf && $8 > hwe {print $2}' eur_stats.hardy > eur_passing_variants.txt
 
-# Step 2: Compute HWE and AF in the AFR cohort
-plink2 --pfile "${GENOTYPES%.pgen}" --freq --hardy --out afr_stats \
---keep <(cut -d, -f1 "$AFR_FILE" | tail -n+2) --nonfounders
+# Step 2: Compute HWE and AF for the AFR cohort
+plink2 --pfile "${GENOTYPES%.pgen}" --keep <(cut -d, -f1 "$AFR_FILE" | tail -n+2) \
+       --freq --hardy --out afr_stats --nonfounders
 
 # Extract AFR variants passing the criteria
 awk -v maf="$MAF" -v hwe="$HWE" '$5 >= maf && $8 > hwe {print $2}' afr_stats.hardy > afr_passing_variants.txt
 
-# Step 3: Compute HWE and AF in the phenotype-defined cohort
-plink2 --pfile "${GENOTYPES%.pgen}" --freq --hardy --out pheno_stats \
---keep <(cut -f1 "$PHENOTYPES" | tail -n+2) --nonfounders
+# Step 3: Compute HWE and AF for the phenotype-defined cohort
+plink2 --pfile "${GENOTYPES%.pgen}" --keep <(cut -f1 "$PHENOTYPES" | tail -n+2) \
+       --freq --hardy --out pheno_stats --nonfounders
 
 # Extract PHENO variants passing the criteria
 awk -v maf="$MAF" -v hwe="$HWE" '$5 >= maf && $8 > hwe {print $2}' pheno_stats.hardy > pheno_passing_variants.txt
