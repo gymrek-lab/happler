@@ -73,30 +73,23 @@ AFR_FILE="${SAMPLES_DIR}/AFR_BLACK.csv"
 test -f "$EUR_FILE" || { echo "EUR cohort file ${EUR_FILE} not found"; exit 1; }
 test -f "$AFR_FILE" || { echo "AFR cohort file ${AFR_FILE} not found"; exit 1; }
 
-# Convert cohort files to space-delimited sample lists
-cut -d, -f1 "$EUR_FILE" | tail -n +2 > eur_samples.keep
-cut -d, -f1 "$AFR_FILE" | tail -n +2 > afr_samples.keep
-
-# Extract phenotype samples as its own cohort
-cut -f1 "$PHENOTYPES" | tail -n +2 > pheno_samples.keep
-
 # Step 1: Compute HWE and AF in the EUR cohort
-plink2 --pfile "${GENOTYPES%.pgen}" --keep eur_samples.keep \
-       --freq --hardy --out eur_stats
+plink2 --pfile "${GENOTYPES%.pgen}" --freq --hardy --out eur_stats \
+--keep <(cut -d, -f1 "$EUR_FILE" | tail -n+2) --nonfounders
 
 # Extract EUR variants passing the criteria
 awk -v maf="$MAF" -v hwe="$HWE" '$5 >= maf && $8 > hwe {print $2}' eur_stats.hardy > eur_passing_variants.txt
 
 # Step 2: Compute HWE and AF in the AFR cohort
-plink2 --pfile "${GENOTYPES%.pgen}" --keep afr_samples.keep \
-       --freq --hardy --out afr_stats
+plink2 --pfile "${GENOTYPES%.pgen}" --freq --hardy --out afr_stats \
+--keep <(cut -d, -f1 "$AFR_FILE" | tail -n+2) --nonfounders
 
 # Extract AFR variants passing the criteria
 awk -v maf="$MAF" -v hwe="$HWE" '$5 >= maf && $8 > hwe {print $2}' afr_stats.hardy > afr_passing_variants.txt
 
 # Step 3: Compute HWE and AF in the phenotype-defined cohort
-plink2 --pfile "${GENOTYPES%.pgen}" --keep pheno_samples.keep \
-       --freq --hardy --out pheno_stats
+plink2 --pfile "${GENOTYPES%.pgen}" --freq --hardy --out pheno_stats \
+--keep <(cut -f1 "$PHENOTYPES" | tail -n+2) --nonfounders
 
 # Extract PHENO variants passing the criteria
 awk -v maf="$MAF" -v hwe="$HWE" '$5 >= maf && $8 > hwe {print $2}' pheno_stats.hardy > pheno_passing_variants.txt
@@ -107,7 +100,7 @@ cat eur_passing_variants.txt afr_passing_variants.txt pheno_passing_variants.txt
 # Step 5: Filter the original pgen file using the list of passing variants and remove multiallelics
 plink2 --pfile "${GENOTYPES%.pgen}" --extract passing_variants.txt \
        --max-alleles 2 --mind "$SAMPLE_CALL_RATE" --geno "$VARIANT_CALL_RATE" \
-       --make-pgen --out "$OUTPUT"
+       --make-pgen --out "$OUTPUT" --nonfounders
 
 # Final output
 echo "Filtered genotype data saved to ${OUTPUT}.pgen"
