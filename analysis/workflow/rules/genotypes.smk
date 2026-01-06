@@ -163,8 +163,71 @@ rule vcf2plink:
         "--threads {threads} --memory {resources.mem_mb}{params.samps} --out {params.prefix} &>{log}"
 
 
+rule aou:
+    """ download a bunch of BCFs from AoU and merge into a single PGEN """
+    params:
+        locus=lambda wildcards: wildcards.locus.replace("_", ":"),
+        prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+    output:
+        pgen=out+"/snps.pgen",
+        pvar=out+"/snps.pvar",
+        psam=out+"/snps.psam",
+        log=temp(out+"/snps.log"),
+    resources:
+        runtime=30,
+    threads: 1
+    log:
+        logs + "/aou",
+    benchmark:
+        bench + "/aou",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "workflow/scripts/aou/get_pgen.bash {params.locus} {params.prefix} &>{log}"
+
+
+rule aou_qc:
+    """ perform sample and variant QC on an AoU PGEN """
+    input:
+        pgen = rules.aou.output.pgen,
+        pvar = rules.aou.output.pvar,
+        psam = rules.aou.output.psam,
+        pheno = lambda wildcards: expand(config["modes"]["run"]["pheno"], trait=wildcards.pheno),
+        pops_dir = lambda wildcards: Path(config["modes"]["run"]["pops_dir"]).parent,
+        eur_csv = lambda wildcards: expand(config["modes"]["run"]["pops_dir"], pop="EUR_WHITE"),
+    params:
+        pop="EUR_WHITE",
+        locus=lambda wildcards: wildcards.locus.replace("_", ":"),
+        in_prefix=lambda wildcards, output: Path(input.pgen).with_suffix(""),
+        prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+    output:
+        pgen=out+"/{pheno}/snps.qc.EUR_WHITE.pgen",
+        pvar=out+"/{pheno}/snps.qc.EUR_WHITE.pvar",
+        psam=out+"/{pheno}/snps.qc.EUR_WHITE.psam",
+        log=temp(out+"/{pheno}/snps.qc.EUR_WHITE.log"),
+    resources:
+        runtime=10,
+    threads: 1
+    log:
+        logs + "/aou_qc",
+    benchmark:
+        bench + "/aou_qc",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "workflow/scripts/aou/plink2_qc_EUR_AFR.bash --samples-file-dir {input.pops_dir} {input.pgen} {input.pheno} &>{log} &&"
+        "plink2 --keep <(cut -f1 -d, {input.eur_csv} | tail -n+2) --out {params.prefix} --pfile {params.in_prefix}.qc --make-pgen &>>{log} &&"
+        "gsutil cp {params.prefix}.p{{gen,var,sam}} ${WORKSPACE_BUCKET}/aryarm/pgens/{wildcards.pheno}/"
+
+
 def subset_input():
-    if check_config("phase_map") or check_config("exclude_samples") or not config["snp_panel"].endswith(".pgen"):
+    if config["snp_panel"] == "AoU":
+        return {
+            "pgen": rules.aou_qc.output.pgen,
+            "pvar": rules.aou_qc.output.pvar,
+            "psam": rules.aou_qc.output.psam,
+        }
+    elif check_config("phase_map") or check_config("exclude_samples") or not config["snp_panel"].endswith(".pgen"):
         return {
             "pgen": rules.vcf2plink.output.pgen,
             "pvar": rules.vcf2plink.output.pvar,
