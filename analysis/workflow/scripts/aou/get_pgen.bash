@@ -18,20 +18,19 @@ batches="$(gsutil ls "$VCF_DIR" | grep -oP '(?<=BATCH)\d+' | sort -n)"
 cd "$out_prefix"
 for batch in $batches; do
     bcftools view -O b -o "$batch".bcf -r "$region" "$(echo "$VCF_DIR" | sed 's/*/'"$batch"'/')"
-#    plink2 --out "$batch" --nonfounders --bcf "$batch".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
+    # plink2 --out "$batch" --nonfounders --bcf "$batch".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
 done
 
-cd ..   
-bcftools merge --no-index -O z -o "$out_prefix".vcf.bgz -l <(ls "$out_prefix"/*.bcf)
+cd ..
+bcftools merge --no-index -O b -o "$out_prefix".bcf -l <(ls "$out_prefix"/*.bcf)
+plink2 --out "$out_prefix" --nonfounders --bcf "$out_prefix".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
+gsutil cp "$out_prefix".p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/ALL_SAMPLES/
 
-# now, let's use hail to filter the GT data
-../happler/analysis/workflow/scripts/aou/hail_qc_EUR_AFR.py "$out_prefix".vcf.bgz "$pheno"
-
-# note that we skip --maf bc the input is already filtered
-plink2 --out "$out_prefix".qc --nonfounders --vcf "$out_prefix".qc.vcf.bgz --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
+# now, let's filter the GT data
+../happler/analysis/workflow/scripts/aou/plink2_qc_EUR_AFR.bash "$out_prefix".pgen "$pheno"
 gsutil cp "$out_prefix".qc.p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/ALL_SAMPLES/
 
-for EUR_WHITE AFR_BLACK; do
+for pop in EUR_WHITE AFR_BLACK; do
     gsutil cp ${WORKSPACE_BUCKET}/samples/"$pop".csv .
     plink2 --keep <(cut -f1 -d, "$pop".csv | tail -n+2) --out "$out_prefix"."$pop".qc --pfile "$out_prefix".qc --make-pgen
     gsutil cp "$out_prefix"."$pop".qc.p{gen,var,sam} ${WORKSPACE_BUCKET}/aryarm/pgens/"$pop"/
