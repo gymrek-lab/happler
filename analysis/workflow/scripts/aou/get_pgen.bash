@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 region="$1"
 out_prefix="$2"
 
@@ -20,7 +22,14 @@ for batch in $batches; do
     # plink2 --out "$batch" --nonfounders --bcf "$batch".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
 done
 
-# TODO: assert that all batches were downloaded
+# assert that all batches were downloaded
+for batch in $batches; do
+    file_path="$batch".bcf
+    if [ ! -f "$file_path" ]; then
+        echo "Error: Required file not found at $file_path" >&2
+        exit 1
+    fi
+fi
 
 cd -
 bcftools merge --no-index -O b -o "$out_prefix".bcf -l <(ls "$out_dir/batches"/*.bcf)
