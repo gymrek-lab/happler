@@ -221,7 +221,7 @@ rule aou_qc:
     shell:
         "plink2 --maf {params.maf} --hwe {params.hwe} --keep <("
         "comm -12 <(cut -f1 {input.pheno} | tail -n+2 | sort -u) <(cut -f1 -d, {input.eur_csv} | tail -n+2 | sort -u)"
-        ") --out {params.prefix} --pfile {params.in_prefix}.qc --make-pgen &>>{log} && "
+        ") --out {params.prefix} --pfile {params.in_prefix} --make-pgen &>>{log} && "
         "gsutil cp {params.prefix}.p{{gen,var,sam}} ${WORKSPACE_BUCKET}/aryarm/{params.prefix_dir} &>{log}"
 
 
