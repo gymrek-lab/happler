@@ -168,6 +168,7 @@ rule aou:
     params:
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+        prefix_dir=lambda wildcards, output: Path(output.pgen).parent,
     output:
         pgen=out+"/snps.pgen",
         pvar=out+"/snps.pvar",
@@ -183,7 +184,8 @@ rule aou:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/aou/get_pgen.bash {params.locus} {params.prefix} &>{log}"
+        "workflow/scripts/aou/get_pgen.bash {params.locus} {params.prefix} &>{log} && "
+        "gsutil cp {params.prefix}.p{{gen,var,sam}} ${WORKSPACE_BUCKET}/aryarm/{params.prefix_dir} &>{log}"
 
 
 rule aou_qc:
@@ -192,19 +194,21 @@ rule aou_qc:
         pgen = rules.aou.output.pgen,
         pvar = rules.aou.output.pvar,
         psam = rules.aou.output.psam,
-        pheno = lambda wildcards: expand(config["modes"]["run"]["pheno"], trait=wildcards.pheno),
-        pops_dir = lambda wildcards: Path(config["modes"]["run"]["pops_dir"]).parent,
+        pheno = lambda wildcards: expand(config["modes"]["run"]["pheno"], trait=wildcards.trait),
         eur_csv = lambda wildcards: expand(config["modes"]["run"]["pops_dir"], pop="EUR_WHITE"),
     params:
         pop="EUR_WHITE",
+        maf=lambda wildcards: check_config("maf", default="0.0"),
+        hwe=lambda wildcards: check_config("hwe", default="0.0"),
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
         in_prefix=lambda wildcards, output: Path(input.pgen).with_suffix(""),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+        prefix_dir=lambda wildcards, output: Path(output.pgen).parent,
     output:
-        pgen=out+"/{pheno}/snps.qc.EUR_WHITE.pgen",
-        pvar=out+"/{pheno}/snps.qc.EUR_WHITE.pvar",
-        psam=out+"/{pheno}/snps.qc.EUR_WHITE.psam",
-        log=temp(out+"/{pheno}/snps.qc.EUR_WHITE.log"),
+        pgen=out+"/{trait}/snps.qc.EUR_WHITE.pgen",
+        pvar=out+"/{trait}/snps.qc.EUR_WHITE.pvar",
+        psam=out+"/{trait}/snps.qc.EUR_WHITE.psam",
+        log=temp(out+"/{trait}/snps.qc.EUR_WHITE.log"),
     resources:
         runtime=10,
     threads: 1
@@ -215,9 +219,10 @@ rule aou_qc:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/aou/plink2_qc_EUR_AFR.bash --samples-file-dir {input.pops_dir} {input.pgen} {input.pheno} &>{log} &&"
-        "plink2 --keep <(cut -f1 -d, {input.eur_csv} | tail -n+2) --out {params.prefix} --pfile {params.in_prefix}.qc --make-pgen &>>{log} &&"
-        "gsutil cp {params.prefix}.p{{gen,var,sam}} ${WORKSPACE_BUCKET}/aryarm/pgens/{wildcards.pheno}/"
+        "plink2 --maf {params.maf} --hwe {params.hwe} --keep <("
+        "comm -12 <(cut -f1 {input.pheno} | tail -n+2 | sort -u) <(cut -f1 -d, {input.eur_csv} | tail -n+2 | sort -u)"
+        ") --out {params.prefix} --pfile {params.in_prefix}.qc --make-pgen &>>{log} && "
+        "gsutil cp {params.prefix}.p{{gen,var,sam}} ${WORKSPACE_BUCKET}/aryarm/{params.prefix_dir} &>{log}"
 
 
 def subset_input():
