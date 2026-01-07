@@ -34,5 +34,5 @@ for batch in $batches; do
 done
 
 cd -
-bcftools merge --no-index -O b -o "$out_prefix".bcf -l <(ls "$out_dir/batches"/*.bcf)
+bcftools merge --no-index -O b -o "$out_prefix".bcf -l <(ls "$TEMP_DIR"/*.bcf)
 plink2 --out "$out_prefix" --nonfounders --bcf "$out_prefix".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
