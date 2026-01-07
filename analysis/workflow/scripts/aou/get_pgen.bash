@@ -12,6 +12,7 @@ out_dir="$(dirname "$out_prefix")"
 chrom="$(echo "$region" | cut -f1 -d: | sed 's/^chr//')"
 pos="$(echo "$region" | cut -f2 -d: | cut -f1 -d-)"
 end="$(echo "$region" | cut -f2 -d: | cut -f2 -d-)"
+region=chr"${chrom}:${pos}-${end}"
 VCF_DIR="${WORKSPACE_BUCKET}/beagle_hg38/chr${chrom}/chr${chrom}."'BATCH*_output.vcf.gz'
 CDR_DIR="gs://fc-aou-datasets-controlled/v7"
 TEMP_DIR=$(mktemp -d)
@@ -21,7 +22,7 @@ batches="$(gsutil ls "$VCF_DIR" | grep -oP '(?<=BATCH)\d+' | sort -n)"
 cd "$TEMP_DIR"
 echo "$TEMP_DIR"
 for batch in $batches; do
-    bcftools view -O b -o "$batch".bcf -r chr"$region" "$(echo "$VCF_DIR" | sed 's/*/'"$batch"'/')"
+    bcftools view -O b -o "$batch".bcf -r "$region" "$(echo "$VCF_DIR" | sed 's/*/'"$batch"'/')"
     # plink2 --out "$batch" --nonfounders --bcf "$batch".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
 done
 
