@@ -197,7 +197,6 @@ rule aou_qc:
         pheno = lambda wildcards: expand(config["modes"]["run"]["pheno"], trait=wildcards.trait),
         eur_csv = lambda wildcards: expand(config["modes"]["run"]["pops_dir"], pop="EUR_WHITE"),
     params:
-        pop="EUR_WHITE",
         maf=lambda wildcards: check_config("maf", default="0.0"),
         hwe=lambda wildcards: check_config("hwe", default="0.0"),
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
