@@ -2,4 +2,3 @@ latency-wait: 30
 use-conda: true
 conda-frontend: conda
 printshellcmds: true
-shadow-prefix: /tscc/lustre/ddn/scratch/$USER
