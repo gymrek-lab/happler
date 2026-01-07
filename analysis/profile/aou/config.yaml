@@ -4,4 +4,4 @@ use-conda: true
 conda-frontend: conda
 printshellcmds: true
 default-storage-provider: gcs
-default-storage-prefix: "${{WORKSPACE_BUCKET}}"/aryarm
+default-storage-prefix: ${{WORKSPACE_BUCKET}}/aryarm
