@@ -2,6 +2,8 @@ from pathlib import Path
 
 
 out = config["out"] + "/genotypes"
+if config["mode"] == "run":
+    out += "/{trait}"
 logs = out + "/logs"
 bench = out + "/bench"
 
@@ -204,10 +206,10 @@ rule aou_qc:
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
         prefix_dir=lambda wildcards, output: Path(output.pgen).parent,
     output:
-        pgen=out+"/{trait}/snps.qc.EUR_WHITE.pgen",
-        pvar=out+"/{trait}/snps.qc.EUR_WHITE.pvar",
-        psam=out+"/{trait}/snps.qc.EUR_WHITE.psam",
-        log=temp(out+"/{trait}/snps.qc.EUR_WHITE.log"),
+        pgen=out+"/snps.qc.EUR_WHITE.pgen",
+        pvar=out+"/snps.qc.EUR_WHITE.pvar",
+        psam=out+"/snps.qc.EUR_WHITE.psam",
+        log=temp(out+"/snps.qc.EUR_WHITE.log"),
     resources:
         runtime=10,
     threads: 1
