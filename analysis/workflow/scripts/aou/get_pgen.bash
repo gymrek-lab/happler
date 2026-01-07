@@ -20,6 +20,8 @@ for batch in $batches; do
     # plink2 --out "$batch" --nonfounders --bcf "$batch".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
 done
 
+# TODO: assert that all batches were downloaded
+
 cd -
 bcftools merge --no-index -O b -o "$out_prefix".bcf -l <(ls "$out_dir/batches"/*.bcf)
 plink2 --out "$out_prefix" --nonfounders --bcf "$out_prefix".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"

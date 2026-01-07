@@ -13,6 +13,8 @@ import pandas as pd
 
 SMALLNUM = 10e-400
 
+# TODO: maybe filter based on beagle imputation score?
+
 
 class HailRunner:
 
