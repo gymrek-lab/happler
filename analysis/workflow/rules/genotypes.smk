@@ -170,7 +170,6 @@ rule aou:
     params:
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
-        prefix_dir=lambda wildcards, output: Path(output.pgen).parent,
     output:
         pgen=out+"/snps.pgen",
         pvar=out+"/snps.pvar",
@@ -186,8 +185,7 @@ rule aou:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/aou/get_pgen.bash {params.locus} {params.prefix} &>{log} && "
-        "gsutil cp {params.prefix}.p{{gen,var,sam}} ${{WORKSPACE_BUCKET}}/aryarm/{params.prefix_dir} &>>{log}"
+        "workflow/scripts/aou/get_pgen.bash {params.locus} {params.prefix} &>{log}"
 
 
 rule aou_qc:
@@ -204,7 +202,6 @@ rule aou_qc:
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
         in_prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
-        prefix_dir=lambda wildcards, output: Path(output.pgen).parent,
     output:
         pgen=out+"/snps.qc.EUR_WHITE.pgen",
         pvar=out+"/snps.qc.EUR_WHITE.pvar",
@@ -222,8 +219,7 @@ rule aou_qc:
     shell:
         "plink2 --maf {params.maf} --hwe {params.hwe} --keep <("
         "comm -12 <(cut -f1 {input.pheno} | tail -n+2 | sort -u) <(cut -f1 -d, {input.eur_csv} | tail -n+2 | sort -u)"
-        ") --out {params.prefix} --pfile {params.in_prefix} --make-pgen &>>{log} && "
-        "gsutil cp {params.prefix}.p{{gen,var,sam}} ${{WORKSPACE_BUCKET}}/aryarm/{params.prefix_dir} &>>{log}"
+        ") --out {params.prefix} --pfile {params.in_prefix} --make-pgen &>{log}"
 
 
 def subset_input():

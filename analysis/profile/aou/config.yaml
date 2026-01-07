@@ -3,5 +3,5 @@ latency-wait: 30
 use-conda: true
 conda-frontend: conda
 printshellcmds: true
-default-storage-provider:gcs
+default-storage-provider: gcs
 default-storage-prefix: !env WORKSPACE_BUCKET
