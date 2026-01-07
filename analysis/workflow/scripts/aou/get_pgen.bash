@@ -31,7 +31,7 @@ for batch in $batches; do
         echo "Error: Required file not found at $file_path" >&2
         exit 1
     fi
-fi
+done
 
 cd -
 bcftools merge --no-index -O b -o "$out_prefix".bcf -l <(ls "$out_dir/batches"/*.bcf)
