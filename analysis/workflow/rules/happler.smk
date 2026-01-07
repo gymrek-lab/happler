@@ -25,7 +25,7 @@ def parse_locus(locus):
     return chrom, start, end
 
 wildcard_constraints:
-    rep="\d+"
+    rep=r"\d+"
 
 
 rule sub_pheno:

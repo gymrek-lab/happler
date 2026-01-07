@@ -202,7 +202,7 @@ rule aou_qc:
         maf=lambda wildcards: check_config("maf", default="0.0"),
         hwe=lambda wildcards: check_config("hwe", default="0.0"),
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
-        in_prefix=lambda wildcards, output: Path(input.pgen).with_suffix(""),
+        in_prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
         prefix_dir=lambda wildcards, output: Path(output.pgen).parent,
     output:
