@@ -1,8 +1,7 @@
-__use_yte__: true
 latency-wait: 30
 use-conda: true
 conda-frontend: conda
 printshellcmds: true
 default-storage-provider: gcs
-default-storage-prefix: ${{WORKSPACE_BUCKET}}/aryarm
-storage-gcs-project: ${{GOOGLE_PROJECT}}
+default-storage-prefix: ${WORKSPACE_BUCKET}/aryarm
+storage-gcs-project: ${GOOGLE_PROJECT}
