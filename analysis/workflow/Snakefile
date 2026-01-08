@@ -211,7 +211,7 @@ elif mode == "run":
         """ obtain a list of the .hap files that have haplotypes with two or more alleles """
         input:
             hps = expand(
-                rules.happler_run.output.hap,
+                str(rules.happler_run.output.hap),
                 zip, trait=locus_traits, locus=locus, allow_missing=True,
             ),
         params:
