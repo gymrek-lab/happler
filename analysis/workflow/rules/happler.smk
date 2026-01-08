@@ -63,7 +63,9 @@ else:
 rule run:
     """ execute happler! """
     input:
-        gts=config["snp_panel"],
+        pgen=config["snp_panel"],
+        pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
+        psam=Path(config["snp_panel"]).with_suffix(".psam"),
         pts=pheno,
         covar=config["covar"],
     params:
