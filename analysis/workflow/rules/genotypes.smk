@@ -175,6 +175,7 @@ rule aou:
         pvar=out+"/snps.pvar",
         psam=out+"/snps.psam",
         log=temp(out+"/snps.log"),
+        bcf=out+"/snps.bcf",
     resources:
         runtime=75,
     threads: 1
