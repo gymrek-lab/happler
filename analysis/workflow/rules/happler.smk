@@ -24,6 +24,12 @@ def parse_locus(locus):
     start = locus.split("_")[1].split("-")[0]
     return chrom, start, end
 
+def gs_fix(og_value, tsfm_func):
+    new_value = tsfm_func(og_value)
+    if isinstance(og_value, snakemake.io._IOFile) and og_value.startswith(".snakemake/storage/gcs"):
+        return og_value.new_from(new_value)
+    return tsfm_func(new_value)
+
 wildcard_constraints:
     rep=r"\d+"
 
@@ -64,8 +70,8 @@ rule run:
     """ execute happler! """
     input:
         pgen=config["snp_panel"],
-        pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
-        psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
+        psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
         pts=pheno,
         covar=config["covar"],
     params:
@@ -140,8 +146,8 @@ rule cond_linreg:
     """plot conditional regressions for a haplotype"""
     input:
         pgen=config["snp_panel"],
-        pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
-        psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
+        psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
         hap=rules.run.output.hap,
         pts=pheno,
     params:
@@ -176,8 +182,8 @@ rule heatmap:
     # TODO: also include causal hap if one exists
     input:
         pgen=config["snp_panel"],
-        pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
-        psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
+        psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
         hap=rules.run.output.hap,
         pts=pheno,
     params:
@@ -241,8 +247,8 @@ rule transform:
     input:
         hap=rules.run.output.gz,
         pgen=config["snp_panel"],
-        pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
-        psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
+        psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
         pts=pheno,
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
@@ -354,8 +360,8 @@ if mode == "midway":
 rule merge:
     input:
         gts=config["snp_panel"],
-        gts_pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
-        gts_psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        gts_pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
+        gts_psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
         hps=lambda wildcards: merge_hps_input(wildcards).pgen,
         hps_pvar=lambda wildcards: merge_hps_input(wildcards).pvar,
         hps_psam=lambda wildcards: merge_hps_input(wildcards).psam,
