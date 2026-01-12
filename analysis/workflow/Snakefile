@@ -254,7 +254,11 @@ elif mode == "run":
         if check_config("SVs", place=config["modes"][mode]):
             files.append(rules.happler_sv_ld.output.ld)
         with open(checkpoints.multiline.get().output["hps"], 'r') as file:
-            multiline_locus, multiline_traits = zip(*(f[:-1].split("\t") for f in file.readlines()))
+            hap_files = file.readlines()
+            if not len(hap_files):
+                # if there weren't any non-empty hap files, just return an empty list
+                return []
+            multiline_locus, multiline_traits = zip(*(f[:-1].split("\t") for f in hap_files))
         return expand(
             expand(
                 files, zip, trait=multiline_traits, locus=multiline_locus,
