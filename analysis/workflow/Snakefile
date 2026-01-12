@@ -217,7 +217,7 @@ elif mode == "run":
         """ obtain a list of the .hap files that have haplotypes with two or more alleles """
         input:
             hps = expand(
-                gs_fix(rules.happler_run.output.hap),
+                gs_fix(rules.happler_run.output.hap, str),
                 zip, trait=locus_traits, locus=locus, allow_missing=True,
             ),
         params:
