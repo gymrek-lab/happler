@@ -210,16 +210,18 @@ if mode != "run":
         config: plots_config
     use rule * from plots as plots_*
 
+handle_gcs_storage = lambda i: storage(i) if i[0].startswith("gs://") else i
+
 if mode == "ld_range":
     FINAL_OUTPUT = [rules.plots_params.output.png, rules.plots_metrics.output.png]
 elif mode == "run":
     checkpoint multiline:
         """ obtain a list of the .hap files that have haplotypes with two or more alleles """
         input:
-            hps = expand(
+            hps = handle_gcs_storage(expand(
                 rules.happler_run.output.hap.replace(".snakemake/storage/gcs", "gs:/"),
                 zip, trait=locus_traits, locus=locus, allow_missing=True,
-            ),
+            )),
         params:
             out = orig_out,
             hp_path = Path(str(rules.happler_run.output.hap).format(locus="*", trait="*")),
