@@ -4,6 +4,7 @@ set -euo pipefail
 
 region="$1"
 out_prefix="$2"
+threads="${3:-1}"
 
 export GCS_REQUESTER_PAYS_PROJECT="${GOOGLE_PROJECT}"
 export GCS_OAUTH_TOKEN="$(gcloud auth application-default print-access-token)"
@@ -21,10 +22,10 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 batches="$(gsutil ls "$VCF_DIR" | grep -oP '(?<=BATCH)\d+' | sort -n)"
 cd "$TEMP_DIR"
 echo "tempdir: $TEMP_DIR"
-for batch in $batches; do
-    bcftools view -O b -o "$batch".bcf -r "$region" "$(echo "$VCF_DIR" | sed 's/*/'"$batch"'/')"
-    # plink2 --out "$batch" --nonfounders --bcf "$batch".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
-done
+echo "$batches" | xargs -P <num_parallel_jobs> -I{} sh -c '
+  batch="{}"
+  bcftools view --threads 1 -O b -o "$batch.bcf" -r "$region" "$(echo "$VCF_DIR" | sed '\''s/*/'"$batch"'/\'')"
+'
 
 # assert that all batches were downloaded
 for batch in $batches; do
@@ -36,5 +37,5 @@ for batch in $batches; do
 done
 
 cd -
-bcftools merge --no-index -O b -o "$out_prefix".bcf -l <(ls "$TEMP_DIR"/*.bcf)
-plink2 --out "$out_prefix" --nonfounders --bcf "$out_prefix".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
+bcftools merge --threads "$threads" --no-index -O b -o "$out_prefix".bcf -l <(ls "$TEMP_DIR"/*.bcf)
+plink2 --threads "$threads" --out "$out_prefix" --nonfounders --bcf "$out_prefix".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"

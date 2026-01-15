@@ -178,7 +178,7 @@ rule aou:
         bcf=out+"/snps.bcf",
     resources:
         runtime=75,
-    threads: 1
+    threads: 4
     log:
         logs + "/aou",
     benchmark:
@@ -186,7 +186,7 @@ rule aou:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/aou/get_pgen.bash {params.locus} {params.prefix} &>{log}"
+        "workflow/scripts/aou/get_pgen.bash '{params.locus}' {params.prefix} {params.threads} &>{log}"
 
 
 rule aou_qc:
