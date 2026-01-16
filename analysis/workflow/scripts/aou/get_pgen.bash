@@ -30,12 +30,12 @@ cd "$TEMP_DIR"
 echo "workdir: $TEMP_DIR"
 echo "$batches" | xargs -P "$threads" -I{} sh -c '
   batch="{}"
-  bcftools view --threads 1 -O b -o "$region/batch.bcf" -r "$region" "$(echo "$VCF_DIR" | sed '\''s/*/'"$batch"'/\'')"
+  bcftools view --threads 1 -O z -o "$region/batch.vcf.gz" -r "$region" "$(echo "$VCF_DIR" | sed '\''s/*/'"$batch"'/\'')"
 '
 
 # assert that all batches were downloaded
 for batch in $batches; do
-    file_path="$region/$batch".bcf
+    file_path="$region/$batch".vcf.gz
     if [ ! -f "$file_path" ]; then
         echo "Error: Required file not found at $file_path" >&2
         exit 1
@@ -43,5 +43,6 @@ for batch in $batches; do
 done
 
 cd -
-bcftools merge --threads "$threads" --no-index -O b -o "$out_prefix".bcf -l <(ls "$TEMP_DIR/$region"/*.bcf)
-plink2 --threads "$threads" --out "$out_prefix" --nonfounders --bcf "$out_prefix".bcf --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
+bcftools merge --threads "$threads" --no-index -O u -l <(ls "$TEMP_DIR/$region"/*.vcf.gz) | \
+bcftools annotate --threads "$threads" -x INFO,^FORMAT/GT -O z -o "$out_prefix".vcf.gz
+plink2 --threads "$threads" --out "$out_prefix" --nonfounders --vf "$out_prefix".vcf.gz --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
