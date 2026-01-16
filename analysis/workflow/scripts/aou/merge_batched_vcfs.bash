@@ -36,7 +36,7 @@ echo "Found $num_files files. First file is: ${files[0]}"
             # FILE 1: Columns 1-9 + Samples
             # - $8="."        -> Zap INFO column
             # - sub(/:.*/...) -> Strip everything after ":" in FORMAT (col 9) and Samples (col 10+) to keep only GT
-            cmd+=" <(zcat \"$f\" | grep -v '^#' | awk 'BEGIN{OFS=\"\t\"} {\$8=\".\"; for(i=9;i<=NF;i++) sub(/:.*/, \"\", \$i); print}')"
+            cmd+=" <(zcat \"$f\" | grep -v '^#' | awk -F $'\t' 'BEGIN{OFS=\"\t\"} {\$8=\".\"; for(i=9;i<=NF;i++) sub(/:.*/, \"\", \$i); print}')"
         else
             # FILES 2-N: Samples Only
             # - cut -f10-     -> Grab sample columns
