@@ -14,17 +14,17 @@ echo "Found $num_files files. First file is: ${files[0]}"
 # 2. Extract and clean the Header from the first file
 # Use a subshell (...) to group header output and body output into one stream for bgzip
 (
+    # We turn off pipefail briefly so zcat doesn't kill the script when awk exits early
+    set +o pipefail
+
     # --- A. HEADER PROCESSING ---
     # Logic: 
     # 1. Skip ##INFO lines
     # 2. Skip ##FORMAT lines unless they define ID=GT
     # 3. Print everything else (##fileformat, #CHROM, etc.)
-    zcat "${files[0]}" | grep "^#" | \
-    awk '
-      /^##INFO/ { next } 
-      /^##FORMAT/ { if ($0 ~ /ID=GT/) print; next } 
-      { print }
-    '
+    zcat "${files[0]}" | awk '/^##INFO/ { next } /^##FORMAT/ { if ($0 ~ /ID=GT/) print; next } /^#/ { print; next } { exit}'
+
+    set -o pipefail # Turn safety back on
 
     # --- B. BODY PROCESSING & MERGING ---
     cmd="paste"
