@@ -166,7 +166,7 @@ rule vcf2plink:
 
 
 rule aou:
-    """ download a bunch of BCFs from AoU and merge into a single PGEN """
+    """ download a bunch of VCFs from AoU and merge into a single PGEN """
     params:
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
@@ -175,7 +175,7 @@ rule aou:
         pvar=out+"/snps.pvar",
         psam=out+"/snps.psam",
         log=temp(out+"/snps.log"),
-        bcf=out+"/snps.bcf",
+        bcf=out+"/snps.vcf.gz",
     resources:
         runtime=75,
     threads: 4
