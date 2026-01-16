@@ -14,22 +14,34 @@ echo "Found $num_files files. First file is: ${files[0]}"
 # 2. Extract and clean the Header from the first file
 # Use a subshell (...) to group header output and body output into one stream for bgzip
 (
-    # A. Print Header (removing ##INFO lines)
-    zcat "${files[0]}" | grep "^#" | grep -v "^##INFO"
+    # --- A. HEADER PROCESSING ---
+    # Logic: 
+    # 1. Skip ##INFO lines
+    # 2. Skip ##FORMAT lines unless they define ID=GT
+    # 3. Print everything else (##fileformat, #CHROM, etc.)
+    zcat "${files[0]}" | grep "^#" | \
+    awk '
+      /^##INFO/ { next } 
+      /^##FORMAT/ { if ($0 ~ /ID=GT/) print; next } 
+      { print }
+    '
 
-    # B. Construct the dynamic paste command
+    # --- B. BODY PROCESSING & MERGING ---
     cmd="paste"
 
     for ((i=0; i<num_files; i++)); do
         f="${files[$i]}"
         
         if [ $i -eq 0 ]; then
-            # FIRST FILE: Remove header, set INFO (col 8) to ".", keep all columns
-            # Note: We escape $8 as \$8 so it isn't evaluated by the shell now
-            cmd+=" <(zcat \"$f\" | grep -v '^#' | awk 'BEGIN{OFS=\"\t\"} {\$8=\".\"; print}')"
+            # FILE 1: Columns 1-9 + Samples
+            # - $8="."        -> Zap INFO column
+            # - sub(/:.*/...) -> Strip everything after ":" in FORMAT (col 9) and Samples (col 10+) to keep only GT
+            cmd+=" <(zcat \"$f\" | grep -v '^#' | awk 'BEGIN{OFS=\"\t\"} {\$8=\".\"; for(i=9;i<=NF;i++) sub(/:.*/, \"\", \$i); print}')"
         else
-            # OTHER FILES: Remove header, cut columns 10-End
-            cmd+=" <(zcat \"$f\" | grep -v '^#' | cut -f10-)"
+            # FILES 2-N: Samples Only
+            # - cut -f10-     -> Grab sample columns
+            # - sub(/:.*/...) -> Strip everything after ":" in all columns to keep only GT
+            cmd+=" <(zcat \"$f\" | grep -v '^#' | cut -f10- | awk 'BEGIN{OFS=\"\t\"} {for(i=1;i<=NF;i++) sub(/:.*/, \"\", \$i); print}')"
         fi
     done
 
