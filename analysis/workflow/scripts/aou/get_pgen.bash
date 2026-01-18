@@ -28,10 +28,8 @@ mkdir -p "$TEMP_DIR/$region"
 batches="$(gsutil ls "$VCF_DIR" | grep -oP '(?<=BATCH)\d+' | sort -n)"
 cd "$TEMP_DIR"
 echo "workdir: $TEMP_DIR"
-echo "$batches" | xargs -P "$threads" -I{} sh -c '
-  batch="{}"
-  bcftools view --threads 1 -O z -o "$region/$batch.vcf.gz" -r "$region" "$(echo "$VCF_DIR" | sed '\''s/*/'"$batch"'/\'')"
-'
+echo "$batches" | xargs -P "$threads" -I{} bash -c \
+  'batch="$1"; bcftools view --threads 1 -O z -o "$2/$batch.vcf.gz" -r "$3" "$(echo "$4" | sed "s/\*/$batch/")"' _ {} "$region" "$region" "$VCF_DIR"
 
 # assert that all batches were downloaded
 for batch in $batches; do
