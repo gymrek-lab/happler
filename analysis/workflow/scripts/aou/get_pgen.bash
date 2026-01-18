@@ -5,7 +5,7 @@ set -euo pipefail
 region="$1"
 out_prefix="$2"
 threads="${3:-1}"
-TEMP_DIR="$4" # default: tmp dir
+TEMP_DIR="${4:-}" # default: tmp dir
 
 export GCS_REQUESTER_PAYS_PROJECT="${GOOGLE_PROJECT}"
 export GCS_OAUTH_TOKEN="$(gcloud auth application-default print-access-token)"
