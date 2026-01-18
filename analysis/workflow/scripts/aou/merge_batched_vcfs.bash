@@ -9,11 +9,15 @@ set -euo pipefail
 OUTPUT="$1" # .vcf.gz (can be local path or gs://bucket/path/merged.vcf.gz)
 INPUT_DIR="$2" # a dir with a bunch of .vcf.gz files (can be local dir or gs://bucket/dir)
 
+# Define number of threads for bgzip (e.g., use all available cores minus 1)
+# nproc is a standard linux command to get core count
+THREADS=$(nproc)
+
 # Helper function to cat files (local or GCS)
 cat_file() {
     local f="$1"
     if [[ "$f" == gs://* ]]; then
-        gsutil cat "$f"
+        gcloud storage cat "$f"
     else
         cat "$f"
     fi
@@ -22,8 +26,8 @@ cat_file() {
 # 1. Collect files using a "version sort" so part2 comes before part10
 if [[ "$INPUT_DIR" == gs://* ]]; then
     echo "Detected GCS input. Listing files from bucket..."
-    # gsutil ls doesn't support version sort (-v), so we use 'sort -V'
-    files=($(gsutil ls "$INPUT_DIR/*.vcf.gz" | sort -V))
+    # gcloud storage ls doesn't support version sort (-v), so we use 'sort -V'
+    files=($(gcloud storage ls "$INPUT_DIR/*.vcf.gz" | sort -V))
 else
     echo "Detected local input."
     files=($(ls -v "$INPUT_DIR"/*.vcf.gz))
@@ -59,10 +63,10 @@ process_stream() {
         f="${files[$i]}"
 
         # Build the command string.
-        # Note: We must use the specific 'gsutil cat' or 'cat' command inside the process substitution.
+        # Note: We must use the specific 'gcloud storage cat' or 'cat' command inside the process substitution.
         if [[ "$f" == gs://* ]]; then
             # GCS Input
-            CAT_CMD="gsutil cat \"$f\""
+            CAT_CMD="gcloud storage cat \"$f\""
         else
             # Local Input
             CAT_CMD="cat \"$f\""
@@ -87,13 +91,13 @@ process_stream() {
 }
 
 # 3. Execute Pipeline
-# If OUTPUT is gs://, pipe bgzip output directly to gsutil cp
+# If OUTPUT is gs://, pipe bgzip output directly to gcloud storage cp
 if [[ "$OUTPUT" == gs://* ]]; then
     echo "Streaming merge directly to GCS: $OUTPUT"
-    process_stream | bgzip | gsutil cp - "$OUTPUT"
+    process_stream | bgzip -@ "$THREADS" | gcloud storage cp - "$OUTPUT"
 else
     echo "Writing merge to local file: $OUTPUT"
-    process_stream | bgzip > "$OUTPUT"
+    process_stream | bgzip -@ "$THREADS" > "$OUTPUT"
 fi
 
 echo "Done! Output written to $OUTPUT"
