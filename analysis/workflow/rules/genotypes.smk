@@ -186,7 +186,7 @@ rule aou:
     conda:
         "../envs/default.yml"
     shell:
-        "workflow/scripts/aou/get_pgen.bash '{params.locus}' {params.prefix} {params.threads} &>{log}"
+        "workflow/scripts/aou/get_pgen.bash '{params.locus}' {params.prefix} {threads} &>{log}"
 
 
 rule aou_qc:
