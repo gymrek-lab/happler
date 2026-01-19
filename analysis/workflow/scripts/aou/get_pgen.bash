@@ -42,4 +42,4 @@ done
 
 cd -
 bash "$(dirname "$0")"/merge_batched_vcfs.bash "$TEMP_DIR/$region.vcf.gz" "$TEMP_DIR/$region"
-plink2 --threads "$threads" --out "$out_prefix" --nonfounders --vcf "$out_prefix".vcf.gz --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
+plink2 --threads "$threads" --out "$out_prefix" --nonfounders --vcf "$TEMP_DIR/$region.vcf.gz" --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 --chr "$chrom" --from-bp "$pos" --to-bp "$end"
