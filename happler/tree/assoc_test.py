@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from decimal import Decimal, getcontext
 
 import numpy as np
+import jax.numpy as jnp
 from scipy import stats
 import numpy.typing as npt
 import statsmodels.api as sm
@@ -410,29 +411,28 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         """
         n = X.shape[0]
         nobs2 = n / 2.0
-        log2pi = np.log(2 * np.pi)
+        log2pi = jnp.log(2 * jnp.pi)
 
         # Center X and y
-        xc = X - X.mean(axis=0)  # (n, p)
+        xc = X - jnp.mean(X, axis=0)  # (n, p)
 
         # Vectorized simple OLS with intercept
-        sxx = np.sum(xc**2, axis=0)  # (p,)
-        sxy = np.sum(xc * yc, axis=0)  # (p,)
+        sxx = jnp.sum(xc**2, axis=0)  # (p,)
+        sxy = jnp.sum(xc * yc, axis=0)  # (p,)
 
-        with np.errstate(divide="ignore", invalid="ignore"):
-            b1 = np.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
+        # Use jnp.where instead of np.where for JAX compatibility
+        b1 = jnp.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
 
         # Residuals for each column's model: r = (y - ym) - b1 * (X - xm)
-        syy = float(np.sum(yc**2))  # scalar
+        syy = float(jnp.sum(yc**2))  # scalar
         ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
 
         # statsmodels-style profile log-likelihood per column
         # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
-        with np.errstate(divide="ignore"):
-            ll = -nobs2 * (log2pi + np.log(ssr / n) + 1.0)  # (p,)
+        ll = -nobs2 * (log2pi + jnp.log(ssr / n) + 1.0)  # (p,)
 
         # Number of parameters k: intercept + slope = 2
-        return -2 * ll + 2 * np.log(n)  # (p,)
+        return np.asarray(-2 * ll + 2 * jnp.log(n))  # (p,)
 
     def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
