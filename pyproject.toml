@@ -57,7 +57,7 @@ statsmodels = [
     { version = "0.14.6" , markers = "python_version > '3.10'" },
 ]
 jax = [
-    { version = "0.4.0" },
+    { version = ">=0.4.0" },
 ]
 
 [project.urls]

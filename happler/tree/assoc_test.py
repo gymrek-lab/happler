@@ -436,7 +436,8 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         ll = -nobs2 * (log2pi + jnp.log(ssr / n) + 1.0)  # (p,)
 
         # Number of parameters k: intercept + slope = 2
-        return np.asarray(-2 * ll + 2 * jnp.log(n))  # (p,)
+        bic = -2 * ll + 2 * jnp.log(n)  # (p,)
+        return np.asarray(bic)
 
     def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
