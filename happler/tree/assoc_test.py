@@ -5,6 +5,9 @@ from abc import ABC, abstractmethod
 from decimal import Decimal, getcontext
 
 import numpy as np
+import jax
+# Enable 64-bit precision for JAX to match NumPy's behavior
+jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 from scipy import stats
 import numpy.typing as npt
