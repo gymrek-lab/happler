@@ -189,12 +189,45 @@ rule aou:
         "workflow/scripts/aou/get_pgen.bash '{params.locus}' {params.prefix} {threads} &>{log}"
 
 
+rule aou_v8:
+    """ subset a PGEN from AoU v8 """
+    input:
+        pgen=lambda wildcards: storage("gs://fc-aou-datasets-controlled/v8/wgs/short_read/snpindel/acaf_threshold/pgen/acaf_threshold.chr{chrom}.pgen".format(chrom=parse_locus(wildcards.locus)[0])),
+        pvar=lambda wildcards: storage("gs://fc-aou-datasets-controlled/v8/wgs/short_read/snpindel/acaf_threshold/pgen/acaf_threshold.chr{chrom}.pvar".format(chrom=parse_locus(wildcards.locus)[0])),
+        psam=lambda wildcards: storage("gs://fc-aou-datasets-controlled/v8/wgs/short_read/snpindel/acaf_threshold/pgen/acaf_threshold.chr{chrom}.psam".format(chrom=parse_locus(wildcards.locus)[0])),
+    params:
+        locus=lambda wildcards: wildcards.locus.replace("_", ":"),
+        pfile=lambda wildcards, input: str(Path(input.pgen).with_suffix("")),
+        prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+        start=lambda wildcards: parse_locus(wildcards.locus)[1],
+        end=lambda wildcards: parse_locus(wildcards.locus)[2],
+        chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
+    output:
+        pgen=out+"/snps.v8.pgen",
+        pvar=out+"/snps.v8.pvar",
+        psam=out+"/snps.v8.psam",
+        log=temp(out+"/snps.log"),
+    resources:
+        runtime=30,
+    threads: 4
+    log:
+        logs + "/aou_v8",
+    benchmark:
+        bench + "/aou_v8",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "plink2 --threads {threads} --out {params.prefix} --pfile {params.pfile} "
+        "--nonfounders --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 "
+        "--chr {params.chrom} --from-bp {params.start} --to-bp {params.end} &>{log}"
+
+
 rule aou_qc:
     """ perform sample and variant QC on an AoU PGEN """
     input:
-        pgen = rules.aou.output.pgen,
-        pvar = rules.aou.output.pvar,
-        psam = rules.aou.output.psam,
+        pgen = rules.aou_v8.output.pgen,
+        pvar = rules.aou_v8.output.pvar,
+        psam = rules.aou_v8.output.psam,
         pheno = lambda wildcards: expand(config["modes"]["run"]["pheno"], trait=wildcards.trait),
         eur_csv = lambda wildcards: expand(config["modes"]["run"]["pops_dir"], pop="EUR_WHITE"),
     params:
