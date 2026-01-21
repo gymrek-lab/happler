@@ -206,7 +206,7 @@ rule aou_v8:
         pgen=out+"/snps.v8.pgen",
         pvar=out+"/snps.v8.pvar",
         psam=out+"/snps.v8.psam",
-        log=temp(out+"/snps.log"),
+        log=temp(out+"/snps.v8.log"),
     resources:
         runtime=30,
     threads: 4
