@@ -5,4 +5,3 @@ printshellcmds: true
 default-storage-provider: gcs
 default-storage-prefix: ${WORKSPACE_BUCKET}/aryarm
 storage-gcs-project: ${GOOGLE_PROJECT}
-keep-storage-local-copies: true
