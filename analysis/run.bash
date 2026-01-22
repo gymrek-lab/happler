@@ -44,26 +44,20 @@ fi
 if [ "$ENVIRONMENT" = "BATCH" ]; then
     snakemake \
     --workflow-profile profile/slurm \
-    --rerun-trigger {mtime,params,input} \
     --notemp \
-    -k \
     -j 64 \
     -c 64 \
     "$@" &>"$out_path/log" &
 elif [ -n "$WORKSPACE_BUCKET" ]; then
     snakemake \
     --workflow-profile profile/aou \
-    --rerun-trigger {mtime,params,input} \
     --notemp \
-    -k \
     -c 4 \
     "$@" &>"$out_path/log" &    
 else
     snakemake \
     --workflow-profile profile/default \
-    --rerun-trigger {mtime,params,input} \
     --notemp \
-    -k \
     -c 4 \
     "$@" &>"$out_path/log" &
 fi

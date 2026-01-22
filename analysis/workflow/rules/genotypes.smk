@@ -208,8 +208,8 @@ rule aou:
         psam=out+"/snps.psam",
         log=temp(out+"/snps.log"),
     resources:
-        runtime=30,
-    threads: 4
+        runtime=8,
+    threads: 1
     log:
         logs + "/aou",
     benchmark:

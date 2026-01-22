@@ -1,7 +1,10 @@
-latency-wait: 30
 use-conda: true
-conda-frontend: conda
+latency-wait: 30
+keep-going: true
 printshellcmds: true
+conda-frontend: conda
+rerun-incomplete: true
 default-storage-provider: gcs
-default-storage-prefix: ${WORKSPACE_BUCKET}/aryarm
+rerun-trigger: [mtime, params, input]
 storage-gcs-project: ${GOOGLE_PROJECT}
+default-storage-prefix: ${WORKSPACE_BUCKET}/aryarm
