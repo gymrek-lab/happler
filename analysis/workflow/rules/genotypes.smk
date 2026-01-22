@@ -165,31 +165,31 @@ rule vcf2plink:
         "--threads {threads} --memory {resources.mem_mb}{params.samps} --out {params.prefix} &>{log}"
 
 
-rule aou:
-    """ download a bunch of VCFs from AoU and merge into a single PGEN """
+rule aou_v7:
+    """ download a bunch of VCFs from AoU v7 and merge into a single PGEN """
     params:
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
     output:
-        pgen=out+"/snps.pgen",
-        pvar=out+"/snps.pvar",
-        psam=out+"/snps.psam",
-        log=temp(out+"/snps.log"),
-        bcf=out+"/snps.vcf.gz",
+        pgen=out+"/snps.v7.pgen",
+        pvar=out+"/snps.v7.pvar",
+        psam=out+"/snps.v7.psam",
+        log=temp(out+"/snps.v7.log"),
+        bcf=out+"/snps.v7.vcf.gz",
     resources:
         runtime=75,
     threads: 4
     log:
-        logs + "/aou",
+        logs + "/aou_v7",
     benchmark:
-        bench + "/aou",
+        bench + "/aou_v7",
     conda:
         "../envs/default.yml"
     shell:
         "workflow/scripts/aou/get_pgen.bash '{params.locus}' {params.prefix} {threads} &>{log}"
 
 
-rule aou_v8:
+rule aou:
     """ subset a PGEN from AoU v8 """
     input:
         pgen=lambda wildcards: storage("gs://fc-aou-datasets-controlled/v8/wgs/short_read/snpindel/acaf_threshold/pgen/acaf_threshold.chr{chrom}.pgen".format(chrom=parse_locus(wildcards.locus)[0])),
@@ -203,17 +203,17 @@ rule aou_v8:
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
     output:
-        pgen=out+"/snps.v8.pgen",
-        pvar=out+"/snps.v8.pvar",
-        psam=out+"/snps.v8.psam",
-        log=temp(out+"/snps.v8.log"),
+        pgen=out+"/snps.pgen",
+        pvar=out+"/snps.pvar",
+        psam=out+"/snps.psam",
+        log=temp(out+"/snps.log"),
     resources:
         runtime=30,
     threads: 4
     log:
-        logs + "/aou_v8",
+        logs + "/aou",
     benchmark:
-        bench + "/aou_v8",
+        bench + "/aou",
     conda:
         "../envs/default.yml"
     shell:
@@ -225,9 +225,9 @@ rule aou_v8:
 rule aou_qc:
     """ perform sample and variant QC on an AoU PGEN """
     input:
-        pgen = rules.aou_v8.output.pgen,
-        pvar = rules.aou_v8.output.pvar,
-        psam = rules.aou_v8.output.psam,
+        pgen = rules.aou.output.pgen,
+        pvar = rules.aou.output.pvar,
+        psam = rules.aou.output.psam,
         pheno = lambda wildcards: expand(config["modes"]["run"]["pheno"], trait=wildcards.trait),
         eur_csv = lambda wildcards: expand(config["modes"]["run"]["pops_dir"], pop="EUR_WHITE"),
     params:
