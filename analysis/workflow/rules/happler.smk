@@ -25,10 +25,9 @@ def parse_locus(locus):
     return chrom, start, end
 
 def gs_fix(og_value, tsfm_func):
-    new_value = tsfm_func(og_value)
     if isinstance(og_value, snakemake.io._IOFile) and og_value.startswith(".snakemake/storage/gcs"):
-        return og_value.new_from(new_value)
-    return tsfm_func(new_value)
+        return storage(str(tsfm_func(og_value)).replace(".snakemake/storage/gcs", "gs:/"))
+    return tsfm_func(og_value
 
 wildcard_constraints:
     rep=r"\d+"
