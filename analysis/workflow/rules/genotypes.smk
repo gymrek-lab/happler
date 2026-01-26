@@ -192,12 +192,10 @@ rule aou_v7:
 rule aou:
     """ subset a PGEN from AoU v8 """
     input:
-        pgen=lambda wildcards: storage("gs://fc-aou-datasets-controlled/v8/wgs/short_read/snpindel/acaf_threshold/pgen/acaf_threshold.chr{chrom}.pgen".format(chrom=parse_locus(wildcards.locus)[0])),
-        pvar=lambda wildcards: storage("gs://fc-aou-datasets-controlled/v8/wgs/short_read/snpindel/acaf_threshold/pgen/acaf_threshold.chr{chrom}.pvar".format(chrom=parse_locus(wildcards.locus)[0])),
-        psam=lambda wildcards: storage("gs://fc-aou-datasets-controlled/v8/wgs/short_read/snpindel/acaf_threshold/pgen/acaf_threshold.chr{chrom}.psam".format(chrom=parse_locus(wildcards.locus)[0])),
+        lambda wildcards: storage(multiext(config["snp_panel"].removesuffix(".pgen").format(chrom=parse_locus(wildcards.locus)[0]), ".pgen", ".pvar", ".psam"))
     params:
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
-        pfile=lambda wildcards, input: str(Path(input.pgen).with_suffix("")),
+        pfile=lambda wildcards, input: str(Path(input[0]).with_suffix("")),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
         start=lambda wildcards: parse_locus(wildcards.locus)[1],
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
@@ -257,7 +255,7 @@ rule aou_qc:
 
 
 def subset_input():
-    if config["snp_panel"] == "AoU":
+    if config["snp_panel"] == "AoU" or config["snp_panel"].startswith("gs://fc-secure-"):
         return {
             "pgen": rules.aou_qc.output.pgen,
             "pvar": rules.aou_qc.output.pvar,
