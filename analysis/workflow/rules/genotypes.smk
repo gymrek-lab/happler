@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 
@@ -192,7 +193,7 @@ rule aou_v7:
 rule aou:
     """ subset a PGEN from AoU v8 """
     input:
-        lambda wildcards: storage(multiext(config["snp_panel"].removesuffix(".pgen").format(chrom=parse_locus(wildcards.locus)[0]), ".pgen", ".pvar", ".psam"))
+        lambda wildcards: storage(multiext(config["snp_panel"].replace("AOU_WORKSPACE_BUCKET", os.environ["WORKSPACE_BUCKET], 1).removesuffix(".pgen").format(chr=parse_locus(wildcards.locus)[0]), ".pgen", ".pvar", ".psam"))
     params:
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
         pfile=lambda wildcards, input: str(Path(input[0]).with_suffix("")),
@@ -255,7 +256,7 @@ rule aou_qc:
 
 
 def subset_input():
-    if config["snp_panel"] == "AoU" or config["snp_panel"].startswith("gs://fc-secure-"):
+    if config["snp_panel"] == "AoU" or config["snp_panel"].startswith("AOU_WORKSPACE_BUCKET"):
         return {
             "pgen": rules.aou_qc.output.pgen,
             "pvar": rules.aou_qc.output.pvar,
