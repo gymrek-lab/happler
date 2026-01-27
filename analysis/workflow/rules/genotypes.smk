@@ -193,7 +193,7 @@ rule aou_v7:
 rule aou:
     """ subset a PGEN from AoU v8 """
     input:
-        lambda wildcards: storage(multiext(config["snp_panel"].replace("AOU_WORKSPACE_BUCKET", os.environ["WORKSPACE_BUCKET], 1).removesuffix(".pgen").format(chr=parse_locus(wildcards.locus)[0]), ".pgen", ".pvar", ".psam"))
+        lambda wildcards: storage(multiext(config["snp_panel"].replace("AOU_WORKSPACE_BUCKET", os.environ["WORKSPACE_BUCKET"], 1).removesuffix(".pgen").format(chr=parse_locus(wildcards.locus)[0]), ".pgen", ".pvar", ".psam"))
     params:
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
         pfile=lambda wildcards, input: str(Path(input[0]).with_suffix("")),

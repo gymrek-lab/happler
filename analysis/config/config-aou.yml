@@ -11,7 +11,7 @@
 # If the VCFs are per-chromosome, replace the contig name in the file name with "{chr}"
 # The VCF(s) must be sorted and indexed (with a .tbi file in the same directory)
 # required!
-snp_panel: AOU_WORKSPACE_BUCKET/phased_pgens/chr{chr}.pgen"
+snp_panel: AOU_WORKSPACE_BUCKET/phased_pgens/chr{chr}.pgen
 
 # A "locus" is a string with a contig name, a colon, the start position, a dash, and
 # the end position or a BED file with a ".bed" file ending
