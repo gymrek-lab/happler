@@ -12,7 +12,7 @@ cd ~/phased_pgens
 
 for i in {1..22}; do
     gsutil -u $GOOGLE_PROJECT -m cp -r "$V8_CDR_DIR"/chr${i}_*.vcf.gz chr${i}.vcf.gz && \
-    plink2 --memory 24000 --vcf chr${i}.vcf.gz --out chr${i} && \
+    plink2 --memory 24000 --vcf chr${i}.vcf.gz --out chr${i} --set-all-var-ids '@:#' && \
     rm chr${i}.vcf.gz;
     (
         gsutil cp chr${i}.log chr${i}.p* "$V8_BUCKET"/phased_pgens/ && \
