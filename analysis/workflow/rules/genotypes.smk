@@ -142,7 +142,7 @@ rule vcf2plink:
             if check_config('exclude_samples') else []
         ),
     params:
-        maf=config["min_maf"],
+        maf=check_config("min_maf", default="0.0"),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
         samps=lambda wildcards, input: (" --" + (
             "keep " if check_config("str_panel") else "remove "
@@ -237,8 +237,8 @@ rule aou_qc:
         pheno = lambda wildcards: expand(config["modes"]["run"]["pheno"], trait=wildcards.trait),
         eur_csv = lambda wildcards: expand(config["modes"]["run"]["pops_dir"], pop="EUR_WHITE"),
     params:
-        maf=lambda wildcards: check_config("min_maf", default="0.0"),
-        hwe=lambda wildcards: check_config("hwe", default="0.0"),
+        maf=check_config("min_maf", default="0.0"),
+        hwe=check_config("hwe", default="0.0"),
         locus=lambda wildcards: wildcards.locus.replace("_", ":"),
         in_prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
