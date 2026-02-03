@@ -2,10 +2,12 @@
 
 # A Bash script using plink2 to perform genotype QC with EUR, AFR, and phenotype-defined cohorts,
 # while ensuring multiallelic variant filtering is applied at the final filtering step.
+# This script is a partial reimplementation of
+# https://github.com/CAST-genomics/cast-workflows/blob/main/gwas/aou/hail_runner_EUR_AFR.py
 
 set -euo pipefail
 
-# USAGE: hail_qc_EUR_AFR.sh <genotypes.pgen> <phenotypes.pheno> [-o output.pgen]
+# USAGE: plink2_hail_qc_EUR_AFR.bash <genotypes.pgen> <phenotypes.pheno> [-o output.pgen]
 # Optional arguments:
 #   --samples-file-dir       Path to EUR_WHITE.csv and AFR_BLACK.csv files (default: current directory)
 #   --sample-call-rate       Minimum sample call rate (default: 0.9)

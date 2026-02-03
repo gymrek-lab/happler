@@ -2,9 +2,9 @@
 
 # Convert the phased AoU v8 VCFs to PGENs
 # Allocate 4 CPUs, 26 GB memory, and a 400 GB SSD (total: $10.19 for 24 hrs)
-# ETA: 7-10 days
+# ETA: 10-12 days
 
-V8_BUCKET="$1" # ex: gs://fc-secure-MYBUCKET
+V8_BUCKET="${1:-$WORKSPACE_BUCKET}" # ex: gs://fc-secure-MYBUCKET
 V8_CDR_DIR="gs://fc-aou-datasets-controlled/v8/wgs/short_read/snpindel/aux/phasing"
 
 mkdir -p ~/phased_pgens

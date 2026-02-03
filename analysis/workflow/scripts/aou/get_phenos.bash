@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Regress covariates out of phenotypes
+# Regress PCs and other covariates out of AoU phenotypes
 # Allocate 4 CPUs, 3.6 GB memory, and a 120 GB disk (the cheapest possible configuration)
 # Execute this script from within the home directory
 
