@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# Regress covariates out of phenotypes
+# Allocate 4 CPUs, 3.6 GB memory, and a 120 GB disk (the cheapest possible configuration)
+# Execute this script from within the home directory
+
 export GCS_REQUESTER_PAYS_PROJECT="${GOOGLE_PROJECT}"
 export GCS_OAUTH_TOKEN="$(gcloud auth application-default print-access-token)"
 CDR_DIR="gs://fc-aou-datasets-controlled/v8"
@@ -19,7 +23,7 @@ tail -n+2 | {
 } | \
 cut --complement -f2 > AOU_PCS.covar
 
-for pheno in platelet_count_new_phenocovar ldl_cholesterol_phenocovar; do
+for pheno in platelet_count_phenocovar ldl_cholesterol_phenocovar; do
     gsutil cp ${WORKSPACE_BUCKET}/phenotypes/$pheno.csv $pheno.csv
     cut -f-2 -d, --output-delimiter $'\t' $pheno.csv | { echo -e "#IID\tpheno"; tail -n+2; } > $pheno.og.pheno
     cut -f 1,3- -d, --output-delimiter $'\t' $pheno.csv | { read -r head; echo "$head" | sed 's/person_id/#IID/'; cat; } > $pheno.og.covar
