@@ -11,11 +11,11 @@ mkdir -p ~/phased_pgens
 cd ~/phased_pgens
 
 for i in {22..1}; do
-    gsutil -u $GOOGLE_PROJECT -m cp -r "$V8_CDR_DIR"/chr${i}_*.vcf.gz chr${i}.vcf.gz && \
+    gcloud storage --billing-project $GOOGLE_PROJECT cp -r "$V8_CDR_DIR"/chr${i}_*.vcf.gz chr${i}.vcf.gz && \
     plink2 --memory 24000 --vcf chr${i}.vcf.gz --out chr${i} --set-all-var-ids '@:#' --make-just-pvar --keep-autoconv && \
     rm chr${i}.vcf.gz;
     (
-        gsutil cp chr${i}.log chr${i}.p{gen,var,sam} "$V8_BUCKET"/phased_pgens/ && \
+        gcloud storage cp chr${i}.log chr${i}.p{gen,var,sam} "$V8_BUCKET"/phased_pgens/ && \
         rm chr${i}.log chr${i}.p* && \
         echo chr${i};
     ) &

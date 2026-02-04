@@ -25,7 +25,7 @@ else
 fi
 mkdir -p "$TEMP_DIR/$region"
 
-batches="$(gsutil ls "$VCF_DIR" | grep -oP '(?<=BATCH)\d+' | sort -n)"
+batches="$(gcloud storage ls "$VCF_DIR" | grep -oP '(?<=BATCH)\d+' | sort -n)"
 cd "$TEMP_DIR"
 echo "workdir: $TEMP_DIR"
 echo "$batches" | xargs -P "$threads" -I{} bash -c \
