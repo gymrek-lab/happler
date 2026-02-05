@@ -8,6 +8,7 @@ set -euo pipefail
 
 OUTPUT="$1" # .vcf.gz (can be local path or gs://bucket/path/merged.vcf.gz)
 INPUT_DIR="$2" # a dir with a bunch of .vcf.gz files (can be local dir or gs://bucket/dir)
+FILTER_IDS="${3:-EnsTR}" # after merging, output any variants with this pattern in their ID to a separate .vcf.gz
 
 # Define number of threads for bgzip (e.g., use all available cores minus 1)
 # nproc is a standard linux command to get core count
@@ -22,6 +23,17 @@ cat_file() {
         cat "$f"
     fi
 }
+
+if [[ -n "$FILTER_IDS" ]]; then
+    FILTER_IDS_OUTPUT="${OUTPUT%.vcf.gz}"."$FILTER_IDS".vcf.gz
+    filter_ids() {
+        awk -F $'\t' '$3 !~ /'"$FILTER_IDS"'/'
+    }
+else
+    filter_ids() {
+        cat
+    }
+fi
 
 # 1. Collect files using a "version sort" so part2 comes before part10
 if [[ "$INPUT_DIR" == gs://* ]]; then
@@ -87,7 +99,7 @@ process_stream() {
     done
 
     # --- C. Execute the constructed command ---
-    eval "$cmd"
+    eval "$cmd" | filter_ids
 }
 
 # 3. Execute Pipeline
