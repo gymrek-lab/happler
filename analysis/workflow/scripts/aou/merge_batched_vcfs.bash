@@ -8,7 +8,7 @@ set -euo pipefail
 
 OUTPUT="$1" # .vcf.gz (can be local path or gs://bucket/path/merged.vcf.gz)
 INPUT_DIR="$2" # a dir with a bunch of .vcf.gz files (can be local dir or gs://bucket/dir)
-FILTER_IDS="${3:-EnsTR}" # after merging, remove any variants with this pattern in their ID
+FILTER_IDS="${3:-}" # after merging, remove any variants with this pattern in their ID. Set this to "EnsTR" to remove TRs, for ex
 
 # Define number of threads for bgzip (e.g., use all available cores minus 1)
 # nproc is a standard linux command to get core count
