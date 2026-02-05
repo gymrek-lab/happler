@@ -25,7 +25,6 @@ cat_file() {
 }
 
 if [[ -n "$FILTER_IDS" ]]; then
-    FILTER_IDS_OUTPUT="${OUTPUT%.vcf.gz}"."$FILTER_IDS".vcf.gz
     filter_ids() {
         awk -F $'\t' '$3 !~ /'"$FILTER_IDS"'/'
     }
@@ -89,17 +88,17 @@ process_stream() {
             # - $8="."        -> Zap INFO column
             # - sub(/:.*/...) -> Strip everything after ":" in FORMAT (col 9) and Samples (col 10+) to keep only GT
             # - NR==1         : If it's the #CHROM line, print it and move on
-            cmd+=" <($CAT_CMD | zcat | grep -v '^##' | awk 'BEGIN{OFS=\"\t\"} NR==1{print; next} {\$8=\".\"; for(i=9;i<=NF;i++) sub(/:.*/, \"\", \$i); print}')"
+            cmd+=" <($CAT_CMD | zcat | grep -v '^##' | filter_ids | awk 'BEGIN{OFS=\"\t\"} NR==1{print; next} {\$8=\".\"; for(i=9;i<=NF;i++) sub(/:.*/, \"\", \$i); print}')"
         else
             # FILES 2-N: Samples Only
             # - cut -f10-     -> Grab sample columns
             # - sed           -> Delete everything after the first colon ":..." until the next tab or end of line to keep only GT
-            cmd+=" <($CAT_CMD | zcat | grep -v '^##' | cut -f10- | sed '2,\$s/:[^\\t]*//g')"
+            cmd+=" <($CAT_CMD | zcat | grep -v '^##' | filter_ids | cut -f10- | sed '2,\$s/:[^\\t]*//g')"
         fi
     done
 
     # --- C. Execute the constructed command ---
-    eval "$cmd" | filter_ids
+    eval "$cmd"
 }
 
 # 3. Execute Pipeline
