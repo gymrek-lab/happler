@@ -27,7 +27,7 @@ cat_file() {
 }
 
 # Helper function to check if file exists (local or GCS)
-file_exists() {
+output_exists() {
     if [[ "$OUTPUT" == gs://* ]]; then
         gcloud storage ls "$OUTPUT" &>/dev/null
     else
@@ -37,7 +37,7 @@ file_exists() {
 
 # Check if we're resuming from a partial file
 RESUME_FROM=0
-if file_exists; then
+if output_exists; then
     echo "Found existing output file. Checking for resumable progress..."
     
     total_lines=$(cat_file "$OUTPUT" | zcat | grep -v '^##' | wc -l || echo 0)
@@ -71,7 +71,7 @@ fi
 # Skip first RESUME_FROM lines when resuming
 skip_lines() {
     if [[ $RESUME_FROM -gt 0 ]]; then
-        tail -n +$((RESUME_FROM + 1))
+        tail -n +$RESUME_FROM
     else
         cat
     fi
