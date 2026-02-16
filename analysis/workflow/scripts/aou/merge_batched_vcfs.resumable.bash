@@ -4,7 +4,9 @@
 # It's important to verify that variants are _exactly_ the same across all VCFs:
 # for f in *.vcf.gz; do zcat "$f" | grep -v '^#' | cut -f1-7 | md5sum; done | sort | uniq -c
 
-# This version of the script can resume from where it left. It still needs to be tested.
+# Note that the script can resume where it left off if it gets interrupted. Resuming an
+# interrupted file can be faster if the output was close to finishing. Otherwise, it's
+# probably best to just restart from scratch.
 
 set -euo pipefail
 
@@ -38,17 +40,15 @@ output_exists() {
 # Check if we're resuming from a partial file
 RESUME_FROM=0
 if output_exists; then
-    echo "Found existing output file. Checking for resumable progress..."
-    
-    total_lines=$(cat_file "$OUTPUT" | zcat | grep -v '^##' | wc -l || echo 0)
+    total_lines=$({ cat_file "$OUTPUT" | zcat; } 2>/dev/null | grep -v '^##' | wc -l || true)
 
     if [[ "$total_lines" -eq 0 ]]; then
-        echo "Partial file appears empty. Delete it first."
+        echo "Found existing output but file appears empty. Delete it first."
         exit 1
     fi
 
     RESUME_FROM=$((total_lines - 1))
-    echo "Resuming from line $total_lines..."
+    echo "Found existing output file. Resuming from line $total_lines"
     
     # Rename existing file to .tmp
     if [[ "$OUTPUT" == gs://* ]]; then
@@ -79,11 +79,11 @@ skip_lines() {
 
 # 1. Collect files using a "version sort" so part2 comes before part10
 if [[ "$INPUT_DIR" == gs://* ]]; then
-    echo "Detected GCS input. Listing files from bucket..."
+    echo "Detected GCS input"
     # gcloud storage ls doesn't support version sort (-v), so we use 'sort -V'
     files=($(gcloud storage ls "$INPUT_DIR/*.vcf.gz" | sort -V))
 else
-    echo "Detected local input."
+    echo "Detected local input"
     files=($(ls -v "$INPUT_DIR"/*.vcf.gz))
 fi
 
@@ -95,8 +95,7 @@ echo "Found $num_files files. First file is: ${files[0]}"
 process_stream() {
     # If resuming, first output the partial file (minus last corrupted line)
     if [[ $RESUME_FROM -gt 0 ]]; then
-        echo "Combining first $RESUME_FROM complete lines with resumed output..." >&2
-        cat_file "${OUTPUT}.tmp" | zcat | head -n -1
+        { cat_file "${OUTPUT}.tmp" | zcat; } 2>/dev/null | head -n -1 || true
     else
         # Only output header if we're starting from the beginning
         # we turn off pipefail briefly so zcat doesn't kill the script when awk exits early
