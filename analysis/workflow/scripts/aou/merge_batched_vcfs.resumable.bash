@@ -71,7 +71,7 @@ fi
 # Skip first RESUME_FROM lines when resuming
 skip_lines() {
     if [[ $RESUME_FROM -gt 0 ]]; then
-        tail -n +$RESUME_FROM
+        tail -n +$((RESUME_FROM + 1))
     else
         cat
     fi
