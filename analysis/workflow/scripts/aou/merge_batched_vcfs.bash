@@ -49,7 +49,7 @@ output_exists() {
 # Check if we're resuming from a partial file
 RESUME_FROM=0
 if output_exists; then
-    total_lines=$({ { read_file "${OUTPUT}" | zcat; } 2>/dev/null || true; } | tee >(head -n -1 | bgzip | write_file "${OUTPUT}.tmp") | grep -v '^#' | wc -l)
+    total_lines=$({ { read_file "${OUTPUT}" | zcat; } 2>/dev/null || true; } | tee >(head -n -1 | bgzip -@ "$THREADS" | write_file "${OUTPUT}.tmp") | grep -v '^#' | wc -l)
 
     if [[ "$total_lines" -eq 0 ]]; then
         echo "Found existing output but file appears empty. Delete it first."
