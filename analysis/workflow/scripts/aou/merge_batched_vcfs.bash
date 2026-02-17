@@ -19,12 +19,21 @@ FILTER_IDS="${3:-EnsTR}" # after merging, remove any variants with this pattern 
 THREADS=$(nproc)
 
 # Helper function to cat files (local or GCS)
-cat_file() {
+read_file() {
     local f="$1"
     if [[ "$f" == gs://* ]]; then
         gcloud storage cat "$f"
     else
         cat "$f"
+    fi
+}
+
+write_file() {
+    local f="$1"
+    if [[ "$f" == gs://* ]]; then
+        gcloud storage cp - "$f"
+    else
+        cat > "$f"
     fi
 }
 
@@ -40,22 +49,16 @@ output_exists() {
 # Check if we're resuming from a partial file
 RESUME_FROM=0
 if output_exists; then
-    total_lines=$({ cat_file "$OUTPUT" | zcat; } 2>/dev/null | grep -v '^##' | wc -l || true)
+    total_lines=$({ { read_file "${OUTPUT}" | zcat; } 2>/dev/null || true; } | tee >(head -n -1 | bgzip | write_file "${OUTPUT}.tmp") | grep -v '^#' | wc -l)
 
     if [[ "$total_lines" -eq 0 ]]; then
         echo "Found existing output but file appears empty. Delete it first."
+        rm -f "${OUTPUT}.tmp"
         exit 1
     fi
 
     RESUME_FROM=$((total_lines - 1))
     echo "Found existing output file. Resuming from line $total_lines"
-    
-    # Rename existing file to .tmp
-    if [[ "$OUTPUT" == gs://* ]]; then
-        gcloud storage mv "$OUTPUT" "${OUTPUT}.tmp"
-    else
-        mv "$OUTPUT" "${OUTPUT}.tmp"
-    fi
 fi
 
 if [[ -n "$FILTER_IDS" ]]; then
@@ -93,11 +96,8 @@ echo "Found $num_files files. First file is: ${files[0]}"
 # 2. Extract the header and first few columns from the first file and then get the GT values from the other files
 # Use a subshell (...) to group header output and body output into one stream for bgzip
 process_stream() {
-    # If resuming, first output the partial file (minus last corrupted line)
-    if [[ $RESUME_FROM -gt 0 ]]; then
-        { cat_file "${OUTPUT}.tmp" | zcat; } 2>/dev/null | head -n -1 || true
-    else
-        # Only output header if we're starting from the beginning
+    # Only output header if we're not resuming an interrupted file
+    if [[ $RESUME_FROM -eq 0 ]]; then
         # we turn off pipefail briefly so zcat doesn't kill the script when awk exits early
         set +o pipefail
 
@@ -106,7 +106,7 @@ process_stream() {
         # 1. Skip ##INFO lines
         # 2. Skip ##FORMAT lines unless they define ID=GT
         # 3. Print everything else (##fileformat, #CHROM, etc.)
-        cat_file "${files[0]}" | zcat | awk '
+        read_file "${files[0]}" | zcat | awk '
           /^##INFO/ { next } 
           /^##FORMAT/ { if ($0 ~ /ID=GT/) print; next } 
           /^#CHROM/ { exit } 
@@ -154,12 +154,22 @@ process_stream() {
 # If OUTPUT is gs://, pipe bgzip output directly to gcloud storage cp
 if [[ "$OUTPUT" == gs://* ]]; then
     echo "Streaming merge directly to GCS: $OUTPUT"
-    process_stream | bgzip -@ "$THREADS" | gcloud storage cp - "$OUTPUT"
-    [[ $RESUME_FROM -gt 0 ]] && gcloud storage rm "${OUTPUT}.tmp"
+    if [[ $RESUME_FROM -gt 0 ]]; then
+        read_file "${OUTPUT}.tmp"
+        gcloud storage rm "${OUTPUT}.tmp"
+        process_stream | bgzip -@ "$THREADS"
+    else
+        process_stream | bgzip -@ "$THREADS"
+    fi | write_file "$OUTPUT"
 else
     echo "Writing merge to local file: $OUTPUT"
-    process_stream | bgzip -@ "$THREADS" > "$OUTPUT"
-    [[ $RESUME_FROM -gt 0 ]] && rm -f "${OUTPUT}.tmp"
+    if [[ $RESUME_FROM -gt 0 ]]; then
+        rm -f "${OUTPUT}"
+        process_stream | bgzip -@ "$THREADS" >> "${OUTPUT}.tmp"
+        mv "${OUTPUT}.tmp" "${OUTPUT}"
+    else
+        process_stream | bgzip -@ "$THREADS" | write_file "${OUTPUT}"
+    fi
 fi
 
 echo "Done! Output written to $OUTPUT"
