@@ -49,6 +49,8 @@ output_exists() {
 # Check if we're resuming from a partial file
 RESUME_FROM=0
 if output_exists; then
+    # Count the total number of lines in the file (including just #CHROM and variant lines)
+    # Also, copy all but the last line (which is likely truncated) to a temporary file
     total_lines=$({ { read_file "${OUTPUT}" | zcat; } 2>/dev/null || true; } | tee >(head -n -1 | bgzip -@ "$THREADS" | write_file "${OUTPUT}.tmp") | grep -v '^#' | wc -l)
 
     if [[ "$total_lines" -eq 0 ]]; then
@@ -74,7 +76,7 @@ fi
 # Skip first RESUME_FROM lines when resuming
 skip_lines() {
     if [[ $RESUME_FROM -gt 0 ]]; then
-        tail -n +$((RESUME_FROM + 1))
+        tail -n +$((RESUME_FROM + 2))
     else
         cat
     fi
@@ -155,6 +157,7 @@ process_stream() {
 if [[ "$OUTPUT" == gs://* ]]; then
     echo "Streaming merge directly to GCS: $OUTPUT"
     if [[ $RESUME_FROM -gt 0 ]]; then
+        # We can't append to an existing file in GCS
         read_file "${OUTPUT}.tmp"
         gcloud storage rm "${OUTPUT}.tmp"
         process_stream | bgzip -@ "$THREADS"
