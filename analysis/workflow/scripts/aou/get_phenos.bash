@@ -4,8 +4,6 @@
 # Allocate 4 CPUs, 3.6 GB memory, and a 120 GB disk (the cheapest possible configuration)
 # Execute this script from within the home directory
 
-export GCS_REQUESTER_PAYS_PROJECT="${GOOGLE_PROJECT}"
-export GCS_OAUTH_TOKEN="$(gcloud auth application-default print-access-token)"
 CDR_DIR="gs://fc-aou-datasets-controlled/v8"
 
 mkdir -p phenos
@@ -31,5 +29,5 @@ for pheno in platelet_count_new_phenocovar ldl_cholesterol_phenocovar; do
     ../happler/analysis/workflow/scripts/residuals.py -o $pheno.residuals.pheno -e <(cut -f-11 AOU_PCS.covar) $pheno.og.pheno $pheno.og.covar
     # Note that we passed both .covar files. If we wanted to merge the .covar files instead, we could do it like this:
     # join -j 1 -t $'\t' --header <(cat $pheno.og.covar | (sed-u 1q; sort -k1,1)) <(cat AOU_PCS.covar | cut -f-11 | (sed -u 1q; sort -k1,1)) > $pheno.merged.og.covar
-    gcloud storage cp $pheno.residuals.pheno ${WORKSPACE_BUCKET}/aryarm/data/aou/phenos/$pheno.resid.pheno
+    gcloud storage cp $pheno.residuals.pheno ${WORKSPACE_BUCKET}/aryarm/data/aou/phenos/$(echo $pheno | sed 's/_new_/_/').resid.pheno
 done
