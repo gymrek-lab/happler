@@ -167,9 +167,8 @@ if [[ "$OUTPUT" == gs://* ]]; then
 else
     echo "Writing merge to local file: $OUTPUT"
     if [[ $RESUME_FROM -gt 0 ]]; then
-        rm -f "${OUTPUT}"
-        process_stream | bgzip -@ "$THREADS" >> "${OUTPUT}.tmp"
         mv "${OUTPUT}.tmp" "${OUTPUT}"
+        process_stream | bgzip -@ "$THREADS" >> "${OUTPUT}"
     else
         process_stream | bgzip -@ "$THREADS" | write_file "${OUTPUT}"
     fi
