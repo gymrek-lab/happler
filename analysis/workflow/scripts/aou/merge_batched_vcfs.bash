@@ -8,6 +8,8 @@
 # interrupted file can be faster if the output was close to finishing. Otherwise, it's
 # probably best to just restart from scratch.
 
+# To test and benchmark this script, you can download the first few variants of all batches in chr22 and try to merge them with this script vs bcftools. Then, convert them to PGEN and compare them with plink2 --pgen-diff to make sure they are the same.
+
 set -euo pipefail
 
 OUTPUT="$1" # .vcf.gz (can be local path or gs://bucket/path/merged.vcf.gz)
