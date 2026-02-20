@@ -54,12 +54,21 @@ if output_exists; then
     echo "Found existing output file. Assuming previously interrupted. Resuming..."
     export GCS_OAUTH_TOKEN="$(gcloud auth application-default print-access-token)"
 
+    # check that we have a version of tabix that supports cloud streaming
+    if [[ "$INPUT_DIR" == gs://* ]]; then
+        test_file=$(gcloud storage ls "$INPUT_DIR/*.vcf.gz" | head -n1)
+        if ! command -v tabix &>/dev/null || ! tabix -H "$test_file" &>/dev/null; then
+            echo "Install a version of tabix with GCS support"
+            exit 1
+        fi
+    fi
+
     # Extract the genomic position of the last complete variant line
     # Also, copy all but the last line (which is likely truncated) to a temporary file
     last_variant="$({ { read_file "${OUTPUT}" | zcat; } 2>/dev/null || true; } | tee >(head -n -1 | bgzip -@ "$THREADS" | write_file "${OUTPUT}.tmp") | tail -n 1)"
 
     if [[ -z "$last_variant" && "$last_variant" != "#"* ]]; then
-        echo "Found existing output but file appears empty. Delete it first."
+        echo "Existing output file appears empty. Delete it first."
         rm -f "${OUTPUT}.tmp"
         exit 1
     fi
