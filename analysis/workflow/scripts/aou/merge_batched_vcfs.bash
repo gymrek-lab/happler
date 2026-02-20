@@ -4,11 +4,17 @@
 # It's important to verify that variants are _exactly_ the same across all VCFs:
 # for f in *.vcf.gz; do zcat "$f" | grep -v '^#' | cut -f1-7 | md5sum; done | sort | uniq -c
 
-# Note that the script can resume where it left off if it gets interrupted.
+# Note that the script can use tabix to resume where it left off if it gets interrupted
 
-# To test and benchmark this script, you can download the first few variants of all batches in chr22 and try to merge them with this script vs bcftools.
-# Then, convert them to PGEN and compare them with plink2 --pgen-diff to make sure they are the same.
-# TODO: the code for that
+# To test and benchmark this script, you can download the first few variants of all batches in chr12 and try to merge them with this script vs bcftools.
+# Then, convert them to PGEN and compare them with plink2 --pgen-diff to make sure they are the same:
+# gcloud storage cp -r "$V7_BUCKET"/chr12 . && mkdir -p test && \
+# for i in chr12/*.vcf.gz; do zcat $i | head -n20 | bgzip > test/$(basename $i) && tabix -p vcf test/$(basename $i); done && \
+# time bash -c 'bcftools merge -O z -o chr12.bcftools.vcf.gz -l <(ls test/*.vcf.gz)' > bcftools.txt && \
+# time bash -c 'merge_batched_vcfs.bash chr12.paste.vcf.gz test' > paste.txt && \
+# for i in bcftools paste; do plink2 --vcf chr12.$i.vcf.gz --out chr12.$i; done && \
+# plink2 --pfile chr12.paste --pgen-diff chr12.bcftools --out pgen-diff && \
+# rm chr12.bcftools.* chr12.paste.*
 
 set -euo pipefail
 
@@ -67,13 +73,14 @@ if output_exists; then
     # Also, copy all but the last line (which is likely truncated) to a temporary file
     last_variant="$({ { read_file "${OUTPUT}" | zcat; } 2>/dev/null || true; } | tee >(head -n -1 | bgzip -@ "$THREADS" | write_file "${OUTPUT}.tmp") | tail -n 1)"
 
-    if [[ -z "$last_variant" && "$last_variant" != "#"* ]]; then
+    if [[ -z "$last_variant" || "$last_variant" != "#"* ]]; then
         echo "Existing output file appears empty. Delete it first."
         rm -f "${OUTPUT}.tmp"
         exit 1
     fi
 
-    RESUME_REGION="$(echo "$last_variant" | cut -f1):$(echo "$last_variant" | cut -f2)"
+    # returns chrom:pos for the last variant
+    RESUME_REGION="$(echo "$last_variant" | cut -f1,2 | tr $'\t' ':')"
 fi
 
 if [[ -n "$FILTER_IDS" ]]; then
