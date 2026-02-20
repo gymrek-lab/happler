@@ -4,11 +4,11 @@
 # It's important to verify that variants are _exactly_ the same across all VCFs:
 # for f in *.vcf.gz; do zcat "$f" | grep -v '^#' | cut -f1-7 | md5sum; done | sort | uniq -c
 
-# Note that the script can resume where it left off if it gets interrupted. Resuming an
-# interrupted file can be faster if the output was close to finishing. Otherwise, it's
-# probably best to just restart from scratch.
+# Note that the script can resume where it left off if it gets interrupted.
 
-# To test and benchmark this script, you can download the first few variants of all batches in chr22 and try to merge them with this script vs bcftools. Then, convert them to PGEN and compare them with plink2 --pgen-diff to make sure they are the same.
+# To test and benchmark this script, you can download the first few variants of all batches in chr22 and try to merge them with this script vs bcftools.
+# Then, convert them to PGEN and compare them with plink2 --pgen-diff to make sure they are the same.
+# TODO: the code for that
 
 set -euo pipefail
 
@@ -49,20 +49,22 @@ output_exists() {
 }
 
 # Check if we're resuming from a partial file
-RESUME_FROM=0
+RESUME_REGION=""
 if output_exists; then
-    # Count the total number of lines in the file (including just #CHROM and variant lines)
-    # Also, copy all but the last line (which is likely truncated) to a temporary file
-    total_lines=$({ { read_file "${OUTPUT}" | zcat; } 2>/dev/null || true; } | tee >(head -n -1 | bgzip -@ "$THREADS" | write_file "${OUTPUT}.tmp") | grep -v '^#' | wc -l)
+    echo "Found existing output file. Assuming previously interrupted. Resuming..."
+    export GCS_OAUTH_TOKEN="$(gcloud auth application-default print-access-token)"
 
-    if [[ "$total_lines" -eq 0 ]]; then
+    # Extract the genomic position of the last complete variant line
+    # Also, copy all but the last line (which is likely truncated) to a temporary file
+    last_variant="$({ { read_file "${OUTPUT}" | zcat; } 2>/dev/null || true; } | tee >(head -n -1 | bgzip -@ "$THREADS" | write_file "${OUTPUT}.tmp") | tail -n 1)"
+
+    if [[ -z "$last_variant" && "$last_variant" != "#"* ]]; then
         echo "Found existing output but file appears empty. Delete it first."
         rm -f "${OUTPUT}.tmp"
         exit 1
     fi
 
-    RESUME_FROM=$((total_lines - 1))
-    echo "Found existing output file. Resuming from line $total_lines"
+    RESUME_REGION="$(echo "$last_variant" | cut -f1):$(echo "$last_variant" | cut -f2)"
 fi
 
 if [[ -n "$FILTER_IDS" ]]; then
@@ -74,15 +76,6 @@ else
         cat
     }
 fi
-
-# Skip first RESUME_FROM lines when resuming
-skip_lines() {
-    if [[ $RESUME_FROM -gt 0 ]]; then
-        tail -n +$((RESUME_FROM + 2))
-    else
-        cat
-    fi
-}
 
 # 1. Collect files using a "version sort" so part2 comes before part10
 if [[ "$INPUT_DIR" == gs://* ]]; then
@@ -101,7 +94,7 @@ echo "Found $num_files files. First file is: ${files[0]}"
 # Use a subshell (...) to group header output and body output into one stream for bgzip
 process_stream() {
     # Only output header if we're not resuming an interrupted file
-    if [[ $RESUME_FROM -eq 0 ]]; then
+    if [[ -z "$RESUME_REGION" ]]; then
         # we turn off pipefail briefly so zcat doesn't kill the script when awk exits early
         set +o pipefail
 
@@ -126,27 +119,28 @@ process_stream() {
     for ((i=0; i<num_files; i++)); do
         f="${files[$i]}"
 
-        # Build the command string.
-        # Note: We must use the specific 'gcloud storage cat' or 'cat' command inside the process substitution.
-        if [[ "$f" == gs://* ]]; then
-            # GCS Input
-            CAT_CMD="gcloud storage cat \"$f\""
-        else
-            # Local Input
-            CAT_CMD="cat \"$f\""
-        fi
-
         if [ $i -eq 0 ]; then
             # FILE 1: Columns 1-9 + Samples
             # - $8="."        -> Zap INFO column
             # - sub(/:.*/...) -> Strip everything after ":" in FORMAT (col 9) and Samples (col 10+) to keep only GT
-            # - NR==1         : If it's the #CHROM line, print it and move on
-            cmd+=" <($CAT_CMD | zcat | grep -v '^##' | filter_ids | awk 'BEGIN{OFS=\"\t\"} NR==1{print; next} {\$8=\".\"; for(i=9;i<=NF;i++) sub(/:.*/, \"\", \$i); print}' | skip_lines)"
+            # - NR==1         : If it's the #CHROM line, print it and move on (only when not resuming)
+            if [[ -z "$RESUME_REGION" ]]; then
+                cmd+=" <(read_file \"$f\" | zcat | grep -v '^##' | filter_ids | awk 'BEGIN{OFS=\"\t\"} NR==1{print; next} {\$8=\".\"; for(i=9;i<=NF;i++) sub(/:.*/, \"\", \$i); print}')"
+            else
+                # If resuming an interrupted file, use tabix to skip lines. Also, no need to process the header anymore.
+                cmd+=" <(tabix \"$f\" \"${RESUME_REGION}-\" | filter_ids | awk 'BEGIN{OFS=\"\t\"} {\$8=\".\"; for(i=9;i<=NF;i++) sub(/:.*/, \"\", \$i); print}')"
+            fi
         else
             # FILES 2-N: Samples Only
             # - cut -f10-     -> Grab sample columns
             # - sed           -> Delete everything after the first colon ":..." until the next tab or end of line to keep only GT
-            cmd+=" <($CAT_CMD | zcat | grep -v '^##' | filter_ids | cut -f10- | sed '2,\$s/:[^\\t]*//g' | skip_lines)"
+            # - sed 2,        -> Skip processing of the first line (#CHROM)
+            if [[ -z "$RESUME_REGION" ]]; then
+                cmd+=" <(read_file \"$f\" | zcat | grep -v '^##' | filter_ids | cut -f10- | sed '2,\$s/:[^\\t]*//g')"
+            else
+                # If resuming an interrupted file, use tabix to skip lines. Also, no need to process the header anymore.
+                cmd+=" <(tabix \"$f\" \"${RESUME_REGION}-\" | filter_ids | cut -f10- | sed 's/:[^\\t]*//g')"
+            fi
         fi
     done
 
@@ -158,7 +152,7 @@ process_stream() {
 # If OUTPUT is gs://, pipe bgzip output directly to gcloud storage cp
 if [[ "$OUTPUT" == gs://* ]]; then
     echo "Streaming merge directly to GCS: $OUTPUT"
-    if [[ $RESUME_FROM -gt 0 ]]; then
+    if [[ -n "$RESUME_REGION" ]]; then
         # We can't append to an existing file in GCS
         read_file "${OUTPUT}.tmp"
         gcloud storage rm "${OUTPUT}.tmp"
@@ -168,7 +162,7 @@ if [[ "$OUTPUT" == gs://* ]]; then
     fi | write_file "$OUTPUT"
 else
     echo "Writing merge to local file: $OUTPUT"
-    if [[ $RESUME_FROM -gt 0 ]]; then
+    if [[ -n "$RESUME_REGION" ]]; then
         mv "${OUTPUT}.tmp" "${OUTPUT}"
         process_stream | bgzip -@ "$THREADS" >> "${OUTPUT}"
     else
