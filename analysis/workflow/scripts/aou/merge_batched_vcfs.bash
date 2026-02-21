@@ -10,11 +10,11 @@
 # Then, convert them to PGEN and compare them with plink2 --pgen-diff to make sure they are the same:
 # gcloud storage cp -r "$V7_BUCKET"/chr12 . && mkdir -p test && \
 # for i in chr12/*.vcf.gz; do zcat $i | head -n20 | bgzip > test/$(basename $i) && tabix -p vcf test/$(basename $i); done && \
-# time bash -c 'bcftools merge -O z -o chr12.bcftools.vcf.gz -l <(ls test/*.vcf.gz)' > bcftools.txt && \
-# time bash -c 'merge_batched_vcfs.bash chr12.paste.vcf.gz test' > paste.txt && \
+# ~/miniforge3/envs/default/bin/time -v -o bcftools.txt bash -c 'bcftools merge -O z -o chr12.bcftools.vcf.gz -l <(ls test/*.vcf.gz)' && \
+# ~/miniforge3/envs/default/bin/time -v -o paste.txt bash -c '~/happler/analysis/workflow/scripts/aou/merge_batched_vcfs.bash chr12.paste.vcf.gz test' && \
 # for i in bcftools paste; do plink2 --vcf chr12.$i.vcf.gz --out chr12.$i; done && \
 # plink2 --pfile chr12.paste --pgen-diff chr12.bcftools --out pgen-diff && \
-# rm chr12.bcftools.* chr12.paste.*
+# rm -f chr12.bcftools.* chr12.paste.* && diff -y *.txt | less
 
 set -euo pipefail
 
@@ -73,7 +73,7 @@ if output_exists; then
     # Also, copy all but the last line (which is likely truncated) to a temporary file
     last_variant="$({ { read_file "${OUTPUT}" | zcat; } 2>/dev/null || true; } | tee >(head -n -1 | bgzip -@ "$THREADS" | write_file "${OUTPUT}.tmp") | tail -n 1)"
 
-    if [[ -z "$last_variant" || "$last_variant" != "#"* ]]; then
+    if [[ -z "$last_variant" || "$last_variant" == "#"* ]]; then
         echo "Existing output file appears empty. Delete it first."
         rm -f "${OUTPUT}.tmp"
         exit 1
