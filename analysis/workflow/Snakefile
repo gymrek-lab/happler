@@ -210,8 +210,7 @@ if mode != "run":
         config: plots_config
     use rule * from plots as plots_*
 
-handle_gcs_storage_single = lambda i: storage(i) if i[0].startswith("gs://") else i
-handle_gcs_storage = lambda i: [handle_gcs_storage_single(j) for j in i] if isinstance(i, (tuple, list)) else handle_gcs_storage_single(i)
+handle_gcs_storage = lambda i: storage(i) if i[0].startswith("gs://") else i
 
 if mode == "ld_range":
     FINAL_OUTPUT = [rules.plots_params.output.png, rules.plots_metrics.output.png]
