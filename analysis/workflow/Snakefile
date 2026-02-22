@@ -223,7 +223,7 @@ elif mode == "run":
                 zip, trait=locus_traits, locus=locus, allow_missing=True,
             )),
         params:
-            out = lambda wildcards, output: output.replace("/multiline.tsv", ""),
+            out = lambda wildcards, output: str(output).replace("/multiline.tsv", ""),
             hp_path = Path(str(rules.happler_run.output.hap).format(locus="*", trait="*")),
         output:
             hps = orig_out + "/multiline.tsv",
