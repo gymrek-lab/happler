@@ -210,7 +210,8 @@ if mode != "run":
         config: plots_config
     use rule * from plots as plots_*
 
-handle_gcs_storage = lambda i: storage(i) if i[0].startswith("gs://") else i
+handle_gcs_storage_single = lambda i: storage(i) if i[0].startswith("gs://") else i
+handle_gcs_storage = lambda i: [handle_gcs_storage_single(j) for j in i] if isinstance(i, (tuple, list)) else handle_gcs_storage_single(i)
 
 if mode == "ld_range":
     FINAL_OUTPUT = [rules.plots_params.output.png, rules.plots_metrics.output.png]
@@ -259,7 +260,8 @@ elif mode == "run":
                 # if there weren't any non-empty hap files, just return an empty list
                 return []
             multiline_locus, multiline_traits = zip(*(f[:-1].split("\t") for f in hap_files))
-        return expand(
+        files = [ f.replace(".snakemake/storage/gcs", "gs:/") for f in files ]
+        return handle_gcs_storage(expand(
             expand(
                 files, zip, trait=multiline_traits, locus=multiline_locus,
                 allow_missing=True,
