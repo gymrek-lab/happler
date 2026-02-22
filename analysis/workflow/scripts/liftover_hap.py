@@ -49,8 +49,8 @@ def main(
                     line_parts = line.split("\t")
                     if first_char == "H":
                         chrom = line_parts[1]
-                    line_parts[2] = str(converter[chrom][int(line_parts[2]) - 1][0][1])
-                    line_parts[3] = str(converter[chrom][int(line_parts[3]) - 1][0][1])
+                    line_parts[2] = str(converter[chrom][int(line_parts[2])][0][1])
+                    line_parts[3] = str(converter[chrom][int(line_parts[3])][0][1])
                     if update_varids and (first_char == "V" or first_char == "R"):
                         line_parts[4] = f"{chrom}:{line_parts[2]}"
                     line = "\t".join(line_parts)
