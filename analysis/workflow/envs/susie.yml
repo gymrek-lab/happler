@@ -7,7 +7,7 @@ dependencies:
     - conda-forge::r-r.utils==2.13.0
     - conda-forge::r-dplyr==1.2.0
     - conda-forge::r-readr==2.2.0
-    - aryarm::r-dscrutils==0.4.3
+    - aryarm::r-dscrutils==0.4.3.5
     - conda-forge::r-pgenlibr==0.5.4
     - conda-forge::r-irkernel==1.3.2
     - conda-forge::sos-notebook==0.24.4
