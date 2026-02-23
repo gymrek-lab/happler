@@ -16,6 +16,9 @@
 # plink2 --pfile chr12.paste --pgen-diff chr12.bcftools --out pgen-diff && \
 # rm -f chr12.bcftools.* chr12.paste.* && diff -y *.txt | less
 
+# If you want to use this script to merge batched VCFs on AoU v7, you should use 2 CPUs, 7.5 GB of RAM, and a 500 GB SSD:
+# for i in {22..1}; do { test -d chr${i} || gcloud storage cp -r "$V7_BUCKET"/chr${i} .; } && ~/happler/analysis/workflow/scripts/aou/merge_batched_vcfs.bash chr${i}.vcf.gz chr$i && rm -r chr${i} && plink2 --vcf chr${i}.vcf.gz --out chr${i} && rm chr${i}.vcf.gz; ( gcloud storage cp chr${i}.log chr${i}.p{gen,var,sam} "$V7_BUCKET"/merged/ && rm chr${i}.log chr${i}.p* && slack chr${i}; ) & done; slack finally
+
 set -euo pipefail
 
 OUTPUT="$1" # .vcf.gz (can be local path or gs://bucket/path/merged.vcf.gz)
