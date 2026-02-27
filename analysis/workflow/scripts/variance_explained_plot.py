@@ -121,9 +121,12 @@ def get_explained_variances(
     
     Returns
     -------
-    dict[str, tuple[float, float]]
-        Explained variances of 1) each haplotype in the .hap file and 2) the
-        haplotype's SNPs. The dict is keyed by each haplotype's ID
+    dict[str, tuple[float, float, float, float]]
+        The dict is keyed by each haplotype's ID and has the following values:
+        1. explained variance for the haplotype
+        2. R-squared for the haplotype
+        3. explained variance for the haplotype's SNPs
+        4. R-squared for the haplotype's SNPs
     """
     # load the phenotypes
     pts = Phenotypes(pts, log=log)
@@ -246,11 +249,8 @@ def main(
             log.warning("All files were removed after subsetting")
 
     # compute explained variance for each haplotype and its SNPs
-    # this 2D array should have two*2 columns: 1) the haplotype and 2) its SNPs
-    # and should have as many rows as there are haplotypes among all of the loci
-    # (note that some loci may have multiple haplotypes)
-    vals = np.array([
-        hap
+    vals = [
+        (params[idx], hap)
         for idx in range(len(params))
         for hap in get_explained_variances(
             get_hap_fname(genotypes, params[idx]),
@@ -258,7 +258,11 @@ def main(
             get_hap_fname(phenotypes, params[idx]),
             log=log
         ).values()
-    ])
+    ]
+    # this 2D array should have two * 2 columns: 1) the haplotype and 2) its SNPs
+    # and should have as many rows as there are haplotypes among all of the loci
+    # (note that some loci may have multiple haplotypes so we adjust 'params' accordingly)
+    params, vals = np.array([v[0] for v in vals]), np.array([v[1] for v in vals])
     explained_variances = vals[:, (0, 2)]
     rsquareds = vals[:, (1, 3)]
 
