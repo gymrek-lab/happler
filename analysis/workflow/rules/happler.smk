@@ -91,10 +91,10 @@ rule run:
         dot=out + "/happler.dot",
     resources:
         # runtime=lambda wildcards, input: (
-        #     rsrc_func(input.gts)(15, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
+        #     rsrc_func(input.pgen)(15, Path(input.pvar).stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
         # ),
         # mem_mb=lambda wildcards, input: (
-        #     rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
+        #     rsrc_func(input.pgen)(4000, Path(input.pvar).stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
         # ),
         runtime=250,
         mem_mb=70000,
@@ -111,7 +111,7 @@ rule run:
         "--discard-multiallelic --region {params.region} {params.keep_SNPs}"
         "{params.covar}--indep-thresh {params.indep} -t {params.thresh} "
         "{params.chunk_size} --out-thresh {params.out_thresh} --show-tree "
-        "{input.gts} {input.pts} &>{log} && "
+        "{input.pgen} {input.pts} &>{log} && "
         "haptools index -o {output.gz} {output.hap} &>>{log}"
 
 
