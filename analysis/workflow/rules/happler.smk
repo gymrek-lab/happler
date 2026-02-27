@@ -106,7 +106,7 @@ rule run:
     conda:
         "happler"
     shell:
-        "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
+        "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} --hap-maf {params.maf} "
         "--max-signals {params.max_signals} --max-iterations {params.max_iterations} "
         "--discard-multiallelic --region {params.region} {params.keep_SNPs}"
         "{params.covar}--indep-thresh {params.indep} -t {params.thresh} "

@@ -94,6 +94,13 @@ def main():
     "--maf",
     type=float,
     default=None,
+    show_default="all variants",
+    help="Only use variants with an MAF above this threshold",
+)
+@click.option(
+    "--hap-maf",
+    type=float,
+    default=None,
     show_default="all haplotypes",
     help="Only build haplotypes with an MAF above this threshold",
 )
@@ -192,6 +199,7 @@ def run(
     discard_missing: bool = False,
     chunk_size: int = None,
     maf: float = None,
+    hap_maf: float = None,
     phased: bool = False,
     max_signals: int = 1,
     max_iterations: int = 1,
@@ -295,7 +303,7 @@ def run(
     hap_tree = tree.TreeBuilder(
         gt,
         ph,
-        maf=maf,
+        maf=hap_maf,
         method=test_method,
         terminator=terminator,
         indep_thresh=indep_thresh,
