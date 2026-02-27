@@ -12,7 +12,7 @@ geuvadis="$2"
 
 # first, create the multiline.txt file, which lists all .hap files with substantial haplotypes
 while read hap; do ls "out/$(echo "$hap" | cut -f1)/happler/run/$(echo "$hap" | cut -f2)/happler.hap"; done < $out/multiline.tsv > $out/multiline.txt
-multiline_files = "$(cat "$out"/multiline.txt | ( [ "$out" == "out" ] && cat || sed 's+out/+'"$out"'/+'))"
+multiline_files="$(cat "$out"/multiline.txt | ( [ "$out" == "out" ] && cat || sed 's+out/+'"$out"'/+'))"
 
 # let's report a few statistics
 num_tot_regions="$(ls -d $out/*_*-* | wc -l)"
