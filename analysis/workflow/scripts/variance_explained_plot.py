@@ -135,6 +135,8 @@ def get_explained_variances(
     # load the haplotypes
     hps = Haplotypes(hps, log=log)
     hps.read()
+    if not len(hps.data):
+        return dict()
 
     # which variants do we need?
     variants = {v.id for hap in hps.data.values() for v in hap.variants}
@@ -154,6 +156,10 @@ def get_explained_variances(
     gts.check_missing()
     gts.check_biallelic()
     gts.index()
+    # check that the hps IDs are in there too
+    if not all(h in gts.variants["id"] for h in hps.data.keys()):
+        gts = GenotypesPLINK.merge_variants((gts, hps.transform(gts)), fname=gts.fname)
+    assert len(gts.variants) == len(variants)
     pts.subset(samples=gts.samples, inplace=True)
 
     # compute explained variance for each SNP and haplotype
@@ -314,8 +320,12 @@ def main(
     with open(output.with_suffix(".tsv"), 'w', newline='') as tsvfile:
         tsv_writer = csv.writer(tsvfile, delimiter='\t')
         tsv_writer.writerow(["locus", "hap_exp_var", "alleles_exp_var", "hap_r2", "alleles_r2", "hap_over_alleles_r2"])
+        if ("locus" in params.dtype.names) and ("gene" in params.dtype.names):
+            name = lambda i: i["locus"]+":"+i["gene"]
+        else:
+            name = lambda i: ":".join(i)
         for i in range(explained_variances.shape[0]):
-            tsv_writer.writerow([params[i]["locus"]+":"+params[i]["gene"], explained_variances[i, 0], explained_variances[i, 1], rsquareds[i, 0], rsquareds[i, 1], rsquareds[i,0]/rsquareds[i,1]])
+            tsv_writer.writerow([name(params[i]), explained_variances[i, 0], explained_variances[i, 1], rsquareds[i, 0], rsquareds[i, 1], rsquareds[i,0]/rsquareds[i,1]])
 
     ax1.scatter(explained_variances[:, 0], explained_variances[:, 0]/explained_variances[:, 1])
     ax1.axline([0, 1], [max_ev_val, 1])
