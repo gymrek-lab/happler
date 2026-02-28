@@ -254,13 +254,6 @@ def flatten_list_of_strings_and_tuples(mixed_list: list):
     help="Only select SNPs with a MAF above this threshold",
 )
 @click.option(
-    "--chunk-size",
-    type=int,
-    default=None,
-    show_default="no chunking",
-    help="How many variants should be loaded at once?",
-)
-@click.option(
     "--show-original",
     is_flag=True,
     default=False,
@@ -311,7 +304,6 @@ def main(
     hap_id: str = None,
     region: str = None,
     maf: float = None,
-    chunk_size: int = None,
     show_original: bool = False,
     chunk_size: int = None,
     log_file: Path = None,
