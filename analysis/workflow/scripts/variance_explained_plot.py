@@ -318,7 +318,7 @@ def main(
         pickle.dump((params, explained_variances, rsquareds), picklef)
 
     with open(output.with_suffix(".tsv"), 'w', newline='') as tsvfile:
-        tsv_writer = csv.writer(tsvfile, delimiter='\t')
+        tsv_writer = csv.writer(tsvfile, delimiter='\t', lineterminator='\n')
         tsv_writer.writerow(["locus", "hap_exp_var", "alleles_exp_var", "hap_r2", "alleles_r2", "hap_over_alleles_r2"])
         if ("locus" in params.dtype.names) and ("gene" in params.dtype.names):
             name = lambda i: i["locus"]+":"+i["gene"]

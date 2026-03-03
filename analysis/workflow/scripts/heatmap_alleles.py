@@ -261,8 +261,10 @@ def main(
 
     # also append the phenotypes
     pts = np.repeat(pts.data[:, 0], 2)[samp_indices]
-    # standardize so that the max value is 1
-    pts = (pts-pts.min())/(pts.max()-pts.min())
+    # quantile normalize
+    lo, hi = np.quantile(pts, [0.01, 0.99])
+    pts = np.clip(pts, lo, hi)
+    pts = (pts - lo) / (hi - lo)
     hpmt = np.append(hpmt, pts[:, np.newaxis], axis=1)
 
     fig = plt.figure()
