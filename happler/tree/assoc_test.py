@@ -5,11 +5,6 @@ from abc import ABC, abstractmethod
 from decimal import Decimal, getcontext
 
 import numpy as np
-import jax
-
-# Enable 64-bit precision for JAX to match NumPy's behavior
-jax.config.update("jax_enable_x64", True)
-import jax.numpy as jnp
 from scipy import stats
 import numpy.typing as npt
 import statsmodels.api as sm
@@ -382,53 +377,6 @@ class AssocTestSimpleSM(AssocTestSimple):
             return param, pval, stderr
 
 
-@jax.jit
-def _compute_bic_jit(X: jnp.ndarray, yc: jnp.ndarray) -> jnp.ndarray:
-    """
-    JIT-compiled helper function to compute BIC for vectorized OLS.
-
-    This function is decorated with @jax.jit for performance optimization.
-    It contains pure JAX operations and can be compiled for GPU/TPU execution.
-
-    Parameters
-    ----------
-    X : jnp.ndarray
-        The genotypes with shape (n, p)
-    yc : jnp.ndarray
-        The phenotypes (centered), with shape (n, 1) or (n,)
-
-    Returns
-    -------
-    jnp.ndarray
-        The BIC values for testing this chunk of haplotypes, with shape (p,)
-    """
-    n = X.shape[0]
-    nobs2 = n / 2.0
-    log2pi = jnp.log(2 * jnp.pi)
-
-    # Center X
-    xc = X - jnp.mean(X, axis=0)  # (n, p)
-
-    # Vectorized simple OLS with intercept
-    sxx = jnp.sum(xc**2, axis=0)  # (p,)
-    sxy = jnp.sum(xc * yc, axis=0)  # (p,)
-
-    # Use jnp.where for JAX compatibility
-    b1 = jnp.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
-
-    # Residuals for each column's model: r = (y - ym) - b1 * (X - xm)
-    syy = jnp.sum(yc**2)  # scalar
-    ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
-
-    # statsmodels-style profile log-likelihood per column
-    # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
-    ll = -nobs2 * (log2pi + jnp.log(ssr / n) + 1.0)  # (p,)
-
-    # Number of parameters k: intercept + slope = 2
-    bic = -2 * ll + 2 * jnp.log(n)  # (p,)
-    return bic
-
-
 class AssocTestSimpleFastBIC(AssocTestSimpleSM):
     """
     Calculate only BIC in a quick, vectorized fashion without statsmodels
@@ -447,27 +395,44 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         """
         Perform the test for a chunk of haplotypes
 
-        This method wraps the JIT-compiled helper function _compute_bic_jit
-        and handles conversion to NumPy arrays for compatibility with the rest
-        of the codebase.
-
         Parameters
         ----------
-        X : npt.NDArray[np.float64]
-            The genotypes with shape (n, p)
+        X : npt.NDArray[np.uint8]
+            The genotypes with shape n x p
         yc : npt.NDArray[np.float64]
-            The phenotypes, with shape (n, 1) or (n,)
+            The phenotypes, with shape n x 1
             They are assumed to be centered already
 
         Returns
         -------
         npt.NDArray[np.float64]
-            The BIC values from testing this chunk of haplotypes, with shape (p,)
+            The resulting from testing this chunk of haplotypes, with shape p x 1
         """
-        # Call the JIT-compiled helper function
-        bic = _compute_bic_jit(X, yc)
-        # Convert JAX array to NumPy for compatibility
-        return np.asarray(bic)
+        n = X.shape[0]
+        nobs2 = n / 2.0
+        log2pi = np.log(2 * np.pi)
+
+        # Center X and y
+        xc = X - X.mean(axis=0)  # (n, p)
+
+        # Vectorized simple OLS with intercept
+        sxx = np.sum(xc**2, axis=0)  # (p,)
+        sxy = np.sum(xc * yc, axis=0)  # (p,)
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            b1 = np.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
+
+        # Residuals for each column's model: r = (y - ym) - b1 * (X - xm)
+        syy = float(np.sum(yc**2))  # scalar
+        ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
+
+        # statsmodels-style profile log-likelihood per column
+        # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
+        with np.errstate(divide="ignore"):
+            ll = -nobs2 * (log2pi + np.log(ssr / n) + 1.0)  # (p,)
+
+        # Number of parameters k: intercept + slope = 2
+        return -2 * ll + 2 * np.log(n)  # (p,)
 
     def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
