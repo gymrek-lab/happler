@@ -393,14 +393,14 @@ def _compute_bic_jit(X: jnp.ndarray, yc: jnp.ndarray) -> jnp.ndarray:
     Parameters
     ----------
     X : jnp.ndarray
-        The genotypes with shape n x p
+        The genotypes with shape (n, p)
     yc : jnp.ndarray
-        The phenotypes (centered), with shape n x 1
+        The phenotypes (centered), with shape (n, 1) or (n,)
 
     Returns
     -------
     jnp.ndarray
-        The BIC values for testing this chunk of haplotypes, with shape p x 1
+        The BIC values for testing this chunk of haplotypes, with shape (p,)
     """
     n = X.shape[0]
     nobs2 = n / 2.0
@@ -453,16 +453,16 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
 
         Parameters
         ----------
-        X : npt.NDArray[np.uint8]
-            The genotypes with shape n x p
+        X : npt.NDArray[np.float64]
+            The genotypes with shape (n, p)
         yc : npt.NDArray[np.float64]
-            The phenotypes, with shape n x 1
+            The phenotypes, with shape (n, 1) or (n,)
             They are assumed to be centered already
 
         Returns
         -------
         npt.NDArray[np.float64]
-            The resulting from testing this chunk of haplotypes, with shape p x 1
+            The BIC values from testing this chunk of haplotypes, with shape (p,)
         """
         # Call the JIT-compiled helper function
         bic = _compute_bic_jit(X, yc)
