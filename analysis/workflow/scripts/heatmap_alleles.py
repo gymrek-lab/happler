@@ -283,7 +283,7 @@ def main(
     # now, tidy up and save
     fig.tight_layout()
     fig.subplots_adjust(wspace=0, hspace=0)
-    fig.savefig(output)
+    fig.savefig(output, dpi=500)
 
 
 if __name__ == "__main__":
