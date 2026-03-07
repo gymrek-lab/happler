@@ -9,6 +9,13 @@ from scipy import stats
 import numpy.typing as npt
 import statsmodels.api as sm
 
+# Import JAX for JIT compilation
+import jax
+import jax.numpy as jnp
+
+# Configure JAX for 64-bit precision to match NumPy behavior
+jax.config.update("jax_enable_x64", True)
+
 
 # We declare this class to be a dataclass to automatically define __init__ and a few
 # other methods. We use frozen=True to make it immutable.
