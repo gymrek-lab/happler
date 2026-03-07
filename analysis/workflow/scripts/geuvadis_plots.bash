@@ -3,7 +3,7 @@
 # arg1: The path to the "out" folder
 
 out="$1"
-geuvadis="$2"
+mode="$2" (ex: geuvadis, ukb, aou)
 
 
 
@@ -24,12 +24,14 @@ echo "Of those $num_regions, here is a breakdown of the number of alleles in eac
 avg_num_alleles="$(for i in $multiline_files; do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | tee >(sort | uniq -c 1>&2) | awk '{ total += $1 } END { print total/NR }')"
 echo "Of those $num_regions, the average number of alleles in each haplotype is $avg_num_alleles."
 
-if [ -n "$geuvadis" ]; then
+if [ "$mode" == "geuvadis" ]; then
   # now, let's make the variance_explained.png plot
   workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/geuvadis/phenos/{gene}.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
-else
+elif [ "$mode" == "ukb" ]; then
   # now, let's make the variance_explained.png plot
   workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/ukb/phenos/{gene}.resid.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
+elif [ "$mode" == "aou" ]; then
+  workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/aou/phenos/{gene}.resid.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
 fi
 echo "Created $out/variance_explained.png"
 
@@ -108,7 +110,7 @@ EOF
 ) | python
 echo "Created $out/mafs.png"
 
-if [ -n "$geuvadis" ]; then
+if [ "$mode" == "geuvadis" ]; then
   # create SV LD plot
   # first, copy all of the results over
   mkdir -p sv_ld/H0
@@ -219,7 +221,7 @@ EOF
 fi
 
 # let's make a plot to show runtime and memory usage
-if [ ! -n "$geuvadis" ]; then
+if [ "$mode" != "geuvadis" ]; then
 (
   echo "a=["$(for i in */happler/run/*/bench/run; do echo "$(wc -l "$(echo "$i" | sed 's+happler/.*$+genotypes/snps.pvar+')" | cut -f1 -d' ')","$(cut -f1,3 --output-delimiter , "$i" | tail -n1)"; done | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
   cat <<'EOF'
