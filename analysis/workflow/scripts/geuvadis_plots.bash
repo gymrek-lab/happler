@@ -12,7 +12,7 @@
 # out/{locus}/happler/run/{gene}/include/merged.pgen or the original SNP panels at out/{locus}/genotypes/snps.pgen
 
 out="$1"
-mode="$2" (ex: geuvadis, ukb, aou)
+mode="$2"
 
 
 
