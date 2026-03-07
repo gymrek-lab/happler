@@ -9,7 +9,7 @@
 # out/{locus}/happler/run/{gene}/happler.p{gen,var,sam}
 # out/{locus}/happler/run/{gene}/include/susie_pips.tsv
 # out/{locus}/happler/run/{gene}/exclude/susie_pips.tsv
-# out/{locus}/happler/run/{gene}/include/merged.pgen or the original SNP panels at out/{locus}/genotypes/snps.pgen
+# out/{locus}/happler/run/{gene}/include/merged.pgen or the original SNP panels at out/{locus}/genotypes/{gene}/snps.pgen
 
 out="$1"
 mode="$2"
@@ -232,7 +232,7 @@ fi
 # let's make a plot to show runtime and memory usage
 if [ "$mode" != "geuvadis" ]; then
 (
-  echo "a=["$(for i in */happler/run/*/bench/run; do echo "$(wc -l "$(echo "$i" | sed 's+happler/.*$+genotypes/snps.pvar+')" | cut -f1 -d' ')","$(cut -f1,3 --output-delimiter , "$i" | tail -n1)"; done | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
+  echo "a=["$(for i in */happler/run/*/bench/run; do echo "$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/run+snps.pvar+')" | cut -f1 -d' ')","$(cut -f1,3 --output-delimiter , "$i" | tail -n1)"; done | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
