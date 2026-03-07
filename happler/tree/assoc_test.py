@@ -384,6 +384,53 @@ class AssocTestSimpleSM(AssocTestSimple):
             return param, pval, stderr
 
 
+@jax.jit
+def _compute_bic_jit(X: jnp.ndarray, yc: jnp.ndarray) -> jnp.ndarray:
+    """
+    JIT-compiled helper function for computing BIC in vectorized OLS regression.
+    
+    This function uses JAX for JIT compilation and GPU/TPU acceleration when available.
+    The implementation is designed to be numerically equivalent to the NumPy version.
+    
+    Parameters
+    ----------
+    X : jnp.ndarray
+        The genotypes with shape (n, p) where n is samples and p is variants
+    yc : jnp.ndarray
+        The centered phenotypes with shape (n, 1)
+    
+    Returns
+    -------
+    jnp.ndarray
+        The BIC values with shape (p,)
+    """
+    n = X.shape[0]
+    nobs2 = n / 2.0
+    log2pi = jnp.log(2 * jnp.pi)
+    
+    # Center X
+    xc = X - jnp.mean(X, axis=0)  # (n, p)
+    
+    # Vectorized simple OLS with intercept
+    sxx = jnp.sum(xc**2, axis=0)  # (p,)
+    sxy = jnp.sum(xc * yc, axis=0)  # (p,)
+    
+    # Compute slopes, handling division by zero
+    b1 = jnp.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
+    
+    # Residuals for each column's model
+    syy = jnp.sum(yc**2)  # scalar
+    ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
+    
+    # statsmodels-style profile log-likelihood per column
+    # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
+    ll = -nobs2 * (log2pi + jnp.log(ssr / n) + 1.0)  # (p,)
+    
+    # Number of parameters k: intercept + slope = 2
+    bic = -2 * ll + 2 * jnp.log(n)  # (p,)
+    return bic
+
+
 class AssocTestSimpleFastBIC(AssocTestSimpleSM):
     """
     Calculate only BIC in a quick, vectorized fashion without statsmodels
