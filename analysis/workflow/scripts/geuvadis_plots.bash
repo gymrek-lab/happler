@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # Recreates a few useful plots for interpreting the output of the Geuvadis analysis
 # arg1: The path to the "out" folder
+# arg2: The operating "mode" (either "geuvadis", "ukb", or "aou")
+
+# Required inputs:
+# out/{locus}/happler/run/{gene}/bench/run
+# out/{locus}/happler/run/{gene}/happler.hap
+# out/{locus}/happler/run/{gene}/happler.p{gen,var,sam}
+# out/{locus}/happler/run/{gene}/include/susie_pips.tsv
+# out/{locus}/happler/run/{gene}/exclude/susie_pips.tsv
+# out/{locus}/happler/run/{gene}/include/merged.pgen or the original SNP panels at out/{locus}/genotypes/snps.pgen
 
 out="$1"
 mode="$2" (ex: geuvadis, ukb, aou)
@@ -93,8 +102,8 @@ EOF
 echo "Created $out/hwe.png"
 
 # now, let's threshold by MAC and create a histogram
-for i in $(cat multiline.txt | sed 's/.hap$/.pvar/;s+out/++'); do plink2 --pfile ${i%.*} --mac 70 --make-pgen --out ${i%.*}-maf --freq &>/dev/null; done
-echo "$(grep 'Error: No variants remaining' */happler/run/*/happler-maf.log | cut -d '/' -f2,5 | wc -l) haplotypes had an MAC below 70."
+for i in $(cat multiline.txt | sed 's/.hap$/.pvar/;s+out/++'); do plink2 --pfile ${i%.*} --mac 20 --make-pgen --out ${i%.*}-maf --freq &>/dev/null; done
+echo "$(grep 'Error: No variants remaining' */happler/run/*/happler-maf.log | cut -d '/' -f2,5 | wc -l) haplotypes had an MAC below 20."
 (
   echo 'a=['$(cat */happler/run/*/happler-maf.afreq | grep -Ev '^#' | cut -f 5 | paste -s -d,)']'
   cat <<'EOF'
