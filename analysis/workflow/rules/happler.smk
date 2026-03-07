@@ -461,9 +461,9 @@ rule pips:
 rule metrics:
     """ compute summary metrics from the output of the finemapper """
     input:
-        gt=lambda wildcards: finemapper_input(wildcards).pgen,
-        gt_pvar=lambda wildcards: finemapper_input(wildcards).pvar,
-        gt_psam=lambda wildcards: finemapper_input(wildcards).psam,
+        gt=rules.finemapper.input.gt,
+        gt_pvar=rules.finemapper.input.gt_pvar,
+        gt_psam=rules.finemapper.input.gt_psam,
         phen=pheno,
         finemap=rules.finemapper.output.susie,
     params:
@@ -516,6 +516,8 @@ rule results:
     """
     input:
         gt=rules.finemapper.input.gt,
+        gt_pvar=rules.finemapper.input.gt_pvar,
+        gt_psam=rules.finemapper.input.gt_psam,
         phen=pheno,
         susie=rules.finemapper.output.susie,
         happler_hap=results_happler_hap_input,
