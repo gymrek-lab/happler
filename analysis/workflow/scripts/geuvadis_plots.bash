@@ -31,7 +31,7 @@ echo "Out of $num_tot_regions regions, $num_regions has at least one haplotype w
 echo "Of those $num_regions, here is a breakdown of the number of haplotypes each region had:"
 while read hap; do grep '^H' $hap | wc -l; done < <(echo "$multiline_files") | sort | uniq -c
 echo "Of those $num_regions, here is a breakdown of the number of alleles in each haplotype:"
-avg_num_alleles="$(for i in $multiline_files; do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | tee >(sort | uniq -c) | awk '{ total += $1 } END { print total/NR }')"
+avg_num_alleles="$(for i in $multiline_files; do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | tee >(sort | uniq -c 2>&1) | awk '{ total += $1 } END { print total/NR }')"
 echo "Of those $num_regions, the average number of alleles in each haplotype is $avg_num_alleles."
 
 if [ "$mode" == "geuvadis" ]; then
@@ -55,7 +55,7 @@ cd "$out"
 
 # now, let's make the hap_pips.png file
 (
-  echo "a=["$(cut -f2 pips.tsv | paste -s -d,)"]"
+  echo "a=["$(cut -f2 pips.tsv | tail -n+2 | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
@@ -130,7 +130,7 @@ if [ "$mode" == "geuvadis" ]; then
   mkdir -p sv_ld/H0
   for i in */happler/run/*/happler_svs.ld; do region="$(echo "$i" | sed 's\/happler_svs.ld$\\;s+/happler/run/+\t+')"; cp "$i" sv_ld/H0/$(echo "$region" | cut -f1):$(echo "$region" | cut -f2).ld; done
   # now, collate the results
-  { echo -e 'file\tpip\tpos\tid\tld'; sort -gr -k2,2 pips.tsv | { while read -r line; do file="sv_ld/$(echo "$line" | cut -f1 | cut -f3 -d:)/$(echo "$line" | cut -f1 | cut -f-2 -d:).ld"; echo -en "$file"$'\t'; echo -en "$(echo "$line" | cut -f2)"$'\t'; awk -F $'\t' -v 'OFS=\t' '{print $2, $3, sqrt($4*$4);}' "$file" | sort -gr -k3,3 | head -n1; done } | sed 's/^.*sv_ld\///'; } > pips_sv_ld.tsv
+  { echo -e 'file\tpip\tpos\tid\tld'; tail -n+2 pips.tsv | sort -gr -k2,2 | { while read -r line; do file="sv_ld/$(echo "$line" | cut -f1 | cut -f3 -d:)/$(echo "$line" | cut -f1 | cut -f-2 -d:).ld"; echo -en "$file"$'\t'; echo -en "$(echo "$line" | cut -f2)"$'\t'; awk -F $'\t' -v 'OFS=\t' '{print $2, $3, sqrt($4*$4);}' "$file" | sort -gr -k3,3 | head -n1; done } | sed 's/^.*sv_ld\///'; } > pips_sv_ld.tsv
   echo "Created $out/pips_sv_ld.tsv" 1>&2
   # now, visualize all of the results
   (
