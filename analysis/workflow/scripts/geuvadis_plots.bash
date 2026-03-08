@@ -31,7 +31,7 @@ echo "Out of $num_tot_regions regions, $num_regions has at least one haplotype w
 echo "Of those $num_regions, here is a breakdown of the number of haplotypes each region had:"
 while read hap; do grep '^H' $hap | wc -l; done < <(echo "$multiline_files") | sort | uniq -c
 echo "Of those $num_regions, here is a breakdown of the number of alleles in each haplotype:"
-avg_num_alleles="$(for i in $multiline_files; do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | tee >(sort | uniq -c 1>&2) | awk '{ total += $1 } END { print total/NR }')"
+avg_num_alleles="$(for i in $multiline_files; do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | tee >(sort | uniq -c) | awk '{ total += $1 } END { print total/NR }')"
 echo "Of those $num_regions, the average number of alleles in each haplotype is $avg_num_alleles."
 
 if [ "$mode" == "geuvadis" ]; then
@@ -120,8 +120,8 @@ plt.savefig("mafs.png")
 EOF
 ) | python
 echo "Created $out/mafs.png" 1>&2
-echo -e "locus\tmaf" > "$out"/mafs.tsv
-for i in "$out"/*/happler/run/*/happler-maf.afreq; do grep -Ev '^#' $i | cut -f2,5 | sed 's+^+'"$(echo $i | sed 's\/happler-maf.afreq$\\;s\^'"$out"'/\\;s+/happler/run/+:+')"':+'; done >> "$out"/mafs.tsv
+echo -e "locus\tmaf" > mafs.tsv
+for i in */happler/run/*/happler-maf.afreq; do grep -Ev '^#' $i | cut -f2,5 | sed 's+^+'"$(echo $i | sed 's\/happler-maf.afreq$\\;s\^'"$out"'/\\;s+/happler/run/+:+')"':+'; done >> mafs.tsv
 echo "Created $out/mafs.tsv" 1>&2
 
 if [ "$mode" == "geuvadis" ]; then
@@ -259,5 +259,6 @@ echo "Created $out/bench.png" 1>&2
 fi
 
 # merge all of the metrics together
-paste -d $'\t' <(head -n1 "$out"/variance_explained.tsv) <(head -n1 "$out"/pips.tsv) <(head -n1 "$out"/mafs.tsv) > "$out"/merged.tsv
-paste -d $'\t' <(tail -n+2 "$out"/variance_explained.tsv | sort) <(tail -n+2 "$out"/pips.tsv | sort) <(tail -n+2 "$out"/mafs.tsv | sort) >> "$out"/merged.tsv
+paste -d $'\t' <(head -n1 variance_explained.tsv) <(head -n1 pips.tsv) <(head -n1 mafs.tsv) > merged.tsv
+paste -d $'\t' <(tail -n+2 variance_explained.tsv | sort) <(tail -n+2 pips.tsv | sort) <(tail -n+2 mafs.tsv | sort) >> merged.tsv
+echo "Created $out/merged.tsv" 1>&2
