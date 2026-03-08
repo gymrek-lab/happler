@@ -390,7 +390,8 @@ def _compute_bic_jit(X: jnp.ndarray, yc: jnp.ndarray) -> jnp.ndarray:
     JIT-compiled helper function for computing BIC in vectorized OLS regression.
     
     This function uses JAX for JIT compilation and GPU/TPU acceleration when available.
-    The implementation is designed to be numerically equivalent to the NumPy version.
+    Includes explicit inf handling to ensure numerical equivalence with NumPy, as JAX
+    JIT optimization can sometimes change exact numerics (e.g., log(exp(x)) -> x).
     
     Parameters
     ----------
@@ -422,12 +423,22 @@ def _compute_bic_jit(X: jnp.ndarray, yc: jnp.ndarray) -> jnp.ndarray:
     syy = jnp.sum(yc**2)  # scalar
     ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
     
+    # Explicitly handle cases that should produce inf values
+    # When SSR is very small or zero, log(SSR/n) should be -inf
+    # JAX JIT might optimize this differently than NumPy
+    ssr_threshold = 1e-300  # Below this, treat as zero
+    ssr_safe = jnp.where(ssr > ssr_threshold, ssr, ssr_threshold)
+    
     # statsmodels-style profile log-likelihood per column
     # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
-    ll = -nobs2 * (log2pi + jnp.log(ssr / n) + 1.0)  # (p,)
+    ll = -nobs2 * (log2pi + jnp.log(ssr_safe / n) + 1.0)  # (p,)
     
     # Number of parameters k: intercept + slope = 2
     bic = -2 * ll + 2 * jnp.log(n)  # (p,)
+    
+    # Explicitly set to -inf where SSR was effectively zero
+    bic = jnp.where(ssr <= ssr_threshold, jnp.array(-jnp.inf), bic)
+    
     return bic
 
 
