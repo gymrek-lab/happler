@@ -388,18 +388,18 @@ class AssocTestSimpleSM(AssocTestSimple):
 def _compute_bic_jit(X: jnp.ndarray, yc: jnp.ndarray) -> jnp.ndarray:
     """
     JIT-compiled helper function for computing BIC in vectorized OLS regression.
-    
+
     This function uses JAX for JIT compilation and GPU/TPU acceleration when available.
     Includes explicit inf handling to ensure numerical equivalence with NumPy, as JAX
     JIT optimization can sometimes change exact numerics (e.g., log(exp(x)) -> x).
-    
+
     Parameters
     ----------
     X : jnp.ndarray
         The genotypes with shape (n, p) where n is samples and p is variants
     yc : jnp.ndarray
         The centered phenotypes with shape (n, 1)
-    
+
     Returns
     -------
     jnp.ndarray
@@ -408,37 +408,37 @@ def _compute_bic_jit(X: jnp.ndarray, yc: jnp.ndarray) -> jnp.ndarray:
     n = X.shape[0]
     nobs2 = n / 2.0
     log2pi = jnp.log(2 * jnp.pi)
-    
+
     # Center X
     xc = X - jnp.mean(X, axis=0)  # (n, p)
-    
+
     # Vectorized simple OLS with intercept
     sxx = jnp.sum(xc**2, axis=0)  # (p,)
     sxy = jnp.sum(xc * yc, axis=0)  # (p,)
-    
+
     # Compute slopes, handling division by zero
     b1 = jnp.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
-    
+
     # Residuals for each column's model
     syy = jnp.sum(yc**2)  # scalar
     ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
-    
+
     # Explicitly handle cases that should produce inf values
     # When SSR is very small or zero, log(SSR/n) should be -inf
     # JAX JIT might optimize this differently than NumPy
     ssr_threshold = 1e-300  # Below this, treat as zero
     ssr_safe = jnp.where(ssr > ssr_threshold, ssr, ssr_threshold)
-    
+
     # statsmodels-style profile log-likelihood per column
     # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
     ll = -nobs2 * (log2pi + jnp.log(ssr_safe / n) + 1.0)  # (p,)
-    
+
     # Number of parameters k: intercept + slope = 2
     bic = -2 * ll + 2 * jnp.log(n)  # (p,)
-    
+
     # Explicitly set to -inf where SSR was effectively zero
     bic = jnp.where(ssr <= ssr_threshold, jnp.array(-jnp.inf), bic)
-    
+
     return bic
 
 
@@ -459,7 +459,7 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
     ) -> npt.NDArray:
         """
         Perform the test for a chunk of haplotypes using JAX JIT compilation
-        
+
         This method uses the JIT-compiled _compute_bic_jit helper function
         for improved computational efficiency with GPU/TPU acceleration.
 
