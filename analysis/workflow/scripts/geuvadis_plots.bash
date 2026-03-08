@@ -90,7 +90,7 @@ echo "Created $out/in_vs_ex_pips.png" 1>&2
 # now, let's check the HWE of the haplotypes
 for i in $(cat multiline.txt | sed 's/.hap$/.pvar/;s+out/++'); do plink2 --pfile ${i%.*} --hardy --out ${i%.*}-hwe &>/dev/null; done
 (
-  echo "a=["$(for i in */happler/run/*/happler-hwe.hardy; do cut -f10 $i | tail -n+2; done | paste -s -d,)"]"
+  echo "a=["$(for i in $(cat multiline.txt | sed 's+happler.hap$+happler-hwe.hardy+;s+out/++'); do cut -f10 $i | tail -n+2; done | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib.pyplot as plt
