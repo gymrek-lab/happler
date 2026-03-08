@@ -262,3 +262,8 @@ fi
 paste -d $'\t' <(head -n1 variance_explained.tsv) <(head -n1 pips.tsv) <(head -n1 mafs.tsv) > merged.tsv
 paste -d $'\t' <(tail -n+2 variance_explained.tsv | sort) <(tail -n+2 pips.tsv | sort) <(tail -n+2 mafs.tsv | sort) >> merged.tsv
 echo "Created $out/merged.tsv" 1>&2
+
+if [ "$mode" == "aou" ]; then
+  zip multiline.zip variance_explained.png hap_pips.png in_vs_ex_pips.png hwe.png mafs.png bench.png merged.tsv
+  echo "Created $out/multiline.zip" 1>&2
+fi
