@@ -290,7 +290,7 @@ def run(
 
     if hap_maf is None:
         # default haplotype MAF is the equivalent of an MAC of 20
-        hap_maf = 20/(2*gt.data.shape[0])
+        hap_maf = 20 / (2 * gt.data.shape[0])
 
     # subset to just one phenotype
     # also reorder and subset samples in Phenotypes to match those in the Genotypes
