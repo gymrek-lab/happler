@@ -12,8 +12,8 @@
 # out/{locus}/happler/run/{gene}/include/merged.pgen (could be switched out for the original snp panels ie snps.pgen)
 # out/{locus}/genotypes/{gene}/snps.pgen
 
-out="$1"
-mode="$2"
+out="${1:out}"
+mode="${2:aou}"
 
 
 
@@ -105,9 +105,9 @@ echo "Created $out/hwe.png" 1>&2
 
 # now, let's threshold by MAC and create a histogram
 for i in $(sed 's/.hap$/.pvar/;s+out/++' multiline.txt); do plink2 --pfile ${i%.*} --mac 20 --make-pgen --out ${i%.*}-maf --freq &>/dev/null; done
-echo "$(grep 'Error: No variants remaining' $(sed 's+out/++;s+.hap+-maf.log+' multiline.txt) | cut -d '/' -f2,5 | wc -l) haplotypes had an MAC below 20."
+echo "$(grep 'Error: No variants remaining' $(sed 's+out/++;s+.hap$+-maf.log+' multiline.txt) | cut -d '/' -f2,5 | wc -l) haplotypes had an MAC below 20."
 (
-  echo 'a=['$(cat $(sed 's+out/++;s+.hap+-maf.afreq+' multiline.txt) | grep -Ev '^#' | cut -f 5 | paste -s -d,)']'
+  echo 'a=['$(cat $(sed 's+out/++;s+.hap$+-maf.afreq+' multiline.txt) | grep -Ev '^#' | cut -f 5 | paste -s -d,)']'
   cat <<'EOF'
 import numpy as np
 import matplotlib.pyplot as plt
@@ -121,14 +121,14 @@ EOF
 ) | python
 echo "Created $out/mafs.png" 1>&2
 echo -e "locus\tmaf" > mafs.tsv
-for i in $(sed 's+out/++;s+.hap+-maf.log+' multiline.txt); do grep -Ev '^#' $i | cut -f2,5 | sed 's+^+'"$(echo $i | sed 's\/happler-maf.afreq$\\;s\^'"$out"'/\\;s+/happler/run/+:+')"':+'; done >> mafs.tsv
+for i in $(sed 's+out/++;s+.hap$+-maf.log+' multiline.txt); do grep -Ev '^#' $i | cut -f2,5 | sed 's+^+'"$(echo $i | sed 's\/happler-maf.afreq$\\;s\^'"$out"'/\\;s+/happler/run/+:+')"':+'; done >> mafs.tsv
 echo "Created $out/mafs.tsv" 1>&2
 
 if [ "$mode" == "geuvadis" ]; then
   # create SV LD plot
   # first, copy all of the results over
   mkdir -p sv_ld/H0
-  for i in $(sed 's+out/++;s+.hap+_svs.ld+' multiline.txt); do region="$(echo "$i" | sed 's\/happler_svs.ld$\\;s+/happler/run/+\t+')"; cp "$i" sv_ld/H0/$(echo "$region" | cut -f1):$(echo "$region" | cut -f2).ld; done
+  for i in $(sed 's+out/++;s+.hap$+_svs.ld+' multiline.txt); do region="$(echo "$i" | sed 's\/happler_svs.ld$\\;s+/happler/run/+\t+')"; cp "$i" sv_ld/H0/$(echo "$region" | cut -f1):$(echo "$region" | cut -f2).ld; done
   # now, collate the results
   { echo -e 'file\tpip\tpos\tid\tld'; tail -n+2 pips.tsv | sort -gr -k2,2 | { while read -r line; do file="sv_ld/$(echo "$line" | cut -f1 | cut -f3 -d:)/$(echo "$line" | cut -f1 | cut -f-2 -d:).ld"; echo -en "$file"$'\t'; echo -en "$(echo "$line" | cut -f2)"$'\t'; awk -F $'\t' -v 'OFS=\t' '{print $2, $3, sqrt($4*$4);}' "$file" | sort -gr -k3,3 | head -n1; done } | sed 's/^.*sv_ld\///'; } > pips_sv_ld.tsv
   echo "Created $out/pips_sv_ld.tsv" 1>&2
@@ -236,7 +236,7 @@ fi
 
 # let's make a plot to show runtime and memory usage
 echo -e "locus\tnum_vars\ttime_s\tmem_mb" > bench.tsv
-# To get just the multiline ones, use '$(sed 's+out/++;s+happler.hap+bench/run+' multiline.txt)' instead of */happler/run/*/bench/run
+# To get just the multiline ones, use '$(sed 's+out/++;s+happler.hap$+bench/run+' multiline.txt)' instead of */happler/run/*/bench/run
 for i in */happler/run/*/bench/run; do
   echo -e "$(echo $i | sed 's+/happler/run/+:+;s+/bench/run++')\t$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/run+snps.pvar+')" | cut -f1 -d' ')\t$(cut -f1,3 "$i" | tail -n1)"
 done >> bench.tsv
