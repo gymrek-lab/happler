@@ -72,6 +72,13 @@ def corr(a, b):
     ),
 )
 @click.option(
+    "--r2",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Compute r^2 (unsigned) instead of r (signed)",
+)
+@click.option(
     "--no-estimate",
     is_flag=True,
     show_default=True,
@@ -107,17 +114,19 @@ def main(
     region: str = None,
     maf: float = None,
     hap_id: str = None,
+    r2: bool = False,
     no_estimate: bool = False,
     target_is_repeat: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
     """
-    Compute LD between a SNP in a PGEN file and all other SNPs in a different
-    PGEN file
+    Compute LD between a SNP in a PGEN file (target) and all other SNPs in a different
+    PGEN file (gts)
 
-    Note that this command computes r (signed) not r^2 (unsigned). This corresponds
-    with the output of plink2 --r-unphased --ld-snp TARGET --nonfounders
+    Note that this command computes r (signed) not r^2 (unsigned). This corresponds w/
+    plink2 --r-unphased 'inter-chr' 'ref-based' --ld-snp TARGET --nonfounders --ld-window-r2 0
+    You can use --r2 to change this to match --r2-unphased
     """
     log = getLogger("compute_pgen_ld", verbosity)
 
@@ -152,6 +161,9 @@ def main(
         variant_lds = pearson_corr_ld(variant_gts, target_gts)
     else:
         variant_lds = corr(variant_gts, target_gts)
+    
+    if r2:
+        variant_lds = np.square(variant_lds)
 
     log.info("Computing LD between genotypes and the target")
     with Data.hook_compressed(output, mode="w") as ld_file:

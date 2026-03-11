@@ -56,6 +56,13 @@ def compute_residuals(pt: npt.NDArray, cv: npt.NDArray):
     help="The path to a file containing a list of sample IDs to remove",
 )
 @click.option(
+    "--no-standardize",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Disable standardizing of the output phenotypes",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(path_type=Path),
@@ -76,6 +83,7 @@ def main(
     covariates: Path,
     extra_covariates: Path = None,
     samples_to_remove: Path = None,
+    no_standardize: bool = False,
     output: Path = Path("/dev/stdout"),
     verbosity: str = "DEBUG",
 ):
@@ -147,7 +155,8 @@ def main(
     resids.data = compute_residuals(pt.data, cv.data)
 
     log.info("Standardizing and writing output")
-    resids.standardize()
+    if no_standardize:
+        resids.standardize()
     resids.write()
 
 

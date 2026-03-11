@@ -1,7 +1,10 @@
+import os
 from pathlib import Path
 
 
 out = config["out"] + "/genotypes"
+if config["mode"] == "run":
+    out += "/{trait}"
 logs = out + "/logs"
 bench = out + "/bench"
 
@@ -139,7 +142,7 @@ rule vcf2plink:
             if check_config('exclude_samples') else []
         ),
     params:
-        maf=config["min_maf"],
+        maf=check_config("min_maf", default="0.0"),
         prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
         samps=lambda wildcards, input: (" --" + (
             "keep " if check_config("str_panel") else "remove "
@@ -163,8 +166,110 @@ rule vcf2plink:
         "--threads {threads} --memory {resources.mem_mb}{params.samps} --out {params.prefix} &>{log}"
 
 
+rule aou_v7:
+    """ download a bunch of VCFs from AoU v7 and merge into a single PGEN """
+    params:
+        locus=lambda wildcards: wildcards.locus.replace("_", ":"),
+        prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+    output:
+        pgen=out+"/snps.v7.pgen",
+        pvar=out+"/snps.v7.pvar",
+        psam=out+"/snps.v7.psam",
+        log=temp(out+"/snps.v7.log"),
+        bcf=out+"/snps.v7.vcf.gz",
+    resources:
+        runtime=75,
+    threads: 4
+    log:
+        logs + "/aou_v7",
+    benchmark:
+        bench + "/aou_v7",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "workflow/scripts/aou/get_pgen.bash '{params.locus}' {params.prefix} {threads} &>{log}"
+
+
+rule aou:
+    """ subset a PGEN from AoU v8 """
+    input:
+        lambda wildcards: storage(
+            multiext(
+                config["snp_panel"]
+                .removesuffix(".pgen")
+                .format(chr=parse_locus(wildcards.locus)[0])
+                .replace("AOU_WORKSPACE_BUCKET", os.environ["WORKSPACE_BUCKET"], 1),
+            ".pgen", ".pvar", ".psam")
+        ),
+    params:
+        locus=lambda wildcards: wildcards.locus.replace("_", ":"),
+        pfile=lambda wildcards, input: str(Path(input[0]).with_suffix("")),
+        prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+        start=lambda wildcards: parse_locus(wildcards.locus)[1],
+        end=lambda wildcards: parse_locus(wildcards.locus)[2],
+        chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
+    output:
+        pgen=out+"/snps.pgen",
+        pvar=out+"/snps.pvar",
+        psam=out+"/snps.psam",
+        log=temp(out+"/snps.log"),
+    resources:
+        runtime=8,
+    threads: 1
+    log:
+        logs + "/aou",
+    benchmark:
+        bench + "/aou",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "plink2 --threads {threads} --out {params.prefix} --pfile {params.pfile} "
+        "--nonfounders --geno 0 --make-pgen --allow-extra-chr --max-alleles 2 "
+        "--chr {params.chrom} --from-bp {params.start} --to-bp {params.end} &>{log}"
+
+
+rule aou_qc:
+    """ perform sample and variant QC on an AoU PGEN """
+    input:
+        pgen = rules.aou.output.pgen,
+        pvar = rules.aou.output.pvar,
+        psam = rules.aou.output.psam,
+        pheno = lambda wildcards: expand(config["modes"]["run"]["pheno"], trait=wildcards.trait),
+        eur_csv = lambda wildcards: expand(config["modes"]["run"]["pops_dir"], pop="EUR_WHITE"),
+    params:
+        maf=check_config("min_maf", default="0.0"),
+        hwe=check_config("hwe", default="0.0"),
+        locus=lambda wildcards: wildcards.locus.replace("_", ":"),
+        in_prefix=lambda wildcards, input: Path(input.pgen).with_suffix(""),
+        prefix=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+    output:
+        pgen=out+"/snps.qc.EUR_WHITE.pgen",
+        pvar=out+"/snps.qc.EUR_WHITE.pvar",
+        psam=out+"/snps.qc.EUR_WHITE.psam",
+        log=temp(out+"/snps.qc.EUR_WHITE.log"),
+    resources:
+        runtime=10,
+    threads: 1
+    log:
+        logs + "/aou_qc",
+    benchmark:
+        bench + "/aou_qc",
+    conda:
+        "../envs/default.yml"
+    shell:
+        "plink2 --maf {params.maf} --hwe {params.hwe} --keep <("
+        "comm -12 <(cut -f1 {input.pheno} | tail -n+2 | sort -u) <(cut -f1 -d, {input.eur_csv} | tail -n+2 | sort -u)"
+        ") --out {params.prefix} --pfile {params.in_prefix} --make-pgen &>{log}"
+
+
 def subset_input():
-    if check_config("phase_map") or check_config("exclude_samples") or not config["snp_panel"].endswith(".pgen"):
+    if config["snp_panel"] == "AoU" or config["snp_panel"].startswith("AOU_WORKSPACE_BUCKET"):
+        return {
+            "pgen": rules.aou_qc.output.pgen,
+            "pvar": rules.aou_qc.output.pvar,
+            "psam": rules.aou_qc.output.psam,
+        }
+    elif check_config("phase_map") or check_config("exclude_samples") or not config["snp_panel"].endswith(".pgen"):
         return {
             "pgen": rules.vcf2plink.output.pgen,
             "pvar": rules.vcf2plink.output.pvar,

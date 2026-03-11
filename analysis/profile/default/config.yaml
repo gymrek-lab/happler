@@ -1,5 +1,6 @@
-latency-wait: 30
 use-conda: true
-conda-frontend: conda
+latency-wait: 30
+keep-going: true
 printshellcmds: true
-shadow-prefix: /tscc/lustre/ddn/scratch/$USER
+conda-frontend: conda
+rerun-trigger: [mtime, params, input]

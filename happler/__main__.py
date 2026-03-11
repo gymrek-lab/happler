@@ -94,7 +94,14 @@ def main():
     "--maf",
     type=float,
     default=None,
-    show_default="all haplotypes",
+    show_default="all variants",
+    help="Only use variants with an MAF above this threshold",
+)
+@click.option(
+    "--hap-maf",
+    type=float,
+    default=None,
+    show_default="the MAF equivalent to an MAC of 20",
     help="Only build haplotypes with an MAF above this threshold",
 )
 @click.option(
@@ -192,6 +199,7 @@ def run(
     discard_missing: bool = False,
     chunk_size: int = None,
     maf: float = None,
+    hap_maf: float = None,
     phased: bool = False,
     max_signals: int = 1,
     max_iterations: int = 1,
@@ -280,6 +288,10 @@ def run(
     gt.check_phase()
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
 
+    if hap_maf is None:
+        # default haplotype MAF is the equivalent of an MAC of 20
+        hap_maf = 20 / (2 * gt.data.shape[0])
+
     # subset to just one phenotype
     # also reorder and subset samples in Phenotypes to match those in the Genotypes
     ph.subset(samples=tuple(gt.samples), names=(pheno,), inplace=True)
@@ -295,7 +307,7 @@ def run(
     hap_tree = tree.TreeBuilder(
         gt,
         ph,
-        maf=maf,
+        maf=hap_maf,
         method=test_method,
         terminator=terminator,
         indep_thresh=indep_thresh,

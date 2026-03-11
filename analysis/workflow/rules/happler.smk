@@ -24,8 +24,13 @@ def parse_locus(locus):
     start = locus.split("_")[1].split("-")[0]
     return chrom, start, end
 
+def gs_fix(og_value, tsfm_func):
+    if isinstance(og_value, snakemake.io._IOFile) and og_value.startswith(".snakemake/storage/gcs"):
+        return storage(str(tsfm_func(og_value)).replace(".snakemake/storage/gcs", "gs:/"))
+    return tsfm_func(og_value)
+
 wildcard_constraints:
-    rep="\d+"
+    rep=r"\d+"
 
 
 rule sub_pheno:
@@ -63,7 +68,9 @@ else:
 rule run:
     """ execute happler! """
     input:
-        gts=config["snp_panel"],
+        pgen=config["snp_panel"],
+        pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
+        psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
         pts=pheno,
         covar=config["covar"],
     params:
@@ -84,10 +91,10 @@ rule run:
         dot=out + "/happler.dot",
     resources:
         # runtime=lambda wildcards, input: (
-        #     rsrc_func(input.gts)(15, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
+        #     rsrc_func(input.pgen)(15, Path(input.pvar).stat().st_size/1000 * 2.5379343786643838 + 20.878965342140603)
         # ),
         # mem_mb=lambda wildcards, input: (
-        #     rsrc_func(input.gts)(4000, Path(input.gts).with_suffix(".pvar").stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
+        #     rsrc_func(input.pgen)(4000, Path(input.pvar).stat().st_size/1000 * 7.5334226167661384 + 22.471377010118147)
         # ),
         runtime=250,
         mem_mb=70000,
@@ -99,12 +106,12 @@ rule run:
     conda:
         "happler"
     shell:
-        "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} "
+        "happler run -o {output.hap} --verbosity DEBUG --maf {params.maf} --hap-maf {params.maf} "
         "--max-signals {params.max_signals} --max-iterations {params.max_iterations} "
         "--discard-multiallelic --region {params.region} {params.keep_SNPs}"
         "{params.covar}--indep-thresh {params.indep} -t {params.thresh} "
         "{params.chunk_size} --out-thresh {params.out_thresh} --show-tree "
-        "{input.gts} {input.pts} &>{log} && "
+        "{input.pgen} {input.pts} &>{log} && "
         "haptools index -o {output.gz} {output.hap} &>>{log}"
 
 
@@ -138,8 +145,8 @@ rule cond_linreg:
     """plot conditional regressions for a haplotype"""
     input:
         pgen=config["snp_panel"],
-        pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
-        psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
+        psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
         hap=rules.run.output.hap,
         pts=pheno,
     params:
@@ -174,8 +181,8 @@ rule heatmap:
     # TODO: also include causal hap if one exists
     input:
         pgen=config["snp_panel"],
-        pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
-        psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
+        psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
         hap=rules.run.output.hap,
         pts=pheno,
     params:
@@ -239,8 +246,8 @@ rule transform:
     input:
         hap=rules.run.output.gz,
         pgen=config["snp_panel"],
-        pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
-        psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
+        psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
         pts=pheno,
     params:
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
@@ -352,8 +359,8 @@ if mode == "midway":
 rule merge:
     input:
         gts=config["snp_panel"],
-        gts_pvar=Path(config["snp_panel"]).with_suffix(".pvar"),
-        gts_psam=Path(config["snp_panel"]).with_suffix(".psam"),
+        gts_pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
+        gts_psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
         hps=lambda wildcards: merge_hps_input(wildcards).pgen,
         hps_pvar=lambda wildcards: merge_hps_input(wildcards).pvar,
         hps_psam=lambda wildcards: merge_hps_input(wildcards).psam,
@@ -454,9 +461,9 @@ rule pips:
 rule metrics:
     """ compute summary metrics from the output of the finemapper """
     input:
-        gt=lambda wildcards: finemapper_input(wildcards).pgen,
-        gt_pvar=lambda wildcards: finemapper_input(wildcards).pvar,
-        gt_psam=lambda wildcards: finemapper_input(wildcards).psam,
+        gt=rules.finemapper.input.gt,
+        gt_pvar=rules.finemapper.input.gt_pvar,
+        gt_psam=rules.finemapper.input.gt_psam,
         phen=pheno,
         finemap=rules.finemapper.output.susie,
     params:
@@ -509,6 +516,8 @@ rule results:
     """
     input:
         gt=rules.finemapper.input.gt,
+        gt_pvar=rules.finemapper.input.gt_pvar,
+        gt_psam=rules.finemapper.input.gt_psam,
         phen=pheno,
         susie=rules.finemapper.output.susie,
         happler_hap=results_happler_hap_input,

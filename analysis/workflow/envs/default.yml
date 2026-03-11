@@ -4,6 +4,7 @@ channels:
     - nodefaults
 dependencies:
     - bioconda::bcftools==1.13
+    - bioconda::liftover==1.3.1
     - conda-forge::datamash==1.7
     - conda-forge::pandas==1.3.0
     - conda-forge::seaborn==0.11.1

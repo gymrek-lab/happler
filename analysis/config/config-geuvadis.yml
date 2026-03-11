@@ -7,24 +7,21 @@
 # Note: this file is written in the YAML syntax (https://learnxinyminutes.com/docs/yaml/)
 
 
-# Paths to a SNP-STR haplotype reference panel
-# You can download this from http://gymreklab.com/2018/03/05/snpstr_imputation.html
+# Paths to a phased SNP panel
 # If the VCFs are per-chromosome, replace the contig name in the file name with "{chr}"
 # The VCF(s) must be sorted and indexed (with a .tbi file in the same directory)
 # required!
-# ref_panel: "/projects/ps-gymreklab/resources/datasets/snpstr/1kg.snp.str.chr{chr}.vcf.gz"
-# snp_panel: "/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
 snp_panel: "data/geuvadis/geuvadis_ensemble_phasing.maf0.1.pgen"
 # str_panel: "/tscc/projects/ps-gymreklab/jmargoli/ukbiobank/str_imputed/runs/first_pass/vcfs/annotated_strs/chr{chr}.vcf.gz"
 
 # Path to a list of samples to exclude from the analysis
 # There should be one sample ID per line
-# exclude_samples: data/ukb_random_samples_exclude.tsv
+# exclude_samples: data/ukb/samples/remove.txt
 
-# If SNPs are unphased, provide the path to a SHAPEIT4 map file like these:
-# https://github.com/odelaneau/shapeit4/tree/master/maps
+# If SNPs are unphased, provide the path to a beagle map file like these:
+# https://bochet.gcc.biostat.washington.edu/beagle/genetic_maps/
 # The map file should use the same reference genome as the reference panel VCFs
-# phase_map: data/genetic_maps/chr{chr}.b37.gmap.gz
+# phase_map: data/genetic_maps/plink.chr{chr}.GRCh37.map
 
 # A "locus" is a string with a contig name, a colon, the start position, a dash, and
 # the end position or a BED file with a ".bed" file ending
@@ -34,6 +31,7 @@ snp_panel: "data/geuvadis/geuvadis_ensemble_phasing.maf0.1.pgen"
 # 3. "hap" - a haplotype
 # 4. "ld_range" - creates random two-SNP haplotypes with a range of LD values between the alleles of each haplotype
 # 5. "run" - execute happler on a locus without simulating anything
+# 6. "midway" - run happler midway-through on simulated data
 # The STR and SNP positions should be contained within the locus.
 # The positions should be provided in the same coordinate system as the reference
 # genome of the reference panel VCFs
@@ -53,7 +51,7 @@ mode: run
 # Note: the finemapping methods won't be able to handle these covariates
 # covar: data/geuvadis/5PCs_sex.covar
 
-# Discard rare variants with a MAF below this number
+# Discard rare variants with an MAF below this number
 # Defaults to 0 if not specified
 min_maf: 0.1
 
