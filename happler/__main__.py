@@ -101,7 +101,7 @@ def main():
     "--hap-maf",
     type=float,
     default=None,
-    show_default="all haplotypes",
+    show_default="the MAF equivalent to an MAC of 20",
     help="Only build haplotypes with an MAF above this threshold",
 )
 @click.option(
@@ -287,6 +287,10 @@ def run(
     gt.check_maf(threshold=maf, discard_also=True)
     gt.check_phase()
     log.info("There are {} samples and {} variants".format(*gt.data.shape))
+
+    if hap_maf is None:
+        # default haplotype MAF is the equivalent of an MAC of 20
+        hap_maf = 20/(2*gt.data.shape[0])
 
     # subset to just one phenotype
     # also reorder and subset samples in Phenotypes to match those in the Genotypes
