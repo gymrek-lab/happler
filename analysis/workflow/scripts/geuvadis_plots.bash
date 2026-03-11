@@ -1,9 +1,19 @@
 #!/usr/bin/env bash
 # Recreates a few useful plots for interpreting the output of the Geuvadis analysis
 # arg1: The path to the "out" folder
+# arg2: The operating "mode" (either "geuvadis", "ukb", or "aou")
+
+# Required inputs:
+# out/{locus}/happler/run/{gene}/bench/run
+# out/{locus}/happler/run/{gene}/happler.hap
+# out/{locus}/happler/run/{gene}/happler.p{gen,var,sam}
+# out/{locus}/happler/run/{gene}/include/susie_pips.tsv
+# out/{locus}/happler/run/{gene}/exclude/susie_pips.tsv
+# out/{locus}/happler/run/{gene}/include/merged.pgen (could be switched out for the original snp panels ie snps.pgen)
+# out/{locus}/genotypes/{gene}/snps.pgen
 
 out="$1"
-geuvadis="$2"
+mode="$2"
 
 
 
@@ -11,7 +21,7 @@ geuvadis="$2"
 ############################################## MAIN PROGRAM ########################################
 
 # first, create the multiline.txt file, which lists all .hap files with substantial haplotypes
-while read hap; do ls "out/$(echo "$hap" | cut -f1)/happler/run/$(echo "$hap" | cut -f2)/happler.hap"; done < $out/multiline.tsv > $out/multiline.txt
+while read hap; do ls "out/$(echo "$hap" | cut -f1)/happler/run/$(echo "$hap" | cut -f2)/happler.hap"; done < $out/multiline.tsv > "$out"/multiline.txt
 multiline_files="$(cat "$out"/multiline.txt | ( [ "$out" == "out" ] && cat || sed 's+out/+'"$out"'/+'))"
 
 # let's report a few statistics
@@ -21,28 +31,31 @@ echo "Out of $num_tot_regions regions, $num_regions has at least one haplotype w
 echo "Of those $num_regions, here is a breakdown of the number of haplotypes each region had:"
 while read hap; do grep '^H' $hap | wc -l; done < <(echo "$multiline_files") | sort | uniq -c
 echo "Of those $num_regions, here is a breakdown of the number of alleles in each haplotype:"
-avg_num_alleles="$(for i in $multiline_files; do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | tee >(sort | uniq -c 1>&2) | awk '{ total += $1 } END { print total/NR }')"
+avg_num_alleles="$(for i in $multiline_files; do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | tee >(sort | uniq -c 2>&1) | awk '{ total += $1 } END { print total/NR }')"
 echo "Of those $num_regions, the average number of alleles in each haplotype is $avg_num_alleles."
 
-if [ -n "$geuvadis" ]; then
+if [ "$mode" == "geuvadis" ]; then
   # now, let's make the variance_explained.png plot
   workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/geuvadis/phenos/{gene}.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
-else
+elif [ "$mode" == "ukb" ]; then
   # now, let's make the variance_explained.png plot
   workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/ukb/phenos/{gene}.resid.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
+elif [ "$mode" == "aou" ]; then
+  workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/aou/phenos/{gene}.resid.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
 fi
-echo "Created $out/variance_explained.png"
+echo "Created $out/variance_explained.png" 1>&2
 
 # now, let's make the pips.tsv file
-for i in "$out"/*/happler/run/*/include/susie_pips.tsv; do grep -P '^H[0-9]\t' $i | sed 's+^+'"$(echo $i | sed 's\/include/susie_pips.tsv$\\;s\^out/\\;s+/happler/run/+:+')"':+'; done > "$out"/pips.tsv
-echo "Created $out/pips.tsv"
+echo -e "locus\tpip" > "$out"/pips.tsv
+for i in $(cat "$out"/multiline.txt | sed 's+happler.hap$+include/susie_pips.tsv+'); do grep -P '^H[0-9]\t' $i | sed 's+^+'"$(echo $i | sed 's\/include/susie_pips.tsv$\\;s\^out/\\;s+/happler/run/+:+')"':+'; done >> "$out"/pips.tsv
+echo "Created $out/pips.tsv" 1>&2
 echo "$(awk -F $'\t' '$2 > 0.9' "$out"/pips.tsv | wc -l) of the $(cat "$out"/pips.tsv | wc -l) haplotypes have PIPs above 0.9"
 
 cd "$out"
 
 # now, let's make the hap_pips.png file
 (
-  echo "a=["$(cut -f2 pips.tsv | paste -s -d,)"]"
+  echo "a=["$(cut -f2 pips.tsv | tail -n+2 | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
@@ -56,7 +69,7 @@ plt.tight_layout()
 plt.savefig("hap_pips.png", bbox_inches="tight")
 EOF
 ) | python
-echo "Created $out/hap_pips.png"
+echo "Created $out/hap_pips.png" 1>&2
 
 # let's make a plot to show the haplotype PIPs vs best SuSiE PIPs when the hap is excluded
 (
@@ -72,12 +85,12 @@ plt.ylabel("Haplotype PIP / Best SNP PIP")
 plt.savefig("in_vs_ex_pips.png")
 EOF
 ) | python
-echo "Created $out/in_vs_ex_pips.png"
+echo "Created $out/in_vs_ex_pips.png" 1>&2
 
 # now, let's check the HWE of the haplotypes
 for i in $(cat multiline.txt | sed 's/.hap$/.pvar/;s+out/++'); do plink2 --pfile ${i%.*} --hardy --out ${i%.*}-hwe &>/dev/null; done
 (
-  echo "a=["$(for i in */happler/run/*/happler-hwe.hardy; do cut -f10 $i | tail -n+2; done | paste -s -d,)"]"
+  echo "a=["$(for i in $(cat multiline.txt | sed 's+happler.hap$+happler-hwe.hardy+;s+out/++'); do cut -f10 $i | tail -n+2; done | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib.pyplot as plt
@@ -88,11 +101,11 @@ plt.title("Haplotype HWE -10log10 P-Values")
 plt.savefig("hwe.png")
 EOF
 ) | python
-echo "Created $out/hwe.png"
+echo "Created $out/hwe.png" 1>&2
 
 # now, let's threshold by MAC and create a histogram
-for i in $(cat multiline.txt | sed 's/.hap$/.pvar/;s+out/++'); do plink2 --pfile ${i%.*} --mac 70 --make-pgen --out ${i%.*}-maf --freq &>/dev/null; done
-echo "$(grep 'Error: No variants remaining' */happler/run/*/happler-maf.log | cut -d '/' -f2,5 | wc -l) haplotypes had an MAC below 70."
+for i in $(cat multiline.txt | sed 's/.hap$/.pvar/;s+out/++'); do plink2 --pfile ${i%.*} --mac 20 --make-pgen --out ${i%.*}-maf --freq &>/dev/null; done
+echo "$(grep 'Error: No variants remaining' */happler/run/*/happler-maf.log | cut -d '/' -f2,5 | wc -l) haplotypes had an MAC below 20."
 (
   echo 'a=['$(cat */happler/run/*/happler-maf.afreq | grep -Ev '^#' | cut -f 5 | paste -s -d,)']'
   cat <<'EOF'
@@ -106,16 +119,19 @@ plt.title("Haplotype MAFs")
 plt.savefig("mafs.png")
 EOF
 ) | python
-echo "Created $out/mafs.png"
+echo "Created $out/mafs.png" 1>&2
+echo -e "locus\tmaf" > mafs.tsv
+for i in */happler/run/*/happler-maf.afreq; do grep -Ev '^#' $i | cut -f2,5 | sed 's+^+'"$(echo $i | sed 's\/happler-maf.afreq$\\;s\^'"$out"'/\\;s+/happler/run/+:+')"':+'; done >> mafs.tsv
+echo "Created $out/mafs.tsv" 1>&2
 
-if [ -n "$geuvadis" ]; then
+if [ "$mode" == "geuvadis" ]; then
   # create SV LD plot
   # first, copy all of the results over
   mkdir -p sv_ld/H0
   for i in */happler/run/*/happler_svs.ld; do region="$(echo "$i" | sed 's\/happler_svs.ld$\\;s+/happler/run/+\t+')"; cp "$i" sv_ld/H0/$(echo "$region" | cut -f1):$(echo "$region" | cut -f2).ld; done
   # now, collate the results
-  { echo -e 'file\tpip\tpos\tid\tld'; sort -gr -k2,2 pips.tsv | { while read -r line; do file="sv_ld/$(echo "$line" | cut -f1 | cut -f3 -d:)/$(echo "$line" | cut -f1 | cut -f-2 -d:).ld"; echo -en "$file"$'\t'; echo -en "$(echo "$line" | cut -f2)"$'\t'; awk -F $'\t' -v 'OFS=\t' '{print $2, $3, sqrt($4*$4);}' "$file" | sort -gr -k3,3 | head -n1; done } | sed 's/^.*sv_ld\///'; } > pips_sv_ld.tsv
-  echo "Created $out/pips_sv_ld.tsv"
+  { echo -e 'file\tpip\tpos\tid\tld'; tail -n+2 pips.tsv | sort -gr -k2,2 | { while read -r line; do file="sv_ld/$(echo "$line" | cut -f1 | cut -f3 -d:)/$(echo "$line" | cut -f1 | cut -f-2 -d:).ld"; echo -en "$file"$'\t'; echo -en "$(echo "$line" | cut -f2)"$'\t'; awk -F $'\t' -v 'OFS=\t' '{print $2, $3, sqrt($4*$4);}' "$file" | sort -gr -k3,3 | head -n1; done } | sed 's/^.*sv_ld\///'; } > pips_sv_ld.tsv
+  echo "Created $out/pips_sv_ld.tsv" 1>&2
   # now, visualize all of the results
   (
     echo "a=["$(tail -n+2 pips_sv_ld.tsv | cut -f2,5 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
@@ -138,7 +154,7 @@ plt.savefig("pips_best_sv_ld.png")
 
 EOF
 ) | python
-  echo "Created $out/pips_best_sv_ld.png"
+  echo "Created $out/pips_best_sv_ld.png" 1>&2
 
   cd -
   # create STR LD plot
@@ -151,7 +167,7 @@ EOF
     ) -b data/geuvadis/mlamkin/Geuvadis_varlevel_corrected_significant_variants.with-end.tsv -wa -wb -loj | \
     sed 's+\t+_+;s+\t+-+'
   ) | awk -F'\t' '$2 == $8' | cut -f8 --complement > "$out"/STR_assocations.tsv
-  echo "Created $out/STR_assocations.tsv"
+  echo "Created $out/STR_assocations.tsv" 1>&2
   # now, let's compute LD for each region
   echo -e "hap\tpip\tpos\tid\tld\talleles" > "$out"/pips_str_ld.tsv
   while IFS= read -r line; do
@@ -160,7 +176,7 @@ EOF
     echo -ne "$(workflow/scripts/compute_pgen_ld.py --verbosity WARNING --target-is-repeat --hap-id "$str_id" -o /dev/stdout "$out/$(echo "$line" | cut -f1)"/happler/run/"$(echo "$line" | cut -f2)"/happler.pgen data/geuvadis/mlamkin/all_Geuvadis_STRs.pgen | tail -n+2 | cut -f4)"
     echo -e "\t$(grep -P '\t'"$str_id"'\t' data/geuvadis/mlamkin/all_Geuvadis_STRs.pvar | cut -f 4,5 --output-delimiter ,)"
   done < <(tail -n+2 "$out"/STR_assocations.tsv) >> "$out"/pips_str_ld.tsv
-  echo "Created $out/pips_str_ld.tsv"
+  echo "Created $out/pips_str_ld.tsv" 1>&2
   (
     head -n1 "$out/pips_str_ld.tsv"
     tail -n+2 "$out/pips_str_ld.tsv" \
@@ -168,7 +184,7 @@ EOF
       | sort -t$'\t' -k1,1 -k5,5nr \
       | awk -F'\t' -v OFS='\t' '!seen[$1]++ { print }'
   ) > "$out/pips_best_str_ld.tsv"
-  echo "Created $out/pips_best_str_ld.tsv"
+  echo "Created $out/pips_best_str_ld.tsv" 1>&2
   cd "$out"
   (
     echo "a=["$(tail -n+2 pips_best_str_ld.tsv | cut -f2,5 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
@@ -191,7 +207,7 @@ plt.savefig("pips_best_str_ld.png")
 
 EOF
 ) | python
-  echo "Created $out/pips_best_str_ld.png"
+  echo "Created $out/pips_best_str_ld.png" 1>&2
   # now, compare STR vs SV LD
   (
     echo "a=["$(join -t $'\t' -j1 --header <(head -n1 pips_sv_ld.tsv; tail -n+2 pips_sv_ld.tsv | sed 's/.ld\t/:H0\t/;s+^H0/++' | sort -k1,1) <(head -n1 pips_best_str_ld.tsv; tail -n+2 pips_best_str_ld.tsv | sort -k1,1) | cut -f5,9 | tail -n+2 | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
@@ -215,13 +231,13 @@ plt.savefig("ld_str_vs_sv.png")
 
 EOF
 ) | python
-  echo "Created $out/ld_str_vs_sv.png";
+  echo "Created $out/ld_str_vs_sv.png"; 1>&2
 fi
 
 # let's make a plot to show runtime and memory usage
-if [ ! -n "$geuvadis" ]; then
+if [ "$mode" != "geuvadis" ]; then
 (
-  echo "a=["$(for i in */happler/run/*/bench/run; do echo "$(wc -l "$(echo "$i" | sed 's+happler/.*$+genotypes/snps.pvar+')" | cut -f1 -d' ')","$(cut -f1,3 --output-delimiter , "$i" | tail -n1)"; done | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
+  echo "a=["$(for i in */happler/run/*/bench/run; do echo "$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/run+snps.pvar+')" | cut -f1 -d' ')","$(cut -f1,3 --output-delimiter , "$i" | tail -n1)"; done | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
@@ -239,5 +255,15 @@ plt.tight_layout()
 plt.savefig("bench.png")
 EOF
 ) | python
-echo "Created $out/bench.png"
+echo "Created $out/bench.png" 1>&2
+fi
+
+# merge all of the metrics together
+paste -d $'\t' <(head -n1 variance_explained.tsv) <(head -n1 pips.tsv) <(head -n1 mafs.tsv) > merged.tsv
+paste -d $'\t' <(tail -n+2 variance_explained.tsv | sort) <(tail -n+2 pips.tsv | sort) <(tail -n+2 mafs.tsv | sort) >> merged.tsv
+echo "Created $out/merged.tsv" 1>&2
+
+if [ "$mode" == "aou" ]; then
+  zip multiline.zip variance_explained.png hap_pips.png in_vs_ex_pips.png hwe.png mafs.png bench.png merged.tsv
+  echo "Created $out/multiline.zip" 1>&2
 fi

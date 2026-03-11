@@ -52,7 +52,7 @@ mode: midway
 # Note: the finemapping methods won't be able to handle these covariates
 # covar: data/geuvadis/5PCs_sex.covar
 
-# Discard rare variants with a MAF below this number
+# Discard rare variants with an MAF below this number
 # Defaults to 0 if not specified
 # NOTE: This is not necessary for midway manhattan simulations because the input data
 # has already been filtered, so we set this to 0 for now

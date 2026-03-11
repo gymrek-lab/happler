@@ -2,8 +2,8 @@
 
 # This R script runs the fine-mapping method SusieR
 
-# param1: The path to a TSV containing the genotype data.
-# param2: The path to a TSV containing the phenotype data.
+# param1: The path to a .pgen file containing the genotype data.
+# param2: The path to a .pheno file containing the phenotype data.
 # param3: The path to a directory in which to write output
 #         This will be created if it doesn't exist.
 # param4: 1 if the causal variant should be removed from the genotype matrix and

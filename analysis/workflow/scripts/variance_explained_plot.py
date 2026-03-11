@@ -256,19 +256,19 @@ def main(
 
     # compute explained variance for each haplotype and its SNPs
     vals = [
-        (params[idx], hap)
+        (params[idx], hp_id, hap)
         for idx in range(len(params))
-        for hap in get_explained_variances(
+        for hp_id, hap in get_explained_variances(
             get_hap_fname(genotypes, params[idx]),
             get_hap_fname(haplotypes, params[idx]),
             get_hap_fname(phenotypes, params[idx]),
             log=log
-        ).values()
+        ).items()
     ]
     # this 2D array should have two * 2 columns: 1) the haplotype and 2) its SNPs
     # and should have as many rows as there are haplotypes among all of the loci
     # (note that some loci may have multiple haplotypes so we adjust 'params' accordingly)
-    params, vals = np.array([v[0] for v in vals]), np.array([v[1] for v in vals])
+    params, hp_ids, vals = np.array([v[0] for v in vals]), [v[1] for v in vals], np.array([v[2] for v in vals])
     explained_variances = vals[:, (0, 2)]
     rsquareds = vals[:, (1, 3)]
 
@@ -318,14 +318,14 @@ def main(
         pickle.dump((params, explained_variances, rsquareds), picklef)
 
     with open(output.with_suffix(".tsv"), 'w', newline='') as tsvfile:
-        tsv_writer = csv.writer(tsvfile, delimiter='\t')
+        tsv_writer = csv.writer(tsvfile, delimiter='\t', lineterminator='\n')
         tsv_writer.writerow(["locus", "hap_exp_var", "alleles_exp_var", "hap_r2", "alleles_r2", "hap_over_alleles_r2"])
         if ("locus" in params.dtype.names) and ("gene" in params.dtype.names):
             name = lambda i: i["locus"]+":"+i["gene"]
         else:
             name = lambda i: ":".join(i)
         for i in range(explained_variances.shape[0]):
-            tsv_writer.writerow([name(params[i]), explained_variances[i, 0], explained_variances[i, 1], rsquareds[i, 0], rsquareds[i, 1], rsquareds[i,0]/rsquareds[i,1]])
+            tsv_writer.writerow([name(params[i])+":"+hp_ids[i], explained_variances[i, 0], explained_variances[i, 1], rsquareds[i, 0], rsquareds[i, 1], rsquareds[i,0]/rsquareds[i,1]])
 
     ax1.scatter(explained_variances[:, 0], explained_variances[:, 0]/explained_variances[:, 1])
     ax1.axline([0, 1], [max_ev_val, 1])

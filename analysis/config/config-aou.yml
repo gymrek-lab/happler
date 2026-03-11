@@ -7,21 +7,11 @@
 # Note: this file is written in the YAML syntax (https://learnxinyminutes.com/docs/yaml/)
 
 
-# Paths to a phased SNP reference panel (like the 1000 Genomes)
+# Paths to a phased SNP panel
 # If the VCFs are per-chromosome, replace the contig name in the file name with "{chr}"
 # The VCF(s) must be sorted and indexed (with a .tbi file in the same directory)
 # required!
-ref_panel: "/tscc/projects/ps-gymreklab/resources/datasets/1000Genomes/phase3VCFs/ALL.chr{chr}.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz"
-snp_panel: "/tscc/projects/ps-gymreklab/resources/datasets/ukbiobank/array_imputed/pfile_converted/chr{chr}.pgen"
-
-# Path to a list of samples to exclude from the analysis
-# There should be one sample ID per line
-exclude_samples: data/ukb/samples/remove.txt
-
-# If SNPs are unphased, provide the path to a beagle map file like these:
-# https://bochet.gcc.biostat.washington.edu/beagle/genetic_maps/
-# The map file should use the same reference genome as the reference panel VCFs
-phase_map: data/genetic_maps/plink.chr{chr}.GRCh37.map
+snp_panel: AOU_WORKSPACE_BUCKET/phased_pgens/chr{chr}.pgen
 
 # A "locus" is a string with a contig name, a colon, the start position, a dash, and
 # the end position or a BED file with a ".bed" file ending
@@ -37,15 +27,21 @@ phase_map: data/genetic_maps/plink.chr{chr}.GRCh37.map
 # genome of the reference panel VCFs
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required! and unless otherwise noted, all attributes of each mode are required
-locus: data/ukb/phenos/platelet_count.bed
+locus: data/aou/phenos/platelet_count.bed
 modes:
  run:
-  pheno: data/ukb/phenos/{trait}.resid.pheno
+  pheno: data/aou/phenos/{trait}.resid.pheno
+  pops_dir: data/aou/pops/{pop}.csv
 mode: run
 
 # Discard rare variants with an MAF below this number
 # Defaults to 0 if not specified
-min_maf: 0.005
+min_maf: 0.0001
+hwe: 1e-100
 
-# A threshold on the pvalues of the haplotypes
-out_thresh: 5e-8
+# Whether to include the causal variant in the set of genotypes provided to the
+# finemapping methods. Set this to true if you're interested in seeing how the
+# methods perform when the causal variant is absent from the data.
+# Defaults to false if not specified
+# You can also provide a list of booleans, if you want to test both values
+exclude_causal: [true, false]

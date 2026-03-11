@@ -16,6 +16,12 @@ def check_config(value, default=False, place=config, as_set=False):
     value = place[value] if (value in place and place[value]) else default
     return (set(value) if isinstance(value, list) else {value}) if as_set else value
 
+def gs_fix(og_value, tsfm_func):
+    new_value = tsfm_func(og_value)
+    if isinstance(og_value, snakemake.io._IOFile) and og_value.startswith(".snakemake/storage/gcs"):
+        return og_value.new_from(new_value)
+    return tsfm_func(new_value)
+
 
 # handle defaults
 config["out"] = check_config("out", "out")
@@ -204,18 +210,20 @@ if mode != "run":
         config: plots_config
     use rule * from plots as plots_*
 
+handle_gcs_storage = lambda i: storage(i) if i[0].startswith("gs://") else i
+
 if mode == "ld_range":
     FINAL_OUTPUT = [rules.plots_params.output.png, rules.plots_metrics.output.png]
 elif mode == "run":
     checkpoint multiline:
         """ obtain a list of the .hap files that have haplotypes with two or more alleles """
         input:
-            hps = expand(
-                rules.happler_run.output.hap,
+            hps = handle_gcs_storage(expand(
+                rules.happler_run.output.hap.replace(".snakemake/storage/gcs", "gs:/"),
                 zip, trait=locus_traits, locus=locus, allow_missing=True,
-            ),
+            )),
         params:
-            out = orig_out,
+            out = lambda wildcards, output: str(output).replace("/multiline.tsv", ""),
             hp_path = Path(str(rules.happler_run.output.hap).format(locus="*", trait="*")),
         output:
             hps = orig_out + "/multiline.tsv",
@@ -246,13 +254,18 @@ elif mode == "run":
         if check_config("SVs", place=config["modes"][mode]):
             files.append(rules.happler_sv_ld.output.ld)
         with open(checkpoints.multiline.get().output["hps"], 'r') as file:
-            multiline_locus, multiline_traits = zip(*(f[:-1].split("\t") for f in file.readlines()))
-        return expand(
+            hap_files = file.readlines()
+            if not len(hap_files):
+                # if there weren't any non-empty hap files, just return an empty list
+                return []
+            multiline_locus, multiline_traits = zip(*(f[:-1].split("\t") for f in hap_files))
+        files = [ f.replace(".snakemake/storage/gcs", "gs:/") for f in files ]
+        return handle_gcs_storage(expand(
             expand(
                 files, zip, trait=multiline_traits, locus=multiline_locus,
                 allow_missing=True,
             ), ex=("in","ex"), allow_missing=True,
-        )
+        ))
 
     rule all:
         input:

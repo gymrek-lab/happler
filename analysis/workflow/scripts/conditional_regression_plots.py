@@ -331,7 +331,7 @@ def main(
     pts.read()
 
     # load the SNPs
-    gts = GenotypesVCF
+    gts = GenotypesVCF(genotypes, log=log)
     if genotypes.suffix == ".pgen":
         gts = GenotypesPLINK
     gts = gts(genotypes, log=log, chunk_size=chunk_size)

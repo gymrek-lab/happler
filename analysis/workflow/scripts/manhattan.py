@@ -162,7 +162,7 @@ def main(
     
         # first, handle cases where there may be more than one .linear file
         cur_ax = ax
-        if cur_ax is tuple:
+        if type(cur_ax) is tuple or type(cur_ax) is np.ndarray:
             cur_ax = cur_ax[idx]
 
         df = pd.read_csv(
