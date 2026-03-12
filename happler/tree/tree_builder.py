@@ -255,6 +255,8 @@ class TreeBuilder:
                         f"Considering {len(maf_mask)} variants for allele {allele}"
                     )
                     hap_mat_sum = hap_mat_sum[:, maf_mask]
+            else:
+                maf_mask = np.arange(hap_mat_sum.shape[1])
             parent_corr = None
             # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
@@ -402,6 +404,8 @@ class TreeBuilder:
                         f"Considering {len(maf_mask[allele])} variants for allele {allele}"
                     )
                     hap_mat_sum = hap_mat_sum[:, maf_mask[allele]]
+            else:
+                maf_mask[allele] = np.arange(hap_mat_sum.shape[1])
             parent_corr[allele] = None
             # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
