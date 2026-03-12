@@ -158,6 +158,7 @@ class Haplotype:
         genotypes: Genotypes,
         allele: int,
         idxs: tuple[int] = None,
+        remove_self: bool = True,
     ) -> npt.NDArray[bool]:
         """
         Transform a genotypes matrix via the current haplotype:
@@ -174,6 +175,9 @@ class Haplotype:
         idxs : tuple[int], optional
             If specified, we will only output haplotypes for the variants at these
             indices. Otherwise, we'll output all of them.
+        remove_self : bool, optional
+            Whether to first remove any variants that are already in this haplotype
+            using np.delete. This is expensive because it creates a new copy.
 
         Returns
         -------
@@ -181,21 +185,20 @@ class Haplotype:
             A 3D haplotype matrix similar to the genotype matrix but with haplotypes
             instead of variants in the columns. It will have the same shape except that
             the number of columns (second dimension) will have decreased by the number
-            of variants in this haplotype.
+            of variants in this haplotype if remove_self is True
         """
-        # first, remove any variants that are already in this haplotype using np.delete
-        # TODO: consider moving this outside of this function
-        gens = np.delete(genotypes.data, self.node_indices, axis=1)
-        # how does the deletion change the desired indices?
-        if idxs is not None:
-            idxs -= np.sum(np.array(self.node_indices)[:, np.newaxis] < idxs, axis=0)
-        else:
-            # alias for all of the indices
-            idxs = np.s_[:]
+        # alias for all indices
+        idx = np.s_[:]
+        if remove_self:
+            # first, remove any variants that are already in this haplotype
+            gens = np.delete(genotypes.data, self.node_indices, axis=1)
+            # how does the deletion change the desired indices?
+            if idxs is not None:
+                idx = idxs - np.sum(np.array(self.node_indices)[:, np.newaxis] < idxs, axis=0)
         # add extra axes to match shape of gens
         hap_data = self.data[:, np.newaxis]
         # use np.logical_and to superimpose the current haplotype onto the GT matrix
-        return np.logical_and(gens[:, idxs] == allele, hap_data)
+        return np.logical_and(gens[:, idx] == allele, hap_data)
 
 
 @dataclass
