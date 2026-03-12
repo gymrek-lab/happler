@@ -245,11 +245,6 @@ class TreeBuilder:
                 # num_common_haps = maf_mask.sum()
                 maf_mask = np.nonzero(maf >= self.maf)[0]
                 num_common_haps = len(maf_mask)
-                if num_common_haps == 0:
-                    # if there weren't any genotypes left, just return None
-                    self.log.debug(f"No variants passed --hap-maf for allele {allele}")
-                    final_to_return.append((None, allele, None))
-                    continue
                 if num_common_haps < hap_mat_sum.shape[1]:
                     self.log.debug(
                         f"Considering {len(maf_mask)} variants for allele {allele}"
@@ -257,6 +252,11 @@ class TreeBuilder:
                     hap_mat_sum = hap_mat_sum[:, maf_mask]
             else:
                 maf_mask = np.arange(hap_mat_sum.shape[1])
+            if hap_mat_sum.shape[1] == 0:
+                # if there weren't any genotypes left, just return None
+                self.log.debug(f"No variants passed --hap-maf for allele {allele}")
+                final_to_return.append((None, allele, None))
+                continue
             parent_corr = None
             # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
@@ -394,11 +394,6 @@ class TreeBuilder:
                 # num_common_haps = maf_mask[allele].sum()
                 maf_mask[allele] = np.nonzero(maf >= self.maf)[0]
                 num_common_haps = len(maf_mask[allele])
-                if num_common_haps == 0:
-                    # if there weren't any genotypes left, just return None
-                    self.log.debug(f"No variants passed --hap-maf for allele {allele}")
-                    final_to_return.append((None, allele, None))
-                    continue
                 if num_common_haps < hap_mat_sum.shape[1]:
                     self.log.debug(
                         f"Considering {len(maf_mask[allele])} variants for allele {allele}"
@@ -406,6 +401,11 @@ class TreeBuilder:
                     hap_mat_sum = hap_mat_sum[:, maf_mask[allele]]
             else:
                 maf_mask[allele] = np.arange(hap_mat_sum.shape[1])
+            if hap_mat_sum.shape[1] == 0:
+                # if there weren't any genotypes left, just return None
+                self.log.debug(f"No variants passed --hap-maf for allele {allele}")
+                final_to_return.append((None, allele, None))
+                continue
             parent_corr[allele] = None
             # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
