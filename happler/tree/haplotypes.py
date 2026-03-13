@@ -195,6 +195,10 @@ class Haplotype:
             # how does the deletion change the desired indices?
             if idxs is not None:
                 idx = idxs - np.sum(np.array(self.node_indices)[:, np.newaxis] < idxs, axis=0)
+        else:
+            gens = genotypes.data
+            if idxs is not None:
+                idx = idxs
         # add extra axes to match shape of gens
         hap_data = self.data[:, np.newaxis]
         # use np.logical_and to superimpose the current haplotype onto the GT matrix
