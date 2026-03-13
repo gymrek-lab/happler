@@ -254,18 +254,13 @@ class TreeBuilder:
             if parent_maf_mask is not None and allele in parent_maf_mask:
                 valid = parent_maf_mask[allele]
                 if parent_indices_set:
-                    keep = np.array(
-                        [v not in parent_indices_set for v in valid], dtype=np.bool_
-                    )
-                    valid = valid[keep]
+                    valid = valid[~np.isin(valid, list(parent_indices_set))]
             else:
                 all_indices = np.arange(num_variants)
                 if parent_indices_set:
-                    keep = np.array(
-                        [v not in parent_indices_set for v in all_indices],
-                        dtype=np.bool_,
-                    )
-                    valid = all_indices[keep]
+                    valid = all_indices[
+                        ~np.isin(all_indices, list(parent_indices_set))
+                    ]
                 else:
                     valid = all_indices
             # step 1: transform the GT matrix using remove_self=False with specific idxs
@@ -418,18 +413,13 @@ class TreeBuilder:
             if parent_maf_mask is not None and allele in parent_maf_mask:
                 valid = parent_maf_mask[allele]
                 if parent_indices_set:
-                    keep = np.array(
-                        [v not in parent_indices_set for v in valid], dtype=np.bool_
-                    )
-                    valid = valid[keep]
+                    valid = valid[~np.isin(valid, list(parent_indices_set))]
             else:
                 all_indices = np.arange(num_variants)
                 if parent_indices_set:
-                    keep = np.array(
-                        [v not in parent_indices_set for v in all_indices],
-                        dtype=np.bool_,
-                    )
-                    valid = all_indices[keep]
+                    valid = all_indices[
+                        ~np.isin(all_indices, list(parent_indices_set))
+                    ]
                 else:
                     valid = all_indices
             # step 1: transform the GT matrix using remove_self=False with specific idxs
