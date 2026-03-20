@@ -194,7 +194,9 @@ class Haplotype:
             gens = np.delete(genotypes.data, self.node_indices, axis=1)
             # how does the deletion change the desired indices?
             if idxs is not None:
-                idx = idxs - np.sum(np.array(self.node_indices)[:, np.newaxis] < idxs, axis=0)
+                idx = idxs - np.sum(
+                    np.array(self.node_indices)[:, np.newaxis] < idxs, axis=0
+                )
         else:
             gens = genotypes.data
             if idxs is not None:

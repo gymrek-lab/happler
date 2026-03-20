@@ -141,9 +141,7 @@ class TreeBuilder:
             )
         )
         # find the variant-allele pairs that give the best haplotype
-        vals, child_maf_mask = self._split_method(
-            parent_hap, parent_res, parent_maf_mask
-        )
+        vals, child_maf_mask = self._split_method(parent_hap, parent_res, parent_maf_mask)
         if vals is not None:
             for variant, allele, results in vals:
                 if variant is None:
@@ -155,9 +153,7 @@ class TreeBuilder:
                 # create a new Haplotype with the variant-allele pair added
                 variant_gts = self.gens.data[:, variant.idx, :2] == allele
                 new_parent_hap = parent_hap.append(variant, allele, variant_gts)
-                self._create_tree(
-                    new_parent_hap, new_node_idx, results, child_maf_mask
-                )
+                self._create_tree(new_parent_hap, new_node_idx, results, child_maf_mask)
 
     def prune_tree(self, from_root: bool = True):
         """
@@ -258,9 +254,7 @@ class TreeBuilder:
             else:
                 all_indices = np.arange(num_variants)
                 if parent_indices_set:
-                    valid = all_indices[
-                        ~np.isin(all_indices, list(parent_indices_set))
-                    ]
+                    valid = all_indices[~np.isin(all_indices, list(parent_indices_set))]
                 else:
                     valid = all_indices
             # step 1: transform the GT matrix using remove_self=False with specific idxs
@@ -417,9 +411,7 @@ class TreeBuilder:
             else:
                 all_indices = np.arange(num_variants)
                 if parent_indices_set:
-                    valid = all_indices[
-                        ~np.isin(all_indices, list(parent_indices_set))
-                    ]
+                    valid = all_indices[~np.isin(all_indices, list(parent_indices_set))]
                 else:
                     valid = all_indices
             # step 1: transform the GT matrix using remove_self=False with specific idxs
@@ -489,7 +481,10 @@ class TreeBuilder:
         best_res_idx = {best_allele: best_result_idx}
         if other_allele in maf_mask:
             pos = np.searchsorted(maf_mask[other_allele], best_var_idx)
-            if pos < len(maf_mask[other_allele]) and maf_mask[other_allele][pos] == best_var_idx:
+            if (
+                pos < len(maf_mask[other_allele])
+                and maf_mask[other_allele][pos] == best_var_idx
+            ):
                 best_res_idx[other_allele] = pos
         num_tests = len(parent.nodes) + 1
         # step 5: retrieve the Variant with the best value
