@@ -45,13 +45,17 @@ elif [ "$mode" == "aou" ]; then
 fi
 echo "Created $out/variance_explained.png" 1>&2
 
-# now, let's make the pips.tsv file
-echo -e "locus\tpip" > "$out"/pips.tsv
-for i in $(sed 's+happler.hap$+include/susie_pips.tsv+' "$out"/multiline.txt); do grep -P '^H[0-9]\t' $i | sed 's+^+'"$(echo $i | sed 's\/include/susie_pips.tsv$\\;s\^out/\\;s+/happler/run/+:+')"':+'; done >> "$out"/pips.tsv
-echo "Created $out/pips.tsv" 1>&2
-echo "$(awk -F $'\t' '$2 > 0.9' "$out"/pips.tsv | wc -l) of the $(cat "$out"/pips.tsv | wc -l) haplotypes have PIPs above 0.9"
-
 cd "$out"
+
+# now, let's make the pips.tsv and exclude_pips.tsv files
+echo -e "locus\tpip" > pips.tsv
+for i in $(sed 's+happler.hap$+include/susie_pips.tsv+;s+out/++' multiline.txt); do grep -P '^H[0-9]\t' $i | sed 's+^+'"$(echo $i | sed 's\/include/susie_pips.tsv$\\;s+/happler/run/+:+')"':+'; done >> pips.tsv
+echo "Created $out/pips.tsv" 1>&2
+echo "$(awk -F $'\t' '$2 > 0.9' pips.tsv | wc -l) of the $(cat pips.tsv | wc -l) haplotypes have PIPs above 0.9"
+# figure out the best PIP among only the SNPs (excluding the hap)
+echo -e "locus\tpip" > exclude_pips.tsv
+for i in $(sed 's+happler.hap$+exclude/susie_pips.tsv+;s+out/++' multiline.txt); do awk '(NR==1) || ($2 > max){max=$2; rec=$0} END{if (NR) print rec}' "$i" | cut -f2 | sed 's+^+'"$(echo $i | sed 's\/exclude/susie_pips.tsv$\\;s\^out/\\;s+/happler/run/+:+')"'\t+'; done >> exclude_pips.tsv
+echo "Created $out/exclude_pips.tsv" 1>&2
 
 # now, let's make the hap_pips.png file
 (
@@ -262,9 +266,20 @@ EOF
 ) | python
 echo "Created $out/bench.png" 1>&2
 
-# merge all of the metrics together
-paste -d $'\t' <(head -n1 variance_explained.tsv) <(head -n1 pips.tsv) <(head -n1 mafs.tsv) > merged.tsv
-paste -d $'\t' <(tail -n+2 variance_explained.tsv | sort) <(tail -n+2 pips.tsv | sort) <(tail -n+2 mafs.tsv | sort) >> merged.tsv
+# merge all of the .tsv files together
+join -t $'\t' -j1 --header <(
+  echo -e "locus\thap_pip\tbest_snp_pip"
+  join -t $'\t' -j1 <(tail -n+2 pips.tsv | sed 's/:/\t/g' | sed 's/\t/:/' | sort -k1,1g) <(tail -n+2 exclude_pips.tsv | sort -k1,1g) | sed 's/\t/:/'
+) <(
+  head -n1 variance_explained.tsv; tail -n+2 variance_explained.tsv | sort -k1,1g
+) | (
+  if [ "$mode" == "geuvadis" ]; then
+  # TODO: also merge with the last four columns of pips_best_str_ld.tsv and the last three columns of pips_sv_ld.tsv
+    cat
+  else
+    cat
+  fi
+) > merged.tsv
 echo "Created $out/merged.tsv" 1>&2
 
 if [ "$mode" == "aou" ]; then
