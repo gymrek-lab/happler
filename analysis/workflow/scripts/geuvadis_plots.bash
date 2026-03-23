@@ -269,17 +269,26 @@ echo "Created $out/bench.png" 1>&2
 # merge all of the .tsv files together
 join -t $'\t' -j1 --header <(
   echo -e "locus\thap_pip\tbest_snp_pip"
-  join -t $'\t' -j1 <(tail -n+2 pips.tsv | sed 's/:/\t/g' | sed 's/\t/:/' | sort -k1,1g) <(tail -n+2 exclude_pips.tsv | sort -k1,1g) | sed 's/\t/:/'
+  join -t $'\t' -j1 <(tail -n+2 pips.tsv | sed 's/:/\t/g' | sed 's/\t/:/' | sort -k1,1) <(tail -n+2 exclude_pips.tsv | sort -k1,1) | sed 's/\t/:/' | sort -k1,1
 ) <(
-  head -n1 variance_explained.tsv; tail -n+2 variance_explained.tsv | sort -k1,1g
-) | (
+  head -n1 variance_explained.tsv
+  tail -n+2 variance_explained.tsv | sort -k1,1
+) | sort -k1,1 | (
   if [ "$mode" == "geuvadis" ]; then
-  # TODO: also merge with the last four columns of pips_best_str_ld.tsv and the last three columns of pips_sv_ld.tsv
-    cat
+    # also merge with the last four columns of pips_best_str_ld.tsv and the last three columns of pips_sv_ld.tsv
+    join -t $'\t' -j1 - <(
+      join -t $'\t' -j1 --header <(
+        echo -ne "locus\t"; head -n1 pips_sv_ld.tsv | cut -f3- | tr $'\t' $'\n' | sed 's/^/sv_/' | paste -s
+        tail -n+2 pips_sv_ld.tsv | cut -f1,3- | sed 's+/+~+;s+.ld\t+~+' | awk -F '~' -v 'OFS=\t' '{print $2":"$1,$3;}' | sort -k1,1
+      ) <(
+        echo -ne "locus\t"; head -n1 pips_best_str_ld.tsv | cut -f3- | tr $'\t' $'\n' | sed 's/^/str_/' | paste -s
+        tail -n+2 pips_best_str_ld.tsv | cut -f1,3- | sort -k1,1
+      ) | sort -k1,1
+    )
   else
     cat
   fi
-) > merged.tsv
+) | sort -k1,1g > merged.tsv
 echo "Created $out/merged.tsv" 1>&2
 
 if [ "$mode" == "aou" ]; then
