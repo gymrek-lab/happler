@@ -13,40 +13,45 @@ license = "MIT"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "numpy>=1.22.4",
-    "click>=8.0.4",
-    "networkx>=2.6.3",
-    "scipy>=1.7.3",
+    "jax>=0.6.2",
     "pydot>=1.4.2",
+    "scipy>=1.12",
+    "click>=8.0.4",
     "pysam>=0.19.0",
+    "numpy>=1.26",
+    "networkx>=2.6.3",
     "haptools>=0.6.2",
     "statsmodels>=0.13.2",
 ]
 
 [tool.poetry.dependencies]
-numpy = [
-    { version = "1.22.4" , markers = "python_version <= '3.10'" },
-    { version = "2.4.2" , markers = "python_version > '3.10'" },
-]
-click = [
-    { version = "8.0.4" , markers = "python_version <= '3.10'" },
-    { version = "8.3.1" , markers = "python_version > '3.10'" },
-]
-networkx = [
-    { version = "2.6.3" , markers = "python_version <= '3.10'" },
-    { version = "3.6" , markers = "python_version > '3.10'" },
-]
-scipy = [
-    { version = "1.7.3" , markers = "python_version <= '3.10'" },
-    { version = "1.16.3" , markers = "python_version > '3.10'" },
+jax = [
+    { version = "0.6.2", markers = "python_version <= '3.10'" },
+    { version = "0.9.0", markers = "python_version > '3.10'" },
 ]
 pydot = [
     { version = "1.4.2" , markers = "python_version <= '3.10'" },
     { version = "4.0.1" , markers = "python_version > '3.10'" },
 ]
+scipy = [
+    { version = "1.12" , markers = "python_version <= '3.10'" },
+    { version = "1.16.3" , markers = "python_version > '3.10'" },
+]
+click = [
+    { version = "8.0.4" , markers = "python_version <= '3.10'" },
+    { version = "8.3.1" , markers = "python_version > '3.10'" },
+]
 pysam = [
     { version = "0.19.0" , markers = "python_version <= '3.10'" },
     { version = "0.23.3" , markers = "python_version > '3.10'" },
+]
+numpy = [
+    { version = "1.26" , markers = "python_version <= '3.10'" },
+    { version = "2.4.1" , markers = "python_version > '3.10'" },
+]
+networkx = [
+    { version = "2.6.3" , markers = "python_version <= '3.10'" },
+    { version = "3.6" , markers = "python_version > '3.10'" },
 ]
 haptools = [
     { version = "0.6.2" },

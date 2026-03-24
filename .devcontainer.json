@@ -15,7 +15,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "mamba env create -y -n happler -f dev-env.yml && conda run -n happler poetry config virtualenvs.in-project true && conda run -n happler poetry install",
+	"postCreateCommand": "conda env create -y -n happler -f dev-env.yml && conda run -n happler poetry config virtualenvs.in-project true && conda run -n happler poetry install",
 
 	// Configure tool-specific properties.
 	"customizations": {

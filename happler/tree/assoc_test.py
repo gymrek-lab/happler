@@ -9,6 +9,13 @@ from scipy import stats
 import numpy.typing as npt
 import statsmodels.api as sm
 
+# Import JAX for JIT compilation
+import jax
+import jax.numpy as jnp
+
+# Configure JAX for 64-bit precision to match NumPy behavior
+jax.config.update("jax_enable_x64", True)
+
 
 # We declare this class to be a dataclass to automatically define __init__ and a few
 # other methods. We use frozen=True to make it immutable.
@@ -377,6 +384,64 @@ class AssocTestSimpleSM(AssocTestSimple):
             return param, pval, stderr
 
 
+@jax.jit
+def _compute_bic_jit(X: jnp.ndarray, yc: jnp.ndarray) -> jnp.ndarray:
+    """
+    JIT-compiled helper function for computing BIC in vectorized OLS regression.
+
+    This function uses JAX for JIT compilation and GPU/TPU acceleration when available.
+    Includes explicit inf handling to ensure numerical equivalence with NumPy, as JAX
+    JIT optimization can sometimes change exact numerics (e.g., log(exp(x)) -> x).
+
+    Parameters
+    ----------
+    X : jnp.ndarray
+        The genotypes with shape (n, p) where n is samples and p is variants
+    yc : jnp.ndarray
+        The centered phenotypes with shape (n, 1)
+
+    Returns
+    -------
+    jnp.ndarray
+        The BIC values with shape (p,)
+    """
+    n = X.shape[0]
+    nobs2 = n / 2.0
+    log2pi = jnp.log(2 * jnp.pi)
+
+    # Center X
+    xc = X - jnp.mean(X, axis=0)  # (n, p)
+
+    # Vectorized simple OLS with intercept
+    sxx = jnp.sum(xc**2, axis=0)  # (p,)
+    sxy = jnp.sum(xc * yc, axis=0)  # (p,)
+
+    # Compute slopes, handling division by zero
+    b1 = jnp.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
+
+    # Residuals for each column's model
+    syy = jnp.sum(yc**2)  # scalar
+    ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
+
+    # Explicitly handle cases that should produce inf values
+    # When SSR is very small or zero, log(SSR/n) should be -inf
+    # JAX JIT might optimize this differently than NumPy
+    ssr_threshold = 1e-300  # Below this, treat as zero
+    ssr_safe = jnp.where(ssr > ssr_threshold, ssr, ssr_threshold)
+
+    # statsmodels-style profile log-likelihood per column
+    # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
+    ll = -nobs2 * (log2pi + jnp.log(ssr_safe / n) + 1.0)  # (p,)
+
+    # Number of parameters k: intercept + slope = 2
+    bic = -2 * ll + 2 * jnp.log(n)  # (p,)
+
+    # Explicitly set to -inf where SSR was effectively zero
+    bic = jnp.where(ssr <= ssr_threshold, jnp.array(-jnp.inf), bic)
+
+    return bic
+
+
 class AssocTestSimpleFastBIC(AssocTestSimpleSM):
     """
     Calculate only BIC in a quick, vectorized fashion without statsmodels
@@ -393,46 +458,27 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         self, X: npt.NDArray[np.float64], yc: npt.NDArray[np.float64]
     ) -> npt.NDArray:
         """
-        Perform the test for a chunk of haplotypes
+        Perform the test for a chunk of haplotypes using JAX JIT compilation
+
+        This method uses the JIT-compiled _compute_bic_jit helper function
+        for improved computational efficiency with GPU/TPU acceleration.
 
         Parameters
         ----------
-        X : npt.NDArray[np.uint8]
-            The genotypes with shape n x p
+        X : npt.NDArray[np.float64]
+            The genotypes with shape (n, p)
         yc : npt.NDArray[np.float64]
-            The phenotypes, with shape n x 1
+            The phenotypes, with shape (n, 1)
             They are assumed to be centered already
 
         Returns
         -------
         npt.NDArray[np.float64]
-            The resulting from testing this chunk of haplotypes, with shape p x 1
+            The BIC values from testing this chunk of haplotypes, with shape (p,)
         """
-        n = X.shape[0]
-        nobs2 = n / 2.0
-        log2pi = np.log(2 * np.pi)
-
-        # Center X and y
-        xc = X - X.mean(axis=0)  # (n, p)
-
-        # Vectorized simple OLS with intercept
-        sxx = np.sum(xc**2, axis=0)  # (p,)
-        sxy = np.sum(xc * yc, axis=0)  # (p,)
-
-        with np.errstate(divide="ignore", invalid="ignore"):
-            b1 = np.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
-
-        # Residuals for each column's model: r = (y - ym) - b1 * (X - xm)
-        syy = float(np.sum(yc**2))  # scalar
-        ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
-
-        # statsmodels-style profile log-likelihood per column
-        # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
-        with np.errstate(divide="ignore"):
-            ll = -nobs2 * (log2pi + np.log(ssr / n) + 1.0)  # (p,)
-
-        # Number of parameters k: intercept + slope = 2
-        return -2 * ll + 2 * np.log(n)  # (p,)
+        # Call JAX JIT-compiled helper and convert result to writable NumPy array
+        bic = _compute_bic_jit(X, yc)
+        return np.array(bic, copy=True)
 
     def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """

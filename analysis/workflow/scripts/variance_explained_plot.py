@@ -3,6 +3,7 @@ import csv
 import pickle
 from pathlib import Path
 from logging import Logger
+from dataclasses import dataclass, field
 
 import click
 import matplotlib
@@ -13,10 +14,45 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
 from haptools.logging import getLogger
+from haptools.ld import pearson_corr_ld
 from haptools.data import Phenotypes, GenotypesVCF, GenotypesPLINK, Haplotypes
+from haptools.data import Extra, Haplotype as HaplotypeBase, Variant as VariantBase
 
 from snakemake_io import glob_wildcards
 
+
+@dataclass
+class HapplerVariant(VariantBase):
+    """
+    A variant allele with sufficient fields for happler
+    Properties and functions are shared with the base Variant object, "VariantBase"
+    """
+
+    score: float
+    _extras: tuple = field(
+        repr=False,
+        init=False,
+        default=(Extra("score", ".2f", "BIC assigned to this variant"),),
+    )
+
+
+@dataclass
+class HapplerHaplotype(HaplotypeBase):
+    """
+    A haplotype with sufficient fields for happler
+    Properties and functions are shared with the base Haplotype object, "HaplotypeBase"
+    """
+
+    beta: float
+    pval: float
+    _extras: tuple = field(
+        repr=False,
+        init=False,
+        default=(
+            Extra("beta", ".2f", "Effect size in linear model"),
+            Extra("pval", ".2f", "-log(pval) in linear model"),
+        ),
+    )
 
 def standardize(data):
     """
@@ -35,7 +71,6 @@ def standardize(data):
 
 
 def get_beta_and_rsquared(result: sm.regression.linear_model.RegressionResults):
-    # TODO: should we return adjusted r-squared instead?
     return result.params[0], result.rsquared
 
 
@@ -98,15 +133,41 @@ def compute_multisnp_rsquared(gt: npt.NDArray, pt: npt.NDArray):
     return sm.OLS(pt, gt).fit().rsquared
 
 
-def get_explained_variances(
+def compute_summary_stats(gt: npt.NDArray, pt: npt.NDArray):
+    """
+    Compute the R-squared value for SNPs (from a single haplotype) in a multiple linear
+    regression
+
+    Parameters
+    ----------
+    gt: npt.NDArray
+        The genotypes of a variant in a 1D array of length num_samples
+    pt: npt.NDArray
+        The phenotype as a 1D array
+
+    Returns
+    -------
+    tuple[float, float]
+        1. Effect size
+        2. P-value
+        3. BIC
+    """
+    # standardize the phenotypes and genotypes
+    pt = standardize(pt[:, np.newaxis]).flatten()
+    gt = standardize(gt[:, np.newaxis]).flatten()
+    # fitting a linear model y = beta1 * x1
+    fit = sm.OLS(pt, gt).fit()
+    return (fit.params[0], fit.pvalues[0], fit.bic)
+
+
+def load_data(
     gts: Path,
     hps: Path,
     pts: Path,
     log: Logger = None
 ):
     """
-    Compute explained variance for the haplotypes in a .hap file and each haplotypes'
-    SNPs
+    Load gts, hps, and pts properly
 
     Parameters
     ----------
@@ -121,19 +182,14 @@ def get_explained_variances(
     
     Returns
     -------
-    dict[str, tuple[float, float, float, float]]
-        The dict is keyed by each haplotype's ID and has the following values:
-        1. explained variance for the haplotype
-        2. R-squared for the haplotype
-        3. explained variance for the haplotype's SNPs
-        4. R-squared for the haplotype's SNPs
+    tuple[gts, hps, pts]
     """
     # load the phenotypes
     pts = Phenotypes(pts, log=log)
     pts.read()
 
     # load the haplotypes
-    hps = Haplotypes(hps, log=log)
+    hps = Haplotypes(hps, haplotype=HapplerHaplotype, variant=HapplerVariant, log=log)
     hps.read()
     if not len(hps.data):
         return dict()
@@ -162,6 +218,40 @@ def get_explained_variances(
     assert len(gts.variants) == len(variants)
     pts.subset(samples=gts.samples, inplace=True)
 
+    return gts, hps, pts
+
+def get_explained_variances(
+    gts: Path,
+    hps: Path,
+    pts: Path,
+    log: Logger = None,
+):
+    """
+    Compute explained variance for the haplotypes in a .hap file and each haplotypes'
+    SNPs
+
+    Parameters
+    ----------
+    gts: Path
+        The path to a PGEN file containing genotypes for all haplotypes and their SNPs
+    hps: Path
+        The path to a .hap file containing a set of haplotypes
+    pts: Path
+        The path to a pheno file containing the phenotypes
+    log: Logger, optional
+        A logging object to write any debugging and error messages
+
+    Returns
+    -------
+    dict[str, tuple[float, float, float, float]]
+        The dict is keyed by each haplotype's ID and has the following values:
+        1. explained variance for the haplotype
+        2. R-squared for the haplotype
+        3. explained variance for the haplotype's SNPs
+        4. R-squared for the haplotype's SNPs
+    """
+    gts, hps, pts = load_data(gts, hps, pts)
+
     # compute explained variance for each SNP and haplotype
     raw_explained_variances = dict(zip(gts.variants["id"], compute_explained_variance(
         gts.data.sum(axis=2), pts.data[:, 0],
@@ -183,6 +273,97 @@ def get_explained_variances(
             *raw_explained_variances[hp.id],
             sum_of_SNPs,
             multi_rsquared,
+        )
+
+    return vals
+
+
+def get_metrics(
+    gts: Path,
+    hps: Path,
+    pts: Path,
+    log: Logger = None
+):
+    """
+    Get metrics for the haplotypes and variants in this .hap file
+
+    Parameters
+    ----------
+    gts: Path
+        The path to a PGEN file containing genotypes for all haplotypes and their SNPs
+    hps: Path
+        The path to a .hap file containing a set of haplotypes
+    pts: Path
+        The path to a pheno file containing the phenotypes
+    log: Logger, optional
+        A logging object to write any debugging and error messages
+
+    Returns
+    -------
+    dict[str, tuple[float, float, float, float]]
+        The dict is keyed by each haplotype's ID and has the following values:
+        0. LD between the alleles of the haplotype
+        1. allele frequency for the haplotype
+        2. effect size for the haplotype
+        3. p-value for the haplotype
+        4. BIC value for the haplotype
+        5. allele frequency for the haplotype's SNP 1
+        6. effect size for the haplotype's SNP 1
+        7. p-value for the haplotype's SNP 1
+        8. BIC value for the haplotype's SNP 1
+        9. allele frequency for the haplotype's SNP 2
+        10. effect size for the haplotype's SNP 2
+        11. p-value for the haplotype's SNP 2
+        12. BIC value for the haplotype's SNP 2
+    """
+    gts, hps, pts = load_data(gts, hps, pts)
+
+    # flip allele if needed before computing AFs and summary stats of variants for each hap
+    flip_allele = lambda af, flip: 1-af if flip else af
+    flip_effect = lambda effect, flip: -effect if flip else effect
+
+    afs = dict(zip(gts.variants['id'], gts.check_maf()))
+
+    summary_stats = {}
+    for variant in gts.variants["id"]:
+        summary_stats[variant] = compute_summary_stats(
+            gts.subset(variants=(variant,)).data.sum(axis=2),
+            pts.data[:, 0]
+        )
+
+    vals = {}
+    for hp in hps.data.values():
+        hp_vars = tuple(variant.id for variant in hp.variants)
+        hp_vars_alls = {variant.id: variant.allele for variant in hps.data[hp.id].variants}
+        hp_vars_gt = gts.subset(variants=hp_vars)
+        # do we need to flip the allele?
+        hp_vars_alls = {
+            als[0]: als[1][0] == hp_vars_alls[als[0]]
+            for als in hp_vars_gt.variants[["id","alleles"]]
+        }
+        if len(hp_vars) > 2:
+            hp_vars_ld = 0
+        elif len(hp_vars) == 2:
+            hp_vars_ld = pearson_corr_ld(
+                (hp_vars_gt.data[:,0] == list(hp_vars_alls.values())[0]).sum(axis=1),
+                (hp_vars_gt.data[:,1] == list(hp_vars_alls.values())[1]).sum(axis=1)
+            )
+        else:
+            hp_vars_ld = float("inf")
+        vals[hp.id] = (
+            hp_vars_ld,
+            afs[hp.id],
+            summary_stats[hp.id][0],
+            summary_stats[hp.id][1],
+            summary_stats[hp.id][2],
+            flip_allele(afs[hp_vars[0]], hp_vars_alls[hp_vars[0]]),
+            flip_effect(summary_stats[hp_vars[0]][0], hp_vars_alls[hp_vars[0]]),
+            summary_stats[hp_vars[0]][1],
+            summary_stats[hp_vars[0]][2],
+            flip_allele(afs[hp_vars[1]], hp_vars_alls[hp_vars[1]]),
+            flip_effect(summary_stats[hp_vars[1]][0], hp_vars_alls[hp_vars[1]]),
+            summary_stats[hp_vars[1]][1],
+            summary_stats[hp_vars[1]][2],
         )
 
     return vals
@@ -265,6 +446,19 @@ def main(
             log=log
         ).items()
     ]
+
+    # compute miscellaneous metrics
+    other_vals = [
+        (params[idx], hp_id, hap)
+        for idx in range(len(params))
+        for hp_id, hap in get_metrics(
+            get_hap_fname(genotypes, params[idx]),
+            get_hap_fname(haplotypes, params[idx]),
+            get_hap_fname(phenotypes, params[idx]),
+            log=log
+        ).items()
+    ]
+
     # this 2D array should have two * 2 columns: 1) the haplotype and 2) its SNPs
     # and should have as many rows as there are haplotypes among all of the loci
     # (note that some loci may have multiple haplotypes so we adjust 'params' accordingly)
@@ -277,6 +471,23 @@ def main(
             "Some of the explained variances are greater than 1! Check that nothing "
             "went wrong."
         )
+
+    params1, hp_ids1, other_vals = np.array([v[0] for v in other_vals]), [v[1] for v in other_vals], np.array([v[2] for v in other_vals])
+    assert (params == params1).all()
+    assert hp_ids1 == hp_ids
+    lds = other_vals[:, 0]
+    hap_afs = other_vals[:, 1]
+    hap_betas = other_vals[:, 2]
+    hap_pvals = other_vals[:, 3]
+    hap_bics = other_vals[:, 4]
+    snp1_afs = other_vals[:, 5]
+    snp1_betas = other_vals[:, 6]
+    snp1_pvals = other_vals[:, 7]
+    snp1_bics = other_vals[:, 8]
+    snp2_afs = other_vals[:, 9]
+    snp2_betas = other_vals[:, 10]
+    snp2_pvals = other_vals[:, 11]
+    snp2_bics = other_vals[:, 12]
 
     # how good are we doing?
     percent_success = 100*(
@@ -315,17 +526,74 @@ def main(
     f, (ax1, ax2) = plt.subplots(1, 2)
 
     with open(output.with_suffix(".pickle"), "wb") as picklef:
-        pickle.dump((params, explained_variances, rsquareds), picklef)
+        pickle.dump((
+            params,
+            explained_variances,
+            rsquareds,
+            lds,
+            hap_afs,
+            hap_betas,
+            hap_pvals,
+            hap_bics,
+            snp1_afs,
+            snp1_betas,
+            snp1_pvals,
+            snp1_bics,
+            snp2_afs,
+            snp2_betas,
+            snp2_pvals,
+            snp2_bics,
+        ), picklef)
 
     with open(output.with_suffix(".tsv"), 'w', newline='') as tsvfile:
         tsv_writer = csv.writer(tsvfile, delimiter='\t', lineterminator='\n')
-        tsv_writer.writerow(["locus", "hap_exp_var", "alleles_exp_var", "hap_r2", "alleles_r2", "hap_over_alleles_r2"])
+        tsv_writer.writerow([
+            "locus",
+            "hap_exp_var",
+            "alleles_exp_var",
+            "hap_r2",
+            "alleles_r2",
+            "hap_over_alleles_r2",
+            "allele_ld",
+            "hap_afs",
+            "hap_betas",
+            "hap_pvals",
+            "hap_bics",
+            "snp1_afs",
+            "snp1_betas",
+            "snp1_pvals",
+            "snp1_bics",
+            "snp2_afs",
+            "snp2_betas",
+            "snp2_pvals",
+            "snp2_bics",
+        ])
         if ("locus" in params.dtype.names) and ("gene" in params.dtype.names):
             name = lambda i: i["locus"]+":"+i["gene"]
         else:
             name = lambda i: ":".join(i)
         for i in range(explained_variances.shape[0]):
-            tsv_writer.writerow([name(params[i])+":"+hp_ids[i], explained_variances[i, 0], explained_variances[i, 1], rsquareds[i, 0], rsquareds[i, 1], rsquareds[i,0]/rsquareds[i,1]])
+            tsv_writer.writerow([
+                name(params[i])+":"+hp_ids[i],
+                explained_variances[i, 0],
+                explained_variances[i, 1],
+                rsquareds[i, 0],
+                rsquareds[i, 1],
+                rsquareds[i,0]/rsquareds[i,1],
+                lds[i],
+                hap_afs[i],
+                hap_betas[i],
+                hap_pvals[i],
+                hap_bics[i],
+                snp1_afs[i],
+                snp1_betas[i],
+                snp1_pvals[i],
+                snp1_bics[i],
+                snp2_afs[i],
+                snp2_betas[i],
+                snp2_pvals[i],
+                snp2_bics[i],
+            ])
 
     ax1.scatter(explained_variances[:, 0], explained_variances[:, 0]/explained_variances[:, 1])
     ax1.axline([0, 1], [max_ev_val, 1])
