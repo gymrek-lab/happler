@@ -257,11 +257,10 @@ class TreeBuilder:
                     valid = all_indices[~np.isin(all_indices, list(parent_indices_set))]
                 else:
                     valid = all_indices
-            # step 1: transform the GT matrix using remove_self=False with specific idxs
-            hap_matrix = parent.transform(
+            # step 1: transform the GT matrix and sum along ploidy axis using JAX JIT
+            hap_mat_sum = parent.transform_and_sum(
                 self.gens, allele, idxs=valid, remove_self=False
             )
-            hap_mat_sum = hap_matrix.sum(axis=2, dtype=np.uint8)
             # step 1.5: exclude any haplotypes that are too rare
             if self.maf is not None:
                 ref_af = hap_mat_sum.sum(axis=0) / hap_mat_sum.shape[0] / 2
@@ -414,11 +413,10 @@ class TreeBuilder:
                     valid = all_indices[~np.isin(all_indices, list(parent_indices_set))]
                 else:
                     valid = all_indices
-            # step 1: transform the GT matrix using remove_self=False with specific idxs
-            hap_matrix = parent.transform(
+            # step 1: transform the GT matrix and sum along ploidy axis using JAX JIT
+            hap_mat_sum = parent.transform_and_sum(
                 self.gens, allele, idxs=valid, remove_self=False
             )
-            hap_mat_sum = hap_matrix.sum(axis=2, dtype=np.uint8)
             # step 1.5: exclude any haplotypes that are too rare
             if self.maf is not None:
                 ref_af = hap_mat_sum.sum(axis=0) / hap_mat_sum.shape[0] / 2
