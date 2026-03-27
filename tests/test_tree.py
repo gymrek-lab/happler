@@ -15,7 +15,10 @@ from happler.tree import (
     TreeBuilder,
     NodeResults,
     NodeResultsExtra,
+    AssocTestSimpleSM,
+    AssocTestSimpleFastBIC,
 )
+from happler.tree.haplotypes import _transform_and_sum_jit
 
 DATADIR = Path(__file__).parent.joinpath("data")
 
@@ -318,3 +321,187 @@ def test_haplotypes_write():
 def test_simple_assoc():
     # TODO
     pass
+
+
+def _make_haplotype(gts_data, variant_idx, allele):
+    """Helper: create a single-node Haplotype from a raw genotype array."""
+    variant = Variant(idx=variant_idx, id=f"SNP{variant_idx}", pos=variant_idx + 1)
+    variant_gts = gts_data[:, variant_idx, :] == allele
+    return Haplotype.from_node(variant, allele, variant_gts)
+
+
+def test_transform_and_sum_matches_transform():
+    """
+    transform_and_sum should produce results identical to transform(...).sum(axis=2)
+    for every combination of allele (0, 1), remove_self (True, False), and idxs.
+    """
+    rng = np.random.default_rng(42)
+    n_samples, n_variants, ploidy = 20, 5, 2
+    gts_data = rng.integers(0, 2, size=(n_samples, n_variants, ploidy)).astype(np.bool_)
+
+    # Build a minimal Genotypes-like object
+    class FakeGenotypes:
+        pass
+
+    fake_gens = FakeGenotypes()
+    fake_gens.data = gts_data
+
+    for allele in (0, 1):
+        for variant_idx in range(n_variants):
+            hap = _make_haplotype(gts_data, variant_idx, allele)
+
+            # --- remove_self=True, no idxs ---
+            expected = hap.transform(fake_gens, allele, remove_self=True).sum(axis=2)
+            actual = hap.transform_and_sum(fake_gens, allele, remove_self=True)
+            np.testing.assert_array_equal(
+                actual,
+                expected,
+                err_msg=f"allele={allele}, variant_idx={variant_idx}, remove_self=True",
+            )
+
+            # --- remove_self=False, no idxs ---
+            expected = hap.transform(fake_gens, allele, remove_self=False).sum(axis=2)
+            actual = hap.transform_and_sum(fake_gens, allele, remove_self=False)
+            np.testing.assert_array_equal(
+                actual,
+                expected,
+                err_msg=f"allele={allele}, variant_idx={variant_idx}, remove_self=False",
+            )
+
+            # --- remove_self=False, explicit idxs (exclude current variant) ---
+            other_idxs = np.array(
+                [i for i in range(n_variants) if i != variant_idx]
+            )
+            expected = hap.transform(
+                fake_gens, allele, idxs=other_idxs, remove_self=False
+            ).sum(axis=2)
+            actual = hap.transform_and_sum(
+                fake_gens, allele, idxs=other_idxs, remove_self=False
+            )
+            np.testing.assert_array_equal(
+                actual,
+                expected,
+                err_msg=(
+                    f"allele={allele}, variant_idx={variant_idx}, "
+                    "remove_self=False, explicit idxs"
+                ),
+            )
+
+
+def test_transform_and_sum_jit_directly():
+    """
+    The raw JAX _transform_and_sum_jit helper should match the NumPy reference
+    np.logical_and(gens == allele, hap_data).sum(axis=2).
+    """
+    import jax.numpy as jnp
+
+    rng = np.random.default_rng(7)
+    n_samples, n_variants, ploidy = 15, 4, 2
+    gts = rng.integers(0, 2, size=(n_samples, n_variants, ploidy)).astype(np.bool_)
+    hap = rng.integers(0, 2, size=(n_samples, 1, ploidy)).astype(np.bool_)
+
+    for allele in (0, 1):
+        expected = np.logical_and(gts == allele, hap).sum(axis=2).astype(np.uint8)
+        result = np.asarray(_transform_and_sum_jit(gts, hap, allele))
+        np.testing.assert_array_equal(
+            result, expected, err_msg=f"_transform_and_sum_jit failed for allele={allele}"
+        )
+
+
+def test_transform_and_sum_dtype():
+    """transform_and_sum should always return a uint8 NumPy array."""
+    rng = np.random.default_rng(0)
+    n_samples, n_variants, ploidy = 10, 3, 2
+    gts_data = rng.integers(0, 2, size=(n_samples, n_variants, ploidy)).astype(np.bool_)
+
+    class FakeGenotypes:
+        pass
+
+    fake_gens = FakeGenotypes()
+    fake_gens.data = gts_data
+
+    hap = _make_haplotype(gts_data, 0, 0)
+    result = hap.transform_and_sum(fake_gens, 0)
+    assert isinstance(result, np.ndarray), "result should be a NumPy array"
+    assert result.dtype == np.uint8, f"expected uint8, got {result.dtype}"
+
+
+def test_align_assoc_results_basic():
+    """
+    _align_assoc_results should expand compact results into global-length arrays,
+    filling untested positions with +inf (bic/pval) or -inf (tscore).
+    """
+    # Create a compact result with 2 tested variants
+    return_dtype = [("bic", np.float64)]
+    compact = np.array([(1.5,), (2.5,)], dtype=return_dtype)
+
+    # Mask says positions 1 and 3 are tested (out of 5 global)
+    mask = np.array([False, True, False, True, False])
+
+    aligned = AssocTestSimpleFastBIC._align_assoc_results(compact, mask)
+
+    assert aligned.shape == (5,)
+    assert np.isinf(aligned["bic"][0]) and aligned["bic"][0] > 0
+    assert aligned["bic"][1] == pytest.approx(1.5)
+    assert np.isinf(aligned["bic"][2]) and aligned["bic"][2] > 0
+    assert aligned["bic"][3] == pytest.approx(2.5)
+    assert np.isinf(aligned["bic"][4]) and aligned["bic"][4] > 0
+
+
+def test_align_assoc_results_tscore():
+    """tscore field should be filled with -inf for untested positions."""
+    return_dtype = [("beta", np.float64), ("pval", np.float64), ("stderr", np.float64),
+                    ("tscore", np.float64)]
+    compact = np.array([(0.5, 0.01, 0.1, 3.0)], dtype=return_dtype)
+
+    mask = np.array([False, False, True])
+    aligned = AssocTestSimpleSM._align_assoc_results(compact, mask)
+
+    assert aligned.shape == (3,)
+    # Untested positions: bic/pval/beta/stderr -> +inf, tscore -> -inf
+    assert np.isinf(aligned["tscore"][0]) and aligned["tscore"][0] < 0
+    assert np.isinf(aligned["tscore"][1]) and aligned["tscore"][1] < 0
+    assert aligned["tscore"][2] == pytest.approx(3.0)
+    assert aligned["beta"][2] == pytest.approx(0.5)
+
+
+def test_align_assoc_results_wrong_shape():
+    """_align_assoc_results should raise ValueError when compact length != mask.sum()."""
+    return_dtype = [("bic", np.float64)]
+    compact = np.array([(1.0,), (2.0,)], dtype=return_dtype)
+    mask = np.array([True, False, True, True])  # sum=3, but compact has 2 rows
+
+    with pytest.raises(ValueError, match="align_to_mask.sum()"):
+        AssocTestSimpleFastBIC._align_assoc_results(compact, mask)
+
+
+def test_assoc_run_with_align_to_mask():
+    """
+    AssocTestSimpleFastBIC.run() with align_to_mask should return global-length results
+    with the tested columns filled in and the rest set to +inf.
+    """
+    rng = np.random.default_rng(99)
+    n_samples = 50
+    X_full = rng.standard_normal((n_samples, 4))
+    y = rng.standard_normal(n_samples)
+
+    # Only test columns 0 and 2 (mask positions 0 and 2 out of 4)
+    mask = np.array([True, False, True, False])
+    X_subset = X_full[:, mask]
+
+    method = AssocTestSimpleFastBIC()
+    # Without align_to_mask: compact results with 2 entries
+    result_compact = method.run(X_subset, y)
+    assert result_compact.data.shape == (2,)
+
+    # With align_to_mask: aligned results with 4 entries
+    result_aligned = method.run(X_subset, y, align_to_mask=mask)
+    assert result_aligned.data.shape == (4,)
+
+    # The tested positions should match the compact results
+    np.testing.assert_array_equal(
+        result_aligned.data["bic"][mask], result_compact.data["bic"]
+    )
+    # The untested positions should be +inf
+    assert np.all(np.isinf(result_aligned.data["bic"][~mask]))
+    assert np.all(result_aligned.data["bic"][~mask] > 0)

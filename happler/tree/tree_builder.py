@@ -494,18 +494,16 @@ class TreeBuilder:
         # For rigid mode: find the same variant in the other allele's results
         other_allele = int(not best_allele)
         # With global-aligned results, both alleles can be handled using the same global best_var_idx.
-        # If a SNP wasn't tested for an allele, its score/value will be inf/-inf and terminators will
-        # treat it as unhelpful.
-        best_res_idx = {best_allele: best_var_idx, other_allele: best_var_idx}
+        # If a SNP wasn't tested for an allele (e.g. no variants passed MAF), skip that allele.
+        best_res_idx = {best_allele: best_var_idx}
+        if other_allele in results:
+            best_res_idx[other_allele] = best_var_idx
         num_tests = len(parent.nodes) + 1
         # step 5: retrieve the Variant with the best value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
         self.log.debug("Chose variant {}".format(best_variant.id))
         # step 6: check the MAFs of the haplotypes we created
         # if the best variant was filtered out for this allele due to low MAF
-        # NOTE: In the aligned-results design, we don't need to explicitly check whether
-        # the best SNP was tested for the other allele. If it was not, its results for
-        # that allele will be inf/-inf and will fail to pass significance/termination checks.
         # iterate through all of the alleles of the best variant and check if they're
         # significant
         for allele in best_res_idx:
