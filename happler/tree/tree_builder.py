@@ -498,6 +498,8 @@ class TreeBuilder:
         best_res_idx = {best_allele: best_var_idx}
         if other_allele in results:
             best_res_idx[other_allele] = best_var_idx
+        else:
+            final_to_return.append((None, allele, None))
         num_tests = len(parent.nodes) + 1
         # step 5: retrieve the Variant with the best value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)

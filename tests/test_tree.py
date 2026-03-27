@@ -369,9 +369,7 @@ def test_transform_and_sum_matches_transform():
             )
 
             # --- remove_self=False, explicit idxs (exclude current variant) ---
-            other_idxs = np.array(
-                [i for i in range(n_variants) if i != variant_idx]
-            )
+            other_idxs = np.array([i for i in range(n_variants) if i != variant_idx])
             expected = hap.transform(
                 fake_gens, allele, idxs=other_idxs, remove_self=False
             ).sum(axis=2)
@@ -450,8 +448,12 @@ def test_align_assoc_results_basic():
 
 def test_align_assoc_results_tscore():
     """tscore field should be filled with -inf for untested positions."""
-    return_dtype = [("beta", np.float64), ("pval", np.float64), ("stderr", np.float64),
-                    ("tscore", np.float64)]
+    return_dtype = [
+        ("beta", np.float64),
+        ("pval", np.float64),
+        ("stderr", np.float64),
+        ("tscore", np.float64),
+    ]
     compact = np.array([(0.5, 0.01, 0.1, 3.0)], dtype=return_dtype)
 
     mask = np.array([False, False, True])
