@@ -19,3 +19,4 @@ analysis/myenv.RData
 # vscode
 .vscode
 venv/
+test.hap
