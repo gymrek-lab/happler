@@ -1,19 +1,19 @@
 from __future__ import annotations
+import logging
 from logging import getLogger
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from decimal import Decimal, getcontext
 
+import jax
 import numpy as np
+import jax.numpy as jnp
 from scipy import stats
 import numpy.typing as npt
 import statsmodels.api as sm
 
-# Import JAX for JIT compilation
-import jax
-import jax.numpy as jnp
-
 # Configure JAX for 64-bit precision to match NumPy behavior
+logging.getLogger("jax").setLevel(logging.WARNING)
 jax.config.update("jax_enable_x64", True)
 
 

@@ -1,12 +1,15 @@
 from __future__ import annotations
 import sys
+import logging
 from pathlib import Path
 from logging import Logger
 from functools import partial
 from typing import TextIO, Generator
 from dataclasses import dataclass, field
 
+import jax
 import numpy as np
+import jax.numpy as jnp
 import numpy.typing as npt
 from haptools.data import (
     Extra,
@@ -18,16 +21,13 @@ from haptools.data import (
     Haplotypes as HaplotypesBase,
 )
 
-# Import JAX for JIT compilation of transform+sum operations
-import jax
-import jax.numpy as jnp
-
-# Configure JAX for 64-bit precision to match NumPy behavior
-jax.config.update("jax_enable_x64", True)
-
 from .variant import Variant
 from .tree import Tree, NodeResults
 from .assoc_test import AssocTestSimpleSM
+
+# Configure JAX for 64-bit precision to match NumPy behavior
+logging.getLogger("jax").setLevel(logging.WARNING)
+jax.config.update("jax_enable_x64", True)
 
 
 @partial(jax.jit, static_argnums=(2,))
