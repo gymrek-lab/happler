@@ -258,8 +258,9 @@ class TreeBuilder:
         # iterate through the two possible alleles and try all SNPs with that allele
         alleles = (0, 1)
         for allele in alleles:
-            # build valid indices: start from parent mask, exclude parent nodes
-            if parent_maf_mask is not None and allele in parent_maf_mask:
+            # step 0: determine variant indices to consider for this allele; start from
+            # parent mask and exclude parent nodes
+            if parent_maf_mask is not None:
                 valid = parent_maf_mask[allele]
                 if parent_indices_set:
                     valid = valid[~np.isin(valid, list(parent_indices_set))]
@@ -273,7 +274,7 @@ class TreeBuilder:
             hap_mat_sum = parent.transform_and_sum(
                 self.gens, allele, idxs=valid, remove_self=False
             )
-            # step 1.5: exclude any haplotypes that are too rare
+            # step 2: exclude any haplotypes that are now too rare
             if self.maf is not None:
                 ref_af = hap_mat_sum.sum(axis=0) / hap_mat_sum.shape[0] / 2
                 maf = np.minimum(ref_af, 1 - ref_af)
@@ -293,12 +294,12 @@ class TreeBuilder:
                 continue
             parent_corr = None
             align_mask = self._make_align_mask(num_variants, child_maf_mask[allele])
-            # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
                 parent_res is None
             ):
                 if self.covariance_correction:
                     parent_corr = pearson_corr_ld(hap_mat_sum, parent.data.sum(axis=1))
+                # step 3: run all association tests on all of the haplotypes
                 results = self.method.run(
                     hap_mat_sum,
                     self.phens.data[:, 0],
@@ -306,22 +307,23 @@ class TreeBuilder:
                     parent_corr=parent_corr,
                     align_to_mask=align_mask,
                 )
-                # step 3: record the best t-score among all the SNPs with this allele
+                # step 4: record the best t-score among all the SNPs with this allele
                 best_var_idx = int(results.data["tscore"].argmax())
             else:
+                # step 3: run all association tests on all of the haplotypes
                 results = self.method.run(
                     hap_mat_sum,
                     self.phens.data[:, 0],
                     align_to_mask=align_mask,
                 )
-                # step 3: record the best p-value among all the SNPs with this allele
+                # step 4: record the best p-value among all the SNPs with this allele
                 best_var_idx = int(results.data[self.ranking_val].argmin())
             node_res = self.results_type.from_np(results.data[best_var_idx])
             num_tests = len(parent.nodes) + 1
-            # step 4: retrieve the Variant with the best value
+            # step 5: retrieve the Variant with the best value
             best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
             self.log.debug("Chose variant {}".format(best_variant.id))
-            # step 5: check whether we don't get a stronger effect by treating this variant
+            # step 6: check whether we don't get a stronger effect by treating this variant
             # as independently causal
             if parent_res is not None:
                 allele_gts = (self.gens.data[:, best_var_idx] == allele).sum(axis=1)[
@@ -414,8 +416,9 @@ class TreeBuilder:
         # iterate through the two possible alleles and try all SNPs with that allele
         alleles = (0, 1)
         for allele in alleles:
-            # build valid indices: start from parent mask, exclude parent nodes
-            if parent_maf_mask is not None and allele in parent_maf_mask:
+            # step 0: determine variant indices to consider for this allele; start from
+            # parent mask and exclude parent nodes
+            if parent_maf_mask is not None:
                 valid = parent_maf_mask[allele]
                 if parent_indices_set:
                     valid = valid[~np.isin(valid, list(parent_indices_set))]
@@ -429,7 +432,7 @@ class TreeBuilder:
             hap_mat_sum = parent.transform_and_sum(
                 self.gens, allele, idxs=valid, remove_self=False
             )
-            # step 1.5: exclude any haplotypes that are too rare
+            # step 2: exclude any haplotypes that are too rare
             if self.maf is not None:
                 ref_af = hap_mat_sum.sum(axis=0) / hap_mat_sum.shape[0] / 2
                 maf = np.minimum(ref_af, 1 - ref_af)
@@ -449,7 +452,6 @@ class TreeBuilder:
                 continue
             parent_corr[allele] = None
             align_mask = self._make_align_mask(num_variants, maf_mask[allele])
-            # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
                 parent_res is None
             ):
@@ -457,6 +459,7 @@ class TreeBuilder:
                     parent_corr[allele] = pearson_corr_ld(
                         hap_mat_sum, parent.data.sum(axis=1)
                     )
+                # step 3: run all association tests on all of the haplotypes
                 results[allele] = self.method.run(
                     hap_mat_sum,
                     self.phens.data[:, 0],
@@ -464,22 +467,23 @@ class TreeBuilder:
                     parent_corr=parent_corr[allele],
                     align_to_mask=align_mask,
                 )
-                # also, record the best t-score among all the SNPs with this allele
+                # step 4: record the best t-score among all the SNPs with this allele
                 best_var_by_allele[allele] = int(results[allele].data["tscore"].argmax())
             else:
+                # step 3: run all association tests on all of the haplotypes
                 results[allele] = self.method.run(
                     hap_mat_sum,
                     self.phens.data[:, 0],
                     align_to_mask=align_mask,
                 )
-                # also record the best value among all the SNPs with this allele
+                # step 4: record the best t-score among all the SNPs with this allele
                 best_var_by_allele[allele] = int(
                     results[allele].data[self.ranking_val].argmin()
                 )
         # exit if neither of the alleles worked
         if not len(best_var_by_allele):
             return None, maf_mask
-        # step 3: find the index of the best variant within the haplotype matrix
+        # step 5: find the index of the best variant within the haplotype matrix
         if isinstance(self.method, AssocTestSimpleSMTScore):
             best_allele = max(
                 best_var_by_allele,
@@ -501,7 +505,7 @@ class TreeBuilder:
         else:
             final_to_return.append((None, allele, None))
         num_tests = len(parent.nodes) + 1
-        # step 5: retrieve the Variant with the best value
+        # step 6: retrieve the Variant with the best value
         best_variant = Variant.from_np(self.gens.variants[best_var_idx], best_var_idx)
         self.log.debug("Chose variant {}".format(best_variant.id))
         # step 6: check the MAFs of the haplotypes we created
