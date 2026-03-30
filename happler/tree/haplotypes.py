@@ -1,11 +1,15 @@
 from __future__ import annotations
 import sys
+import logging
 from pathlib import Path
 from logging import Logger
+from functools import partial
 from typing import TextIO, Generator
 from dataclasses import dataclass, field
 
+import jax
 import numpy as np
+import jax.numpy as jnp
 import numpy.typing as npt
 from haptools.data import (
     Extra,
@@ -20,6 +24,42 @@ from haptools.data import (
 from .variant import Variant
 from .tree import Tree, NodeResults
 from .assoc_test import AssocTestSimpleSM
+
+# Configure JAX for 64-bit precision to match NumPy behavior
+logging.getLogger("jax").setLevel(logging.WARNING)
+jax.config.update("jax_enable_x64", True)
+
+
+@partial(jax.jit, static_argnums=(2,))
+def _transform_and_sum_jit(
+    gens_subset: jnp.ndarray,
+    hap_data: jnp.ndarray,
+    allele: int,
+) -> jnp.ndarray:
+    """
+    JIT-compiled function combining haplotype transform and sum operations.
+
+    Fuses ``np.logical_and(gens_subset == allele, hap_data).sum(axis=2)`` into
+    a single compiled kernel, avoiding materialization of the intermediate
+    3D boolean array.
+
+    Parameters
+    ----------
+    gens_subset : jnp.ndarray
+        A subset of the genotype matrix with shape (n_samples, n_variants, ploidy)
+    hap_data : jnp.ndarray
+        The haplotype data with shape (n_samples, 1, ploidy)
+    allele : int
+        The allele value (0 or 1)
+
+    Returns
+    -------
+    jnp.ndarray
+        The summed haplotype matrix with shape (n_samples, n_variants), dtype uint8
+    """
+    return jnp.sum(jnp.logical_and(gens_subset == allele, hap_data), axis=2).astype(
+        jnp.uint8
+    )
 
 
 class Haplotype:
@@ -153,11 +193,47 @@ class Haplotype:
         """
         return tuple(node[0].idx for node in self.nodes)
 
+    def _setup_gens_idx(
+        self, genotypes: Genotypes, idxs: tuple[int] = None, remove_self: bool = True
+    ) -> tuple[npt.NDArray, np.s_ | tuple[int]]:
+        """
+        Helper function to set up the genotypes and indices for transform()
+
+        Parameters
+        ----------
+        genotypes : Genotypes
+            The genotypes which to transform using the current haplotype
+        idxs : tuple[int], optional
+            If specified, we will only output haplotypes for the variants at these
+            indices. Otherwise, we'll output all of them.
+
+        Returns
+        -------
+        gens : npt.NDArray
+            The genotype data with any self-variants removed if remove_self is True
+        idx : np.s_ or tuple[int]
+            The indices to use for transformation, adjusted if self-variants were removed
+        """
+        idx = np.s_[:]  # alias for all indices
+        gens = genotypes.data
+        if remove_self:
+            # first, remove any variants that are already in this haplotype
+            gens = np.delete(gens, self.node_indices, axis=1)
+            # how does the deletion change the desired indices?
+            if idxs is not None:
+                idx = idxs - np.sum(
+                    np.array(self.node_indices)[:, np.newaxis] < idxs, axis=0
+                )
+        elif idxs is not None:
+            idx = idxs
+        return gens, idx
+
     def transform(
         self,
         genotypes: Genotypes,
         allele: int,
         idxs: tuple[int] = None,
+        remove_self: bool = True,
     ) -> npt.NDArray[bool]:
         """
         Transform a genotypes matrix via the current haplotype:
@@ -174,6 +250,9 @@ class Haplotype:
         idxs : tuple[int], optional
             If specified, we will only output haplotypes for the variants at these
             indices. Otherwise, we'll output all of them.
+        remove_self : bool, optional
+            Whether to first remove any variants that are already in this haplotype
+            using np.delete. This is expensive because it creates a new copy.
 
         Returns
         -------
@@ -181,21 +260,50 @@ class Haplotype:
             A 3D haplotype matrix similar to the genotype matrix but with haplotypes
             instead of variants in the columns. It will have the same shape except that
             the number of columns (second dimension) will have decreased by the number
-            of variants in this haplotype.
+            of variants in this haplotype if remove_self is True
         """
-        # first, remove any variants that are already in this haplotype using np.delete
-        # TODO: consider moving this outside of this function
-        gens = np.delete(genotypes.data, self.node_indices, axis=1)
-        # how does the deletion change the desired indices?
-        if idxs is not None:
-            idxs -= np.sum(np.array(self.node_indices)[:, np.newaxis] < idxs, axis=0)
-        else:
-            # alias for all of the indices
-            idxs = np.s_[:]
-        # add extra axes to match shape of gens
-        hap_data = self.data[:, np.newaxis]
+        gens, idx = self._setup_gens_idx(genotypes, idxs, remove_self)
         # use np.logical_and to superimpose the current haplotype onto the GT matrix
-        return np.logical_and(gens[:, idxs] == allele, hap_data)
+        return np.logical_and(gens[:, idx] == allele, self.data[:, np.newaxis])
+
+    def transform_and_sum(
+        self,
+        genotypes: Genotypes,
+        allele: int,
+        idxs: tuple[int] = None,
+        remove_self: bool = True,
+    ) -> npt.NDArray[np.uint8]:
+        """
+        Transform a genotypes matrix and sum along the ploidy axis using JAX JIT.
+
+        Combines :py:meth:`~.Haplotype.transform` and ``.sum(axis=2)`` into a
+        single JAX JIT-compiled operation, avoiding materialization of the
+        intermediate 3D boolean array.
+
+        Parameters
+        ----------
+        genotypes : Genotypes
+            The genotypes which to transform using the current haplotype
+        allele : int
+            The allele (either 0 or 1) of the SNPs we're adding
+        idxs : tuple[int], optional
+            If specified, we will only output haplotypes for the variants at these
+            indices. Otherwise, we'll output all of them.
+        remove_self : bool, optional
+            Whether to first remove any variants that are already in this haplotype
+            using np.delete. This is expensive because it creates a new copy.
+
+        Returns
+        -------
+        npt.NDArray[np.uint8]
+            A 2D matrix with shape (num_samples, num_variants) where each entry is
+            the count of chromosomes carrying the haplotype (0, 1, or 2)
+        """
+        gens, idx = self._setup_gens_idx(genotypes, idxs, remove_self)
+        # use JAX JIT to fuse the logical_and + sum operations
+        return np.asarray(
+            _transform_and_sum_jit(gens[:, idx], self.data[:, np.newaxis], int(allele))
+        )
 
 
 @dataclass
