@@ -1,19 +1,19 @@
 from __future__ import annotations
+import logging
 from logging import getLogger
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from decimal import Decimal, getcontext
 
+import jax
 import numpy as np
+import jax.numpy as jnp
 from scipy import stats
 import numpy.typing as npt
 import statsmodels.api as sm
 
-# Import JAX for JIT compilation
-import jax
-import jax.numpy as jnp
-
 # Configure JAX for 64-bit precision to match NumPy behavior
+logging.getLogger("jax").setLevel(logging.WARNING)
 jax.config.update("jax_enable_x64", True)
 
 
@@ -208,7 +208,13 @@ class AssocTest(ABC):
         return Decimal(10) ** Decimal(log10_pval)
 
     @abstractmethod
-    def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
+    def run(
+        self,
+        X: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+        *,
+        align_to_mask: npt.NDArray[np.bool_] | None = None,
+    ) -> AssocResults:
         """
         Run a series of phenotype-haplotype association tests for each haplotype
         (column) in X and return their p-values
@@ -227,6 +233,44 @@ class AssocTest(ABC):
             The p-values from testing each haplotype, with shape p x 1
         """
         pass
+
+    @staticmethod
+    def _align_assoc_results(
+        compact: npt.NDArray,
+        align_to_mask: npt.NDArray[np.bool_],
+    ) -> npt.NDArray:
+        """
+        Expand compact per-column results into a global-aligned result array.
+
+        Parameters
+        ----------
+        compact
+            Structured array with length == number of tested columns (X.shape[1]).
+        align_to_mask
+            Boolean mask of length == total number of global variants, where True marks
+            the global variant indices represented by columns in X. Must satisfy:
+                align_to_mask.sum() == len(compact)
+
+        Fill rule
+        ---------
+        All fields are filled with +inf except 'tscore', which is filled with -inf.
+        This makes argmin safe for bic/pval and argmax safe for tscore.
+        """
+        align_to_mask = np.asarray(align_to_mask, dtype=bool)
+        if compact.shape[0] != int(align_to_mask.sum()):
+            raise ValueError(
+                "align_to_mask.sum() must equal number of tested columns/results"
+            )
+
+        aligned = np.empty(align_to_mask.shape[0], dtype=compact.dtype)
+        for name in compact.dtype.names:
+            if name == "tscore":
+                aligned[name] = -np.inf
+            else:
+                # Works for float fields and object fields (e.g., pval stored as object)
+                aligned[name] = np.inf
+        aligned[align_to_mask] = compact
+        return aligned
 
 
 class AssocTestSimple(AssocTest):
@@ -307,7 +351,13 @@ class AssocTestSimple(AssocTest):
         else:
             return res.slope, res.pvalue, res.stderr
 
-    def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
+    def run(
+        self,
+        X: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+        *,
+        align_to_mask: npt.NDArray[np.bool_] | None = None,
+    ) -> AssocResults:
         """
         Implement AssocTest for a simple linear regression.
 
@@ -327,15 +377,16 @@ class AssocTestSimple(AssocTest):
         X = self.standardize(X)
         # use ordinary least squares for a simple regression
         # return an array of p-values
-        return AssocResults(
-            np.array(
-                [
-                    self.perform_test(X[:, variant_idx], y)
-                    for variant_idx in range(X.shape[1])
-                ],
-                dtype=self.return_dtype,
-            )
+        compact = np.array(
+            [
+                self.perform_test(X[:, variant_idx], y)
+                for variant_idx in range(X.shape[1])
+            ],
+            dtype=self.return_dtype,
         )
+        if align_to_mask is None:
+            return AssocResults(compact)
+        return AssocResults(self._align_assoc_results(compact, align_to_mask))
 
 
 class AssocTestSimpleSM(AssocTestSimple):
@@ -480,7 +531,13 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         bic = _compute_bic_jit(X, yc)
         return np.array(bic, copy=True)
 
-    def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
+    def run(
+        self,
+        X: npt.NDArray[np.float64],
+        y: npt.NDArray[np.float64],
+        *,
+        align_to_mask: npt.NDArray[np.bool_] | None = None,
+    ) -> AssocResults:
         """
         Implement AssocTest for a simple, univariate OLS model: y ~ 1 + X[:, j]
 
@@ -517,7 +574,10 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
 
             bic_vals[start:end] = self.perform_test(X[:, start:end], yc)
 
-        return AssocResults(bic_vals.astype([("bic", np.float64)]))
+        compact = bic_vals.astype([("bic", np.float64)])
+        if align_to_mask is None:
+            return AssocResults(compact)
+        return AssocResults(self._align_assoc_results(compact, align_to_mask))
 
 
 class AssocTestSimpleCovariates(AssocTestSimpleSM):
@@ -606,6 +666,8 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
         y: npt.NDArray[np.float64],
         parent_res: NodeResults = None,
         parent_corr: npt.NDArray[np.float64] = None,
+        *,
+        align_to_mask: npt.NDArray[np.bool_] | None = None,
     ) -> AssocResults:
         """
         Implement AssocTest for a simple linear regression.
@@ -630,12 +692,13 @@ class AssocTestSimpleSMTScore(AssocTestSimpleSM):
             corr = lambda i: parent_corr[i]
         # use ordinary least squares for a simple regression
         # return an array of p-values
-        return AssocResults(
-            np.array(
-                [
-                    self.perform_test(X[:, variant_idx], y, parent_res, corr(variant_idx))
-                    for variant_idx in range(X.shape[1])
-                ],
-                dtype=self.return_dtype,
-            )
+        compact = np.array(
+            [
+                self.perform_test(X[:, variant_idx], y, parent_res, corr(variant_idx))
+                for variant_idx in range(X.shape[1])
+            ],
+            dtype=self.return_dtype,
         )
+        if align_to_mask is None:
+            return AssocResults(compact)
+        return AssocResults(self._align_assoc_results(compact, align_to_mask))
