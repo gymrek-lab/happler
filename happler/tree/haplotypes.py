@@ -195,7 +195,7 @@ class Haplotype:
 
     def _setup_gens_idx(
         self, genotypes: Genotypes, idxs: tuple[int] = None, remove_self: bool = True
-    ) -> tuple[npt.NDArray, np.s_ | tuple[int]]:
+    ) -> tuple[npt.NDArray, npt.NDArray[np.intp]]:
         """
         Helper function to set up the genotypes and indices for transform()
 
@@ -210,22 +210,24 @@ class Haplotype:
         Returns
         -------
         gens : npt.NDArray
-            The genotype data with any self-variants removed if remove_self is True
-        idx : np.s_ or tuple[int]
-            The indices to use for transformation, adjusted if self-variants were removed
+            The genotype data
+        idx : npt.NDArray[np.intp]
+            The variant indices to use for transformation, with any self-variants
+            excluded if remove_self is True
         """
-        idx = np.s_[:]  # alias for all indices
         gens = genotypes.data
-        if remove_self:
-            # first, remove any variants that are already in this haplotype
-            gens = np.delete(gens, self.node_indices, axis=1)
-            # how does the deletion change the desired indices?
-            if idxs is not None:
-                idx = idxs - np.sum(
-                    np.array(self.node_indices)[:, np.newaxis] < idxs, axis=0
-                )
-        elif idxs is not None:
-            idx = idxs
+        # Build candidate indices from all variants or a caller-provided subset.
+        if idxs is None:
+            if remove_self:
+                idx = np.arange(gens.shape[1], dtype=np.intp)
+            else:
+                idx = np.s_[:]
+        else:
+            idx = np.asarray(idxs, dtype=np.intp)
+
+        if remove_self and self.node_indices:
+            # Filter out selected indices that are already in this haplotype to avoid self-matching
+            idx = idx[~np.isin(idx, self.node_indices)]
         return gens, idx
 
     def transform(
@@ -252,7 +254,7 @@ class Haplotype:
             indices. Otherwise, we'll output all of them.
         remove_self : bool, optional
             Whether to first remove any variants that are already in this haplotype
-            using np.delete. This is expensive because it creates a new copy.
+            by filtering indices. This avoids deleting columns from the genotype matrix.
 
         Returns
         -------
@@ -291,7 +293,7 @@ class Haplotype:
             indices. Otherwise, we'll output all of them.
         remove_self : bool, optional
             Whether to first remove any variants that are already in this haplotype
-            using np.delete. This is expensive because it creates a new copy.
+            by filtering indices. This avoids deleting columns from the genotype matrix.
 
         Returns
         -------
