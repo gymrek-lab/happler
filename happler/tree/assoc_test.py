@@ -454,7 +454,9 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         self.results_type = NodeResultsBIC
         self.chunk_size = chunk_size
 
-    def _compute_bic(X: npt.NDArray[np.float64], yc: npt.NDArray[np.float64]) -> npt.NDArray:
+    def _compute_bic(
+        self, X: npt.NDArray[np.float64], yc: npt.NDArray[np.float64]
+    ) -> npt.NDArray:
         n = X.shape[0]
         nobs2 = n / 2.0
         log2pi = np.log(2 * np.pi)
