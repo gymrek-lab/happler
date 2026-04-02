@@ -439,6 +439,7 @@ class TreeBuilder:
                 maf_mask[int(not best_allele)], maf_mask[best_allele][best_var_idx]
             ),
         }
+        best_res_idx = dict(sorted(best_res_idx.items()))
         num_tests = len(parent.nodes) + 1
         # step 4: find the index of the best variant within the genotype matrix
         # We need to account for the rare variants that were masked out and indices
