@@ -505,12 +505,8 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         npt.NDArray[np.float64]
             The BIC values from testing this chunk of haplotypes, with shape (p,)
         """
-        use_jax = False
-        if use_jax:
-            # Call JAX JIT-compiled helper and convert result to writable NumPy array
-            return np.array(_compute_bic_jit(X, yc), copy=True)
-        else:
-            return self._compute_bic(X, yc)
+        return np.array(_compute_bic_jit(X, yc), copy=True)
+        # return self._compute_bic(X, yc)
 
     def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
