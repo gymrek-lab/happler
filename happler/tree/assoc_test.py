@@ -454,6 +454,35 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         self.results_type = NodeResultsBIC
         self.chunk_size = chunk_size
 
+    def _compute_bic(
+        self, X: npt.NDArray[np.float64], yc: npt.NDArray[np.float64]
+    ) -> npt.NDArray:
+        n = X.shape[0]
+        nobs2 = n / 2.0
+        log2pi = np.log(2 * np.pi)
+
+        # Center X and y
+        xc = X - X.mean(axis=0)  # (n, p)
+
+        # Vectorized simple OLS with intercept
+        sxx = np.sum(xc**2, axis=0)  # (p,)
+        sxy = np.sum(xc * yc, axis=0)  # (p,)
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            b1 = np.where(sxx > 0, sxy / sxx, 0.0)  # slopes, (p,)
+
+        # Residuals for each column's model: r = (y - ym) - b1 * (X - xm)
+        syy = float(np.sum(yc**2))  # scalar
+        ssr = syy - 2 * b1 * sxy + (b1**2) * sxx
+
+        # statsmodels-style profile log-likelihood per column
+        # ll = -n/2 * [ log(2π) + log(SSR/n) + 1 ]
+        with np.errstate(divide="ignore"):
+            ll = -nobs2 * (log2pi + np.log(ssr / n) + 1.0)  # (p,)
+
+        # Number of parameters k: intercept + slope = 2
+        return -2 * ll + 2 * np.log(n)  # (p,)
+
     def perform_test(
         self, X: npt.NDArray[np.float64], yc: npt.NDArray[np.float64]
     ) -> npt.NDArray:
@@ -476,9 +505,8 @@ class AssocTestSimpleFastBIC(AssocTestSimpleSM):
         npt.NDArray[np.float64]
             The BIC values from testing this chunk of haplotypes, with shape (p,)
         """
-        # Call JAX JIT-compiled helper and convert result to writable NumPy array
-        bic = _compute_bic_jit(X, yc)
-        return np.array(bic, copy=True)
+        return np.array(_compute_bic_jit(X, yc), copy=True)
+        # return self._compute_bic(X, yc)
 
     def run(self, X: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> AssocResults:
         """
