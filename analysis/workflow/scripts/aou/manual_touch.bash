@@ -11,7 +11,7 @@ mkdir -p "$WORKDIR"
 DRY_RUN="${DRY_RUN:-0}"  # DRY_RUN=1 to only print actions
 
 # Extract gs:// URIs from output: blocks, in appearance order, and de-dupe while preserving order.
-for uri in $(grep 'output:' log | sed 's/^.*output: //' | sed 's/, /\n/g;s/ (.* storage)//g')); do
+for uri in $(grep 'output:' "$LOG_FILE" | sed 's/^.*output: //' | sed 's/, /\n/g;s/ (.* storage)//g'); do
 
     # Existence check (skip missing; also skip prefix-style matches)
     local ls_out=""
