@@ -13,7 +13,7 @@ DRY_RUN="${DRY_RUN:-0}"  # DRY_RUN=1 to only print actions
 tmpdir="$(mktemp -d "$WORKDIR/touch.XXXXXX")"
 
 # Extract gs:// URIs from output: blocks in appearance order
-for uri in $(grep 'output:' "$LOG_FILE" | sed 's/^.*output: //' | sed 's/, /\n/g;s/ \(.* storage\)//g'); do
+for uri in $(grep 'output:' "$LOG_FILE" | sed 's/^.*output: //' | sed 's/, /\n/g;s/ (.* storage)//g'); do
 
     # Existence check (skip missing; also skip prefix-style matches)
     ls_out=""
