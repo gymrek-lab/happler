@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-LOG_FILE="${1:log}"
+LOG_FILE="${1:-log}"
 WORKDIR="${WORKDIR:-/tmp/snakemake_gcs_touch}"
 mkdir -p "$WORKDIR"
 
