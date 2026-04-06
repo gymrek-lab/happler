@@ -20,25 +20,23 @@ for uri in $(grep 'output:' "$LOG_FILE" | sed 's/^.*output: //' | sed 's/, /\n/g
     ls_out="$(gcloud storage ls "$uri" 2>/dev/null || true)"
 
     if [[ -z "$ls_out" ]]; then
-        echo "[SKIP missing] $uri"
+        echo "[SKIP missing] $uri" >&2
         return 0
     fi
     if ! grep -Fxq -- "$uri" <<<"$ls_out"; then
-        echo "[SKIP non-object/prefix] $uri"
+        echo "[SKIP non-object/prefix] $uri" >&2
         return 0
     fi
 
     localpath="$tmpdir/object"
 
     if [[ "$DRY_RUN" == "1" ]]; then
-        echo "[DRY] gcloud storage cp '$uri' '$localpath'"
-        echo "[DRY] gcloud storage cp '$localpath' '$uri'"
+        echo "gcloud storage cp '$uri' '$localpath'"
+        echo "gcloud storage cp '$localpath' '$uri'"
     else
         gcloud storage cp "$uri" "$localpath"
         gcloud storage cp "$localpath" "$uri"
     fi
-
-    echo "[OK] touched $uri"
 
 done
 
