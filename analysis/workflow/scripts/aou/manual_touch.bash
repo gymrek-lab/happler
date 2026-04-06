@@ -10,11 +10,13 @@ mkdir -p "$WORKDIR"
 
 DRY_RUN="${DRY_RUN:-0}"  # DRY_RUN=1 to only print actions
 
+tmpdir="$(mktemp -d "$WORKDIR/touch.XXXXXX")"
+
 # Extract gs:// URIs from output: blocks, in appearance order, and de-dupe while preserving order.
 for uri in $(grep 'output:' "$LOG_FILE" | sed 's/^.*output: //' | sed 's/, /\n/g;s/ (.* storage)//g'); do
 
     # Existence check (skip missing; also skip prefix-style matches)
-    local ls_out=""
+    ls_out=""
     ls_out="$(gcloud storage ls "$uri" 2>/dev/null || true)"
 
     if [[ -z "$ls_out" ]]; then
@@ -26,8 +28,6 @@ for uri in $(grep 'output:' "$LOG_FILE" | sed 's/^.*output: //' | sed 's/, /\n/g
         return 0
     fi
 
-    local tmpdir localpath
-    tmpdir="$(mktemp -d "$WORKDIR/touch.XXXXXX")"
     localpath="$tmpdir/object"
 
     if [[ "$DRY_RUN" == "1" ]]; then
@@ -38,10 +38,10 @@ for uri in $(grep 'output:' "$LOG_FILE" | sed 's/^.*output: //' | sed 's/, /\n/g
         gcloud storage cp "$localpath" "$uri"
     fi
 
-    rm -rf "$tmpdir"
     echo "[OK] touched $uri"
 
 done
 
-echo
+rm -rf "$tmpdir"
+
 echo "Done."
