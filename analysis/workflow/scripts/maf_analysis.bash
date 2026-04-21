@@ -16,6 +16,8 @@ mafs=("${3[@]}")
 pheno="$4"
 out="$5"
 
+echo "this far"
+
 output_dir="$out/$region"/mafs
 min_maf=0.0001
 pheno_name=platelet_count
@@ -47,10 +49,15 @@ workflow/scripts/variance_explained_plot.py \
 -o "$output_dir"/variance_explained.png \
 "$out/$region"/genotypes/"$pheno_name"/"$geno_name".pgen \
 "$pheno" \
-"$output_dir"/{maf}.hap
+"$output_dir"/$maf.hap
 
 # compute LD for each hap at each MAF by merging all of the hap files for each MAF value and transforming them all
-haptools transform -o "$output_dir"/$best_variant/haps.pgen "$out/$region"/genotypes/"$pheno_name"/"$geno_name".pgen <(grep -E '^#' "$output_dir"/"${mafs[0]}".hap; for maf in "${mafs[@]}"; do sed 's/\tH0\t/\tH0:'"$maf"'\t/;s/\tH1\t/\tH1:'"$maf"'\t/' "$output_dir"/$maf.hap | grep -Ev '^#'; done)
+haptools transform -o "$output_dir"/$best_variant/haps.pgen "$out/$region"/genotypes/"$pheno_name"/"$geno_name".pgen <(
+    grep -E '^#' "$output_dir"/"${mafs[0]}".hap
+    for maf in "${mafs[@]}"; do
+        sed 's/\tH0\t/\tH0:'"$maf"'\t/;s/\tH1\t/\tH1:'"$maf"'\t/' "$output_dir"/$maf.hap | grep -Ev '^#'
+    done
+)
 workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir"/$best_variant/haps.ld "$output_dir"/$best_variant/haps.pgen "$output_dir"/$best_variant/best_variant.pgen
 
 cd "$output_dir"
