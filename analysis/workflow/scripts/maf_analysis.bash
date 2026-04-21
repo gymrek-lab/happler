@@ -74,9 +74,33 @@ haptools transform -o "$output_dir/$best_variant"/haps.pgen "$geno_file".pgen <(
 echo "Computing LD between each haplotype and the causal variant" 1>&2
 workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir/$best_variant"/haps.ld "$output_dir/$best_variant"/haps.pgen "$output_dir/$best_variant"/best_variant.pgen
 
+echo "Computing LD between all SNPs and the causal variant at each threshold" 1>&2
+plink2 --r2-unphased 'inter-chr' 'cols=id,freq' --ld-snp "$best_variant" --ld-window-r2 0 --nonfounders --pfile "$geno_file" --out "$output_dir/$best_variant"/snps
+echo "Getting the best SNP at each MAF threshold" 1>&2
+tail -n+2 "$output_dir/$best_variant"/snps.vcor | sort -k5,5gr | cut -f3-5 > "$output_dir/$best_variant"/snps.sort.vcor
+# create an r^2 report for the SNPs
+{
+    echo -e "maf_thresh\tsnp\tmaf\tr2"
+    for maf in "${mafs[@]}"; do
+        echo -ne "$maf\t"
+        awk -F $'\t' '$2 > '"$maf" "$output_dir/$best_variant"/snps.mac20.sort.vcor | head -1
+    done
+} > "$output_dir/$best_variant"/snps.ld
+
+echo "Merging the SNP and hap r2 reports together" 1>&2
+{
+    echo -e "maf_thresh\thap_id\thap_r2\tsnp_r2"
+    join -t $'\t' -12 -21 <(
+        tail -n+2 "$output_dir/$best_variant"/haps.ld | cut -f3,4 | sed 's/:/\t/' | sort -k2,2
+    ) <(
+        tail -n+2 "$output_dir/$best_variant"/snps.ld | cut -f 1,4 | sort -k1,1
+    )
+} > "$output_dir/$best_variant"/maf_hap_snp_r2.tsv
+
+# -------------
+
 cd "$output_dir"
 
-# plot variance_explained
 echo "Plotting variance explained" 1>&2
 (
   echo "a=["$(cut -f1,6 variance_explained.tsv | tail -n+2 | tr ':' $'\t' | grep 'H0' | cut -f 1,3 | sort -g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
@@ -91,6 +115,30 @@ plt.xlabel("-log10(MAF)")
 plt.ylabel("Haplotype / Haplotype's SNPs")
 plt.title("Variance Explained (R^2)")
 plt.savefig("varexp_maf.png")
+
+EOF
+) | python
+
+cd "$best_variant"
+
+echo "Plotting LD with causal variant" 1>&2
+(
+  echo "a=["$(tail -n+2  maf_hap_snp_r2.tsv | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  cat <<'EOF'
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+data = np.array(a)
+hap_ids = np.unique(data[:,1])
+for hp_id in hap_ids:
+  dat = data[hp_id == data[:,1]]
+  plt.plot(-np.log10(dat[:,0]), dat[:,2], 'o', label=f"Haplotype {int(hp_id)}")
+plt.plot(-np.log10(data[:,0]), data[:,3], 'o', label="Best SNP")
+plt.xlabel("-log10(MAF)")
+plt.ylabel("LD (R^2) with best SNP at --mac 20")
+plt.legend()
+plt.savefig("ld_maf.png")
 
 EOF
 ) | python
