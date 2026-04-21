@@ -25,8 +25,10 @@ geno_name=snps.qc.EUR_WHITE
 mkdir -p "$output_dir"
 
 for maf in "${mafs[@]}"; do
+    echo "Running happler for MAF "$maf
+    [ ! -f "$output_dir/$maf".hap ] && \
     happler run \
-    -o "$output_dir"/"$maf".hap \
+    -o "$output_dir/$maf".hap \
     --verbosity DEBUG \
     --maf "$maf" \
     --hap-maf "$min_maf" \
@@ -35,20 +37,23 @@ for maf in "${mafs[@]}"; do
     --discard-multiallelic \
     --remove-SNPs \
     --indep-thresh 15 \
-    -t 20 \
+    -t 18 \
     --chunk-size 500 \
     --out-thresh 5e-08 \
     "$out/$region"/genotypes/"$pheno_name"/"$geno_name".pgen \
     "$pheno"
 done
 
+mafs="$(for maf in "${mafs[@]}"; do echo -e "$(wc -l "$output_dir/$maf".hap)\t$maf"; done | grep -v '^0' | cut -f2)"
+mafs=( $mafs )
+
 workflow/scripts/variance_explained_plot.py \
 --verbosity WARNING \
--s <(wc -l "$output_dir"/*.hap | grep -v total | sed 's/^ *//' | grep -v '^0' | sed 's/^.* //') \
+-s <(for maf in "${mafs[@]}"; do echo "$output_dir/$maf".hap; done) \
 -o "$output_dir"/variance_explained.png \
 "$out/$region"/genotypes/"$pheno_name"/"$geno_name".pgen \
 "$pheno" \
-"$output_dir"/$maf.hap
+"$output_dir/*.hap
 
 # compute LD for each hap at each MAF by merging all of the hap files for each MAF value and transforming them all
 haptools transform -o "$output_dir"/$best_variant/haps.pgen "$out/$region"/genotypes/"$pheno_name"/"$geno_name".pgen <(
