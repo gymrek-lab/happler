@@ -167,7 +167,7 @@ EOF
     echo -ne "region\tgene\thap.id\tpip\t"
     head -n1 data/geuvadis/mlamkin/Geuvadis_varlevel_corrected_significant_variants.with-end.tsv && \
     ~/miniconda3/envs/htslib/bin/bedtools intersect -a <(
-      echo -e "chrom\tstart\tend\tgene\tpip" && cat "$out"/pips.tsv | sed 's+_+\t+;s+-+\t+;s+:+\t+g' | sort -k1,1V -k2,2n
+      echo -e "chrom\tstart\tend\tgene\thap.id\tpip" && tail -n+2 "$out"/pips.tsv | sed 's+_+\t+;s+-+\t+;s+:+\t+g' | sort -k1,1V -k2,2n
     ) -b data/geuvadis/mlamkin/Geuvadis_varlevel_corrected_significant_variants.with-end.tsv -wa -wb -loj | \
     sed 's+\t+_+;s+\t+-+'
   ) | awk -F'\t' '$2 == $8' | cut -f8 --complement > "$out"/STR_assocations.tsv
@@ -267,10 +267,12 @@ EOF
 echo "Created $out/bench.png" 1>&2
 
 # merge all of the .tsv files together
-join -t $'\t' -j1 --header <(
+(
   echo -e "locus\thap_pip\tbest_snp_pip"
   join -t $'\t' -j1 <(tail -n+2 pips.tsv | sed 's/:/\t/g' | sed 's/\t/:/' | sort -k1,1) <(tail -n+2 exclude_pips.tsv | sort -k1,1) | sed 's/\t/:/' | sort -k1,1
-) <(
+) > merged_pips.tsv
+
+join -t $'\t' -j1 --header merged_pips.tsv <(
   head -n1 variance_explained.tsv
   tail -n+2 variance_explained.tsv | sort -k1,1
 ) | sort -k1,1 | (

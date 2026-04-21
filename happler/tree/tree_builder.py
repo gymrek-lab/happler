@@ -208,32 +208,6 @@ class TreeBuilder:
             f"Pruned {count} leaves with LD > {self.ld_prune_thresh} with their siblings"
         )
 
-    def maf_mask(
-        self,
-        hap_matrix: npt.NDArray[np.bool_],
-    ) -> npt.NDArray:
-        """
-        Check the minor allele frequency of each haplotype in the provided hap matrix
-
-        Parameters
-        ----------
-        hap_matrix: npt.NDArray[np.bool_]
-            An array of haplotype "genotypes" of shape: num_samples x num_haplotypes
-
-        Returns
-        -------
-            An integer mask denoting the indices of the haplotypes that passed the
-            MAF threshold
-        """
-        if self.maf is None:
-            return np.arange(hap_matrix.shape[1])
-        num_strands = 2 * hap_matrix.shape[0]
-        # TODO: make this work for multi-allelic variants, too?
-        ref_af = hap_matrix.sum(axis=(0, 2)) / num_strands
-        maf = np.array([ref_af, 1 - ref_af]).min(axis=0)
-        common_variants = maf >= self.maf
-        return np.nonzero(common_variants)[0]
-
     def _find_split_flexible(
         self, parent: Haplotype, parent_res: NodeResults = None
     ) -> tuple[Variant, np.void]:
@@ -260,18 +234,24 @@ class TreeBuilder:
         alleles = (0, 1)
         for allele in alleles:
             # step 1: transform the GT matrix into a matrix of common haplotypes
-            hap_matrix = parent.transform(self.gens, allele)
-            maf_mask = self.maf_mask(hap_matrix)
-            if len(maf_mask) != hap_matrix.shape[1]:
-                self.log.debug(
-                    f"Considering {len(maf_mask)} variants for allele {allele}"
-                )
-            hap_matrix = hap_matrix[:, maf_mask]
-            if hap_matrix.shape[1] == 0:
+            hap_mat_sum = parent.transform_and_sum(self.gens, allele)
+            # step 1.5: filter out any haplotypes with low MAF
+            if self.maf is not None:
+                ref_af = hap_mat_sum.sum(axis=0) / hap_mat_sum.shape[0] / 2
+                maf = np.minimum(ref_af, 1 - ref_af)
+                maf_mask = np.nonzero(maf >= self.maf)[0]
+                if len(maf_mask) < hap_mat_sum.shape[1]:
+                    self.log.debug(
+                        f"Considering {len(maf_mask)} variants for allele {allele}"
+                    )
+                    hap_mat_sum = hap_mat_sum[:, maf_mask]
+            else:
+                maf_mask = np.arange(hap_mat_sum.shape[1])
+            if hap_mat_sum.shape[1] == 0:
                 # if there weren't any genotypes left, just return None
+                self.log.debug(f"No variants passed --hap-maf for allele {allele}")
                 final_to_return.append((None, allele, None))
                 continue
-            hap_mat_sum = hap_matrix.sum(axis=2, dtype=np.uint8)
             parent_corr = None
             # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
@@ -398,22 +378,24 @@ class TreeBuilder:
         alleles = (0, 1)
         for allele in alleles:
             # step 1: transform the GT matrix into a matrix of common haplotypes
-            hap_matrix = parent.transform(self.gens, allele)
-            maf_mask[allele] = self.maf_mask(hap_matrix)
-            if len(maf_mask[allele]) != hap_matrix.shape[1]:
-                self.log.debug(
-                    f"Considering {len(maf_mask[allele])} variants for allele {allele}"
-                )
-            # check if we actually need to filter at all
-            # If not, it's better to avoid it bc this can create a copy of the array!
-            if maf_mask[allele].shape[0] == 0:
+            hap_mat_sum = parent.transform_and_sum(self.gens, allele)
+            # step 1.5: filter out any haplotypes with low MAF
+            if self.maf is not None:
+                ref_af = hap_mat_sum.sum(axis=0) / hap_mat_sum.shape[0] / 2
+                maf = np.minimum(ref_af, 1 - ref_af)
+                maf_mask[allele] = np.nonzero(maf >= self.maf)[0]
+                if len(maf_mask[allele]) < hap_mat_sum.shape[1]:
+                    self.log.debug(
+                        f"Considering {len(maf_mask[allele])} variants for allele {allele}"
+                    )
+                    hap_mat_sum = hap_mat_sum[:, maf_mask[allele]]
+            else:
+                maf_mask[allele] = np.arange(hap_mat_sum.shape[1])
+            if hap_mat_sum.shape[1] == 0:
                 # if there weren't any genotypes left, just return None
+                self.log.debug(f"No variants passed --hap-maf for allele {allele}")
                 final_to_return.append((None, allele, None))
                 continue
-            elif maf_mask[allele].shape[0] < hap_matrix.shape[1]:
-                hap_mat_sum = hap_matrix[:, maf_mask[allele]].sum(axis=2, dtype=np.uint8)
-            else:
-                hap_mat_sum = hap_matrix.sum(axis=2, dtype=np.uint8)
             parent_corr[allele] = None
             # step 2: run all association tests on all of the haplotypes
             if isinstance(self.method, AssocTestSimpleSMTScore) and not (
