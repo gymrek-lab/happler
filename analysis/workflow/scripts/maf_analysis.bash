@@ -6,9 +6,10 @@
 # arg3: phenotype file (ex: data/aou/phenos/platelet_count.resid.pheno)
 # arg4: out path (ex: out)
 # ex: workflow/scripts/maf_analysis.bash 5:88884379 5_87367336-90059999 "0.05 0.055 0.1" data/aou/phenos/platelet_count.resid.pheno out
-
 # Note: You should first investigate the MAF of the causal SNP to determine the best MAFs to use:
 # plink2 --pfile out/"$region"/genotypes/"$pheno_name"/"$geno_name" --out out/"$region"/genotypes/"$pheno_name"/"$geno_name".maf --freq
+
+set -euo pipefail
 
 best_variant="$1"
 region="$2"
@@ -24,9 +25,10 @@ geno_name=snps.qc.EUR_WHITE
 
 mkdir -p "$output_dir"
 
+# NOTE: THRESHOLD IS 18 NOT 20
 for maf in "${mafs[@]}"; do
     [ ! -f "$output_dir/$maf".hap ] && \
-    echo "Running happler for MAF "$maf && \
+    echo "Running happler for MAF "$maf 1>&2 && \
     happler run \
     -o "$output_dir/$maf".hap \
     --verbosity DEBUG \
@@ -44,17 +46,21 @@ for maf in "${mafs[@]}"; do
     "$pheno"
 done
 
-mafs="$(for maf in "${mafs[@]}"; do echo -e "$(wc -l "$output_dir/$maf".hap)\t$maf"; done | grep -v '^0' | cut -f2)"
+echo "Collecting haplotypes with more than one allele" 1>&2
+mafs=$(for maf in "${mafs[@]}"; do echo -e "$(wc -l "$output_dir/$maf".hap)\t$maf"; done | grep -v '^0' | cut -f2)
 mafs=( $mafs )
 
+echo "Computing variance explained for each haplotype" 1>&2
 workflow/scripts/variance_explained_plot.py \
 --verbosity WARNING \
 -s <(for maf in "${mafs[@]}"; do echo "$output_dir/$maf".hap; done) \
 -o "$output_dir"/variance_explained.png \
 "$out/$region"/genotypes/"$pheno_name"/"$geno_name".pgen \
 "$pheno" \
-"$output_dir"/*.hap
+"$output_dir"/'{maf}'.hap
 
+echo "Computing LD between each haplotype and the causal variant" 1>&2
+mkdir -p "$output_dir"/$best_variant/haps.pgen
 # compute LD for each hap at each MAF by merging all of the hap files for each MAF value and transforming them all
 haptools transform -o "$output_dir"/$best_variant/haps.pgen "$out/$region"/genotypes/"$pheno_name"/"$geno_name".pgen <(
     grep -E '^#' "$output_dir/${mafs[0]}".hap
@@ -67,6 +73,7 @@ workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir"/$best_va
 cd "$output_dir"
 
 # plot variance_explained
+echo "Plotting variance explained" 1>&2
 (
   echo "a=["$(cut -f1,6 variance_explained.tsv | tail -n+2 | tr ':' $'\t' | grep 'H0' | cut -f 1,3 | sort -g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
   cat <<'EOF'
