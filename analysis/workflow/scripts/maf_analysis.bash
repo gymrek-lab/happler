@@ -83,7 +83,7 @@ set +o pipefail
 # create an r^2 report for the SNPs
 {
     echo -e "maf_thresh\tsnp\tmaf\tr2"
-    for maf in "${mafs[@]}"; do
+    for maf in "${all_mafs[@]}"; do
         echo -ne "$maf\t"
         awk -F $'\t' '$2 > '"$maf" "$output_dir/$best_variant"/snps.sort.vcor | head -1
     done
