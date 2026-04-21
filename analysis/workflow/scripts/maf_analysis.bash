@@ -83,7 +83,7 @@ tail -n+2 "$output_dir/$best_variant"/snps.vcor | sort -k5,5gr | cut -f3-5 > "$o
     echo -e "maf_thresh\tsnp\tmaf\tr2"
     for maf in "${mafs[@]}"; do
         echo -ne "$maf\t"
-        awk -F $'\t' '$2 > '"$maf" "$output_dir/$best_variant"/snps.mac20.sort.vcor | head -1
+        awk -F $'\t' '$2 > '"$maf" "$output_dir/$best_variant"/snps.sort.vcor | head -1
     done
 } > "$output_dir/$best_variant"/snps.ld
 
