@@ -59,8 +59,8 @@ workflow/scripts/variance_explained_plot.py \
 "$pheno" \
 "$output_dir"/'{maf}'.hap
 
-mkdir -p "$output_dir"/$best_variant/haps.pgen
-echo "Transform all haplotypes into one merged PGEN" 1>&2
+mkdir -p "$output_dir"/$best_variant
+echo "Transforming all haplotypes into one merged PGEN" 1>&2
 # compute LD for each hap at each MAF by merging all of the hap files for each MAF value and transforming them all
 haptools transform -o "$output_dir"/$best_variant/haps.pgen "$out/$region"/genotypes/"$pheno_name"/"$geno_name".pgen <(
     grep -E '^#' "$output_dir/${mafs[0]}".hap
