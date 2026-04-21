@@ -48,6 +48,7 @@ for maf in "${mafs[@]}"; do
 done
 
 echo "Collecting haplotypes with more than one allele" 1>&2
+all_mafs=( "${mafs[@]}" )
 mafs=$(for maf in "${mafs[@]}"; do echo -e "$(wc -l "$output_dir/$maf".hap)\t$maf"; done | grep -v '^0' | cut -f2)
 mafs=( $mafs )
 
@@ -78,6 +79,7 @@ echo "Computing LD between all SNPs and the causal variant at each threshold" 1>
 plink2 --r2-unphased 'inter-chr' 'cols=id,freq' --ld-snp "$best_variant" --ld-window-r2 0 --nonfounders --pfile "$geno_file" --out "$output_dir/$best_variant"/snps
 echo "Getting the best SNP at each MAF threshold" 1>&2
 tail -n+2 "$output_dir/$best_variant"/snps.vcor | sort -k5,5gr | cut -f3-5 > "$output_dir/$best_variant"/snps.sort.vcor
+set +o pipefail
 # create an r^2 report for the SNPs
 {
     echo -e "maf_thresh\tsnp\tmaf\tr2"
@@ -86,6 +88,7 @@ tail -n+2 "$output_dir/$best_variant"/snps.vcor | sort -k5,5gr | cut -f3-5 > "$o
         awk -F $'\t' '$2 > '"$maf" "$output_dir/$best_variant"/snps.sort.vcor | head -1
     done
 } > "$output_dir/$best_variant"/snps.ld
+set -o pipefail
 
 echo "Merging the SNP and hap r2 reports together" 1>&2
 {
