@@ -2,18 +2,18 @@
 
 # arg1: the ID of the causal SNP (ex: 5:88884379)
 # arg1: region to extract (ex: 5_87367336-90059999)
-# arg2: MAFs (ex: (0.001 0.01 0.015 0.02 0.025 0.03 0.035 0.04 0.045 0.05 0.1))
+# arg2: MAFs (ex: "0.001 0.01 0.015 0.02 0.025 0.03 0.035 0.04 0.045 0.05 0.1")
 # arg3: phenotype file (ex: data/aou/phenos/platelet_count.resid.pheno)
 # arg4: out path (ex: out)
-# ex: workflow/scripts/maf_analysis.bash 5:88884379 5_87367336-90059999 (0.05 0.055 0.1) data/aou/phenos/platelet_count.resid.pheno out
+# ex: workflow/scripts/maf_analysis.bash 5:88884379 5_87367336-90059999 "0.05 0.055 0.1" data/aou/phenos/platelet_count.resid.pheno out
 
 # Note: You should first investigate the MAF of the causal SNP to determine the best MAFs to use:
 # plink2 --pfile out/"$region"/genotypes/"$pheno_name"/"$geno_name" --out out/"$region"/genotypes/"$pheno_name"/"$geno_name".maf --freq
 
 best_variant="$1"
 region="$2"
-echo this far
-mafs=("${3[@]}")
+maf_str="$3"
+read -r -a mafs <<< "$maf_str"
 pheno="$4"
 out="$5"
 
