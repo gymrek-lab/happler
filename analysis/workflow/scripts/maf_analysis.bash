@@ -12,11 +12,10 @@
 
 best_variant="$1"
 region="$2"
+echo this far
 mafs=("${3[@]}")
 pheno="$4"
 out="$5"
-
-echo "this far"
 
 output_dir="$out/$region"/mafs
 min_maf=0.0001
