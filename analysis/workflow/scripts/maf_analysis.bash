@@ -59,8 +59,8 @@ workflow/scripts/variance_explained_plot.py \
 "$pheno" \
 "$output_dir"/'{maf}'.hap
 
-echo "Computing LD between each haplotype and the causal variant" 1>&2
 mkdir -p "$output_dir"/$best_variant/haps.pgen
+echo "Transform all haplotypes into one merged PGEN" 1>&2
 # compute LD for each hap at each MAF by merging all of the hap files for each MAF value and transforming them all
 haptools transform -o "$output_dir"/$best_variant/haps.pgen "$out/$region"/genotypes/"$pheno_name"/"$geno_name".pgen <(
     grep -E '^#' "$output_dir/${mafs[0]}".hap
@@ -68,6 +68,7 @@ haptools transform -o "$output_dir"/$best_variant/haps.pgen "$out/$region"/genot
         sed 's/\tH0\t/\tH0:'"$maf"'\t/;s/\tH1\t/\tH1:'"$maf"'\t/' "$output_dir/$maf".hap | grep -Ev '^#'
     done
 )
+echo "Computing LD between each haplotype and the causal variant" 1>&2
 workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir"/$best_variant/haps.ld "$output_dir"/$best_variant/haps.pgen "$output_dir"/$best_variant/best_variant.pgen
 
 cd "$output_dir"
