@@ -64,6 +64,8 @@ workflow/scripts/variance_explained_plot.py \
 mkdir -p "$output_dir"/$best_variant
 echo "Creating PGEN for best variant" 1>&2
 plink2 --snp "$best_variant" --pfile "$geno_file" --make-pgen --freq --out "$output_dir/$best_variant"/best_variant
+best_variant_maf="$(grep -P "\t$best_variant\t" "$output_dir/$best_variant"/best_variant.afreq | cut -f5 | awk '{min = ($1 < 1-$1 ? $1 : 1-$1); print min;}')"
+echo "Causal variant MAF: $best_variant_maf" 1>&2
 echo "Transforming all haplotypes into one merged PGEN" 1>&2
 # compute LD for each hap at each MAF by merging all of the hap files for each MAF value and transforming them all
 haptools transform -o "$output_dir/$best_variant"/haps.pgen "$geno_file".pgen <(
@@ -79,13 +81,20 @@ echo "Computing LD between all SNPs and the causal variant at each threshold" 1>
 plink2 --r2-unphased 'inter-chr' 'cols=id,freq' --ld-snp "$best_variant" --ld-window-r2 0 --nonfounders --pfile "$geno_file" --out "$output_dir/$best_variant"/snps
 echo "Getting the best SNP at each MAF threshold" 1>&2
 tail -n+2 "$output_dir/$best_variant"/snps.vcor | sort -k5,5gr | cut -f3-5 > "$output_dir/$best_variant"/snps.sort.vcor
+
+# TODO: Instead of getting the SNP that has the best LD with the causal SNP, we should use the SNP with the best PIP from finemappinp with SuSiE
+
 set +o pipefail
 # create an r^2 report for the SNPs
 {
     echo -e "maf_thresh\tsnp\tmaf\tr2"
     for maf in "${all_mafs[@]}"; do
         echo -ne "$maf\t"
-        awk -F $'\t' '$2 > '"$maf" "$output_dir/$best_variant"/snps.sort.vcor | head -1
+        if awk -v n1="$maf" -v n2="$best_variant_maf" 'BEGIN { exit (n1 > n2 ? 0 : 1) }'; then
+            awk -F $'\t' '$2 > '"$maf" "$output_dir/$best_variant"/snps.sort.vcor | head -1
+        else
+            echo -e "$best_variant\t$best_variant_maf\t1"
+        fi
     done
 } > "$output_dir/$best_variant"/snps.ld
 set -o pipefail
@@ -93,11 +102,12 @@ set -o pipefail
 echo "Merging the SNP and hap r2 reports together" 1>&2
 {
     echo -e "maf_thresh\thap_id\thap_r2\tsnp_r2"
-    join -t $'\t' -12 -21 <(
-        tail -n+2 "$output_dir/$best_variant"/haps.ld | cut -f3,4 | sed 's/:/\t/' | sort -k2,2
-    ) <(
+    join -t $'\t' -a1 -11 -22 <(
         tail -n+2 "$output_dir/$best_variant"/snps.ld | cut -f 1,4 | sort -k1,1
-    )
+    ) <(
+        tail -n+2 "$output_dir/$best_variant"/haps.ld | cut -f3,4 | sed 's/:/\t/' | sort -k2,2
+    ) | \
+    awk -F $'\t' -v 'OFS=\t' 'NF == 2 { $3="H0";$4=$2 } {print $1, $3, $4, $2;}'
 } > "$output_dir/$best_variant"/maf_hap_snp_r2.tsv
 
 # -------------
@@ -126,20 +136,22 @@ cd "$best_variant"
 
 echo "Plotting LD with causal variant" 1>&2
 (
-  echo "a=["$(tail -n+2  maf_hap_snp_r2.tsv | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  echo "a=["$(tail -n+2 maf_hap_snp_r2.tsv | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 data = np.array(a)
+both = data[data[:,2] == data[:,3]]
 hap_ids = np.unique(data[:,1])
 for hp_id in hap_ids:
   dat = data[hp_id == data[:,1]]
-  plt.plot(-np.log10(dat[:,0]), dat[:,2], 'o', label=f"Haplotype {int(hp_id)}")
-plt.plot(-np.log10(data[:,0]), data[:,3], 'o', label="Best SNP")
-plt.xlabel("-log10(MAF)")
-plt.ylabel("LD (R^2) with best SNP at --mac 20")
+  plt.plot(dat[:,0], dat[:,2], 'o-', label=f"Haplotype {int(hp_id)}")
+plt.plot(data[:,0], data[:,3], 'o-', label="Best SNP")
+plt.plot(both[:,0], both[:,3], 'o', label="Both")
+plt.xlabel("MAF")
+plt.ylabel("LD (R^2) with causal SNP")
 plt.legend()
 plt.savefig("ld_maf.png")
 
