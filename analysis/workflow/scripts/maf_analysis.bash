@@ -44,7 +44,7 @@ for maf in "${mafs[@]}"; do
     --chunk-size 500 \
     --out-thresh 5e-08 \
     "$geno_file".pgen \
-    "$pheno"
+    "$pheno" &> "$output_dir/$maf".log
 done
 
 echo "Collecting haplotypes with more than one allele" 1>&2
@@ -59,7 +59,7 @@ workflow/scripts/variance_explained_plot.py \
 -o "$output_dir"/variance_explained.png \
 "$geno_file".pgen \
 "$pheno" \
-"$output_dir"/'{maf}'.hap
+"$output_dir"/'{maf}'.hap &> "$output_dir"/variance_explained.log
 
 mkdir -p "$output_dir"/$best_variant
 echo "Creating PGEN for best variant" 1>&2
@@ -73,9 +73,9 @@ haptools transform -o "$output_dir/$best_variant"/haps.pgen "$geno_file".pgen <(
     for maf in "${mafs[@]}"; do
         sed 's/\tH0\t/\tH0:'"$maf"'\t/;s/\tH1\t/\tH1:'"$maf"'\t/' "$output_dir/$maf".hap | grep -Ev '^#'
     done
-)
+) &> "$output_dir/$best_variant"/haps.log
 echo "Computing LD between each haplotype and the causal variant" 1>&2
-workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir/$best_variant"/haps.ld "$output_dir/$best_variant"/haps.pgen "$output_dir/$best_variant"/best_variant.pgen
+workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir/$best_variant"/haps.ld "$output_dir/$best_variant"/haps.pgen "$output_dir/$best_variant"/best_variant.pgen &> "$output_dir/$best_variant"/haps.ld.log
 
 echo "Computing LD between all SNPs and the causal variant at each threshold" 1>&2
 plink2 --r2-unphased 'inter-chr' 'cols=id,freq' --ld-snp "$best_variant" --ld-window-r2 0 --nonfounders --pfile "$geno_file" --out "$output_dir/$best_variant"/snps
