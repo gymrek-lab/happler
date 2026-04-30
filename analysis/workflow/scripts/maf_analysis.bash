@@ -149,8 +149,8 @@ for hp_id in hap_ids:
     dat = data[hp_id == data[:,1]]
     plt.plot(dat[:,0], dat[:,2], 'o-', color=color_by_hap[hp_id], label=f"Haplotype {int(hp_id)}")
 plt.axvline(x=lowest_maf, color='red', linestyle='--')
-plt.plot(data[:,0], data[:,3], 'o-', label="Best SNP")
-plt.plot(both[:,0], both[:,3], 'o', label="Both")
+plt.plot(data[:,0], data[:,3], 'o-', color='black', label="Best SNP")
+plt.plot(both[:,0], both[:,3], 'o', color='grey', label="Both")
 plt.xlabel("MAF")
 plt.ylabel("LD (R^2) with causal SNP")
 plt.ylim(0, 1.02)
