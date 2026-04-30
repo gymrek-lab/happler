@@ -141,12 +141,16 @@ data = np.array(a)
 both = data[data[:,2] == data[:,3]]
 hap_ids = np.unique(data[:,1])
 lowest_maf = np.unique(data[:,4]).min()
+# Pick a colormap and sample as many distinct colors as needed
+cmap = plt.get_cmap("tab20")  # good for up to ~20 distinct colors
+colors = cmap(np.linspace(0, 1, len(hap_ids)))
+color_by_hap = {hp: colors[i] for i, hp in enumerate(hap_ids)}
+for hp_id in hap_ids:
+    dat = data[hp_id == data[:,1]]
+    plt.plot(dat[:,0], dat[:,2], 'o-', color=color_by_hap[hp_id], label=f"Haplotype {int(hp_id)}")
+plt.axvline(x=lowest_maf, color='red', linestyle='--')
 plt.plot(data[:,0], data[:,3], 'o-', label="Best SNP")
 plt.plot(both[:,0], both[:,3], 'o', label="Both")
-for hp_id in hap_ids:
-  dat = data[hp_id == data[:,1]]
-  plt.plot(dat[:,0], dat[:,2], 'o-', label=f"Haplotype {int(hp_id)}")
-plt.axvline(x=lowest_maf, color='red', linestyle='--')
 plt.xlabel("MAF")
 plt.ylabel("LD (R^2) with causal SNP")
 plt.ylim(0, 1.02)
