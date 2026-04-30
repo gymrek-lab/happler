@@ -39,7 +39,7 @@ for maf in "${mafs[@]}"; do
     --discard-multiallelic \
     --remove-SNPs \
     --indep-thresh 15 \
-    -t 20 \
+    -t 18 \
     --chunk-size 500 \
     --out-thresh 5e-08 \
     "$geno_file".pgen \
@@ -140,14 +140,13 @@ import matplotlib.pyplot as plt
 data = np.array(a)
 both = data[data[:,2] == data[:,3]]
 hap_ids = np.unique(data[:,1])
-mafs = np.unique(data[:,4])
+lowest_maf = np.unique(data[:,4]).min()
+plt.plot(data[:,0], data[:,3], 'o-', label="Best SNP")
+plt.plot(both[:,0], both[:,3], 'o', label="Both")
 for hp_id in hap_ids:
   dat = data[hp_id == data[:,1]]
   plt.plot(dat[:,0], dat[:,2], 'o-', label=f"Haplotype {int(hp_id)}")
-plt.plot(data[:,0], data[:,3], 'o-', label="Best SNP")
-plt.plot(both[:,0], both[:,3], 'o', label="Both")
-for maf in mafs:
-  plt.axvline(x=maf, color='red', linestyle='--')
+plt.axvline(x=lowest_maf, color='red', linestyle='--')
 plt.xlabel("MAF")
 plt.ylabel("LD (R^2) with causal SNP")
 plt.ylim(0, 1.02)
