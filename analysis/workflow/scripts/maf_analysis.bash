@@ -62,7 +62,7 @@ haptools transform -o "$output_dir"/haps.pgen "$geno_file".pgen <(
 
 echo "Merging SNPs and haps for each MAF" 1>&2
 for maf in "${all_mafs[@]}"; do
-    if printf '%s\0' "${arr[@]}" | grep -qzxF "$search_item"; then
+    if printf '%s\0' "${mafs[@]}" | grep -qzxF "$maf"; then
         [ ! -f "$output_dir/$maf.rds" ] && \
         workflow/scripts/merge_plink.py \
         --chunk-size 1000 \
@@ -74,7 +74,7 @@ for maf in "${all_mafs[@]}"; do
         "$output_dir"/haps.pgen \
         "$output_dir/$maf".merge.pgen &> "$output_dir/$maf".merge.log
     else
-        plink2 --maf "$maf" --pfile "$geno_file" --make-pgen --out "$output_dir/$maf".merge
+        plink2 --maf "$maf" --pfile "$geno_file" --make-pgen --out "$output_dir/$maf".merge &>/dev/null
     fi && \
     workflow/scripts/run_SuSiE.R "$output_dir/$maf".merge.pgen "$pheno" "$output_dir" NULL 10 &> "$output_dir/$maf".susie.log && \
     workflow/scripts/extract_pips.R "$output_dir/$maf.rds" "$output_dir/$maf.pips.tsv" &>"$output_dir/$maf.pips.log"
