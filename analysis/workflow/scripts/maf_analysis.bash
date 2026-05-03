@@ -46,6 +46,30 @@ for maf in "${mafs[@]}"; do
     "$pheno" &> "$output_dir/$maf".log
 done
 
+echo "Transforming all haplotypes into one merged PGEN" 1>&2
+# merge all of the hap files for each MAF value and transform them all
+haptools transform -o "$output_dir"/haps.pgen "$geno_file".pgen <(
+    grep -E '^#' "$output_dir/${mafs[0]}".hap
+    for maf in "${mafs[@]}"; do
+        sed 's/\tH0\t/\tH0:'"$maf"'\t/;s/\tH1\t/\tH1:'"$maf"'\t/' "$output_dir/$maf".hap | grep -Ev '^#'
+    done
+) &> "$output_dir"/haps.log
+
+echo "Merging SNPs and haps for each MAF" 1>&2
+for maf in "${mafs[@]}"; do
+    [ ! -f "$output_dir/$maf.rds" ] && \
+    workflow/scripts/merge_plink.py \
+    --chunk-size 1000 \
+    --maf "$maf" \
+    --maf-file 2 \
+    --verbosity DEBUG \
+    "$geno_file".pgen \
+    "$output_dir"/haps.pgen \
+    "$output_dir/$maf.pgen" &> "$output_dir/$maf".merge.log && \
+    workflow/scripts/run_SuSiE.R "$output_dir/$maf.pgen" "$pheno" "$output_dir" NULL 10 &> "$output_dir/$maf".susie.log && \
+    workflow/scripts/extract_pips.R "$output_dir/$maf.rds" "$output_dir/$maf.pips.tsv" &>"$output_dir/$maf.pips.log"
+done
+
 echo "Collecting haplotypes with more than one allele" 1>&2
 all_mafs=( "${mafs[@]}" )
 mafs=$(for maf in "${mafs[@]}"; do echo -e "$(wc -l "$output_dir/$maf".hap)\t$maf"; done | grep -v '^0' | cut -f2)
@@ -65,23 +89,13 @@ echo "Creating PGEN for best variant" 1>&2
 plink2 --snp "$best_variant" --pfile "$geno_file" --make-pgen --freq --out "$output_dir/$best_variant"/best_variant
 best_variant_maf="$(grep -P "\t$best_variant\t" "$output_dir/$best_variant"/best_variant.afreq | cut -f5 | awk '{min = ($1 < 1-$1 ? $1 : 1-$1); print min;}')"
 echo "Causal variant MAF: $best_variant_maf" 1>&2
-echo "Transforming all haplotypes into one merged PGEN" 1>&2
-# compute LD for each hap at each MAF by merging all of the hap files for each MAF value and transforming them all
-haptools transform -o "$output_dir/$best_variant"/haps.pgen "$geno_file".pgen <(
-    grep -E '^#' "$output_dir/${mafs[0]}".hap
-    for maf in "${mafs[@]}"; do
-        sed 's/\tH0\t/\tH0:'"$maf"'\t/;s/\tH1\t/\tH1:'"$maf"'\t/' "$output_dir/$maf".hap | grep -Ev '^#'
-    done
-) &> "$output_dir/$best_variant"/haps.log
 echo "Computing LD between each haplotype and the causal variant" 1>&2
-workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir/$best_variant"/haps.ld "$output_dir/$best_variant"/haps.pgen "$output_dir/$best_variant"/best_variant.pgen &> "$output_dir/$best_variant"/haps.ld.log
+workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir/$best_variant"/haps.ld "$output_dir"/haps.pgen "$output_dir"/best_variant.pgen &> "$output_dir/$best_variant"/haps.ld.log
 
 echo "Computing LD between all SNPs and the causal variant at each threshold" 1>&2
 plink2 --r2-unphased 'inter-chr' 'cols=id,freq' --ld-snp "$best_variant" --ld-window-r2 0 --nonfounders --pfile "$geno_file" --out "$output_dir/$best_variant"/snps
 echo "Getting the best SNP at each MAF threshold" 1>&2
 tail -n+2 "$output_dir/$best_variant"/snps.vcor | sort -k5,5gr | cut -f3-5 > "$output_dir/$best_variant"/snps.sort.vcor
-
-# TODO: Instead of getting the SNP that has the best LD with the causal SNP, we should use the SNP with the best PIP from finemappinp with SuSiE
 
 set +o pipefail
 # create an r^2 report for the SNPs

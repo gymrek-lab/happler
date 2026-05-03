@@ -23,7 +23,14 @@ from haptools.data import GenotypesPLINK
     type=float,
     default=None,
     show_default="all variants",
-    help="Only use variants with MAFs above this threshold",
+    help="Only use variants with MAFs above this threshold for both files",
+)
+@click.option(
+    "--maf-file",
+    type=click.Choice(["1", "2", "both"]),
+    default="both",
+    show_default=True,
+    help="Which file should the MAF threshold be applied to?",
 )
 @click.option(
     "--replace/--no-replace",
@@ -44,6 +51,13 @@ from haptools.data import GenotypesPLINK
     ),
 )
 @click.option(
+    "--extract",
+    type=click.Path(path_type=Path),
+    default=None,
+    show_default="all variants",
+    help="Keep only certain variants from file1. Works similarly to plink2's --extract",
+)
+@click.option(
     "-v",
     "--verbosity",
     type=click.Choice(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]),
@@ -57,8 +71,10 @@ def main(
     output: Path,
     region: str = None,
     maf: float = None,
+    maf_file: str = "both",
     replace: bool = True,
     chunk_size: int = None,
+    extract: Path = None,
     verbosity: str = "DEBUG",
 ):
     """
@@ -82,6 +98,8 @@ def main(
         You should only set this flag to False if you are confident that file1 and
         file2 have no conflicting variant IDs. Otherwise, you may end up with an
         output fileset that has duplicate IDs!
+    extract: Path, optional
+        This will do the same thing as plink2's --extract argument but for file1 only
     verbosity: str, optional
         How verbose do we want the log to be?
     """
@@ -91,15 +109,29 @@ def main(
     gts1 = GenotypesPLINK(fname=file1, chunk_size=chunk_size, log=log)
     gts2 = GenotypesPLINK(fname=file2, chunk_size=chunk_size, log=log)
 
-    gts1.read(region=region)
+    if extract is not None:
+        with extract as extract_file:
+            extract = set(extract_file.read().splitlines())
+
+    gts1.read(region=region, variants=extract)
     gts2.read(region=region)
 
     if maf is not None:
-        log.info("Subsetting by MAF")
-        for gts in (gts1, gts2):
-            gts.check_missing()
-            gts.check_biallelic()
-            gts.check_maf(threshold=maf, discard_also=True)
+        if maf_file == "both":
+            maf_file = "both files"
+        elif maf_file == "1":
+            maf_file = "file1"
+        else:
+            maf_file = "file2"
+        log.info(f"Subsetting {maf_file} by MAF")
+        if maf_file in ("file1", "both files"):
+            gts1.check_missing()
+            gts1.check_biallelic()
+            gts1.check_maf(threshold=maf, discard_also=True)
+        if maf_file in ("file2", "both files"):
+            gts2.check_missing()
+            gts2.check_biallelic()
+            gts2.check_maf(threshold=maf, discard_also=True)
 
     if gts1.samples != gts2.samples:
         log.info("Getting intersection of samples in order of file1")
