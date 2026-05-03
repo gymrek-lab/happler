@@ -79,7 +79,7 @@ for maf in "${all_mafs[@]}"; do
     fi
     conda activate .snakemake/conda/885b27680699bdbf0ec4008de1a842a3_
     [ ! -f "$output_dir/$maf.rds" ] && \
-    echo "Running SuSiE for MAF $maf" 1>&2 \
+    echo "Running SuSiE for MAF $maf" 1>&2 && \
     workflow/scripts/run_SuSiE.R "$output_dir/$maf".merge.pgen "$pheno" "$output_dir" NULL 10 &> "$output_dir/$maf".susie.log && \
     workflow/scripts/extract_pips.R "$output_dir/$maf.rds" "$output_dir/$maf.pips.tsv" &>"$output_dir/$maf.pips.log"
     conda deactivate
