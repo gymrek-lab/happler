@@ -46,6 +46,11 @@ for maf in "${mafs[@]}"; do
     "$pheno" &> "$output_dir/$maf".log
 done
 
+echo "Collecting haplotypes with more than one allele" 1>&2
+all_mafs=( "${mafs[@]}" )
+mafs=$(for maf in "${mafs[@]}"; do echo -e "$(wc -l "$output_dir/$maf".hap)\t$maf"; done | grep -v '^0' | cut -f2)
+mafs=( $mafs )
+
 echo "Transforming all haplotypes into one merged PGEN" 1>&2
 # merge all of the hap files for each MAF value and transform them all
 haptools transform -o "$output_dir"/haps.pgen "$geno_file".pgen <(
@@ -56,24 +61,24 @@ haptools transform -o "$output_dir"/haps.pgen "$geno_file".pgen <(
 ) &> "$output_dir"/haps.log
 
 echo "Merging SNPs and haps for each MAF" 1>&2
-for maf in "${mafs[@]}"; do
-    [ ! -f "$output_dir/$maf.rds" ] && \
-    workflow/scripts/merge_plink.py \
-    --chunk-size 1000 \
-    --maf "$maf" \
-    --maf-file 2 \
-    --verbosity DEBUG \
-    "$geno_file".pgen \
-    "$output_dir"/haps.pgen \
-    "$output_dir/$maf.pgen" &> "$output_dir/$maf".merge.log && \
-    workflow/scripts/run_SuSiE.R "$output_dir/$maf.pgen" "$pheno" "$output_dir" NULL 10 &> "$output_dir/$maf".susie.log && \
+for maf in "${all_mafs[@]}"; do
+    if printf '%s\0' "${arr[@]}" | grep -qzxF "$search_item"; then
+        [ ! -f "$output_dir/$maf.rds" ] && \
+        workflow/scripts/merge_plink.py \
+        --chunk-size 1000 \
+        --maf "$maf" \
+        --maf-file 2 \
+        --extract <(grep -Ev '^#' "$output_dir"/haps.pvar | cut -f3 | grep ':'"$maf") \
+        --verbosity DEBUG \
+        "$geno_file".pgen \
+        "$output_dir"/haps.pgen \
+        "$output_dir/$maf".merge.pgen &> "$output_dir/$maf".merge.log
+    else
+        plink2 --maf "$maf" --pfile "$geno_file" --make-pgen --out "$output_dir/$maf".merge
+    fi && \
+    workflow/scripts/run_SuSiE.R "$output_dir/$maf".merge.pgen "$pheno" "$output_dir" NULL 10 &> "$output_dir/$maf".susie.log && \
     workflow/scripts/extract_pips.R "$output_dir/$maf.rds" "$output_dir/$maf.pips.tsv" &>"$output_dir/$maf.pips.log"
 done
-
-echo "Collecting haplotypes with more than one allele" 1>&2
-all_mafs=( "${mafs[@]}" )
-mafs=$(for maf in "${mafs[@]}"; do echo -e "$(wc -l "$output_dir/$maf".hap)\t$maf"; done | grep -v '^0' | cut -f2)
-mafs=( $mafs )
 
 echo "Computing variance explained for each haplotype" 1>&2
 workflow/scripts/variance_explained_plot.py \
