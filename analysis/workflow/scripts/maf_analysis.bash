@@ -62,6 +62,7 @@ haptools transform -o "$output_dir"/haps.pgen "$geno_file".pgen <(
 ) &> "$output_dir"/haps.log
 
 for maf in "${all_mafs[@]}"; do
+    mkdir -p "$output_dir/susie_$maf"
     if printf '%s\0' "${mafs[@]}" | grep -qzxF "$maf"; then
         echo "Merging SNPs and haps for MAF $maf" 1>&2
         workflow/scripts/merge_plink.py \
@@ -72,16 +73,16 @@ for maf in "${all_mafs[@]}"; do
         --verbosity DEBUG \
         "$geno_file".pgen \
         "$output_dir"/haps.pgen \
-        "$output_dir/$maf".merge.pgen &> "$output_dir/$maf".merge.log
+        "$output_dir/susie_$maf"/merge.pgen &> "$output_dir/susie_$maf"/merge.log
     else
         echo "Filtering SNPs for MAF $maf" 1>&2
-        plink2 --maf "$maf" --pfile "$geno_file" --make-pgen --out "$output_dir/$maf".merge &>/dev/null
+        plink2 --maf "$maf" --pfile "$geno_file" --make-pgen --out "$output_dir/susie_$maf"/merge &>/dev/null
     fi
     conda activate .snakemake/conda/885b27680699bdbf0ec4008de1a842a3_
-    [ ! -f "$output_dir/$maf.rds" ] && \
+    [ ! -f "$output_dir/susie_$maf"/susie.rds ] && \
     echo "Running SuSiE for MAF $maf" 1>&2 && \
-    workflow/scripts/run_SuSiE.R "$output_dir/$maf".merge.pgen "$pheno" "$output_dir" NULL "$(echo "$region" | sed 's/_/:/')" 10 &> "$output_dir/$maf".susie.log && \
-    workflow/scripts/extract_pips.R "$output_dir/$maf.rds" "$output_dir/$maf.pips.tsv" &>"$output_dir/$maf.pips.log"
+    workflow/scripts/run_SuSiE.R "$output_dir/susie_$maf"/merge.pgen "$pheno" "$output_dir/susie_$maf" NULL "$(echo "$region" | sed 's/_/:/')" 10 &> "$output_dir/susie_$maf"/susie.log && \
+    workflow/scripts/extract_pips.R "$output_dir/susie_$maf"/susie.rds "$output_dir/susie_$maf"/pips.tsv" &>"$output_dir/susie_$maf"/pips.log"
     conda deactivate
 done
 
