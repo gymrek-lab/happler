@@ -60,10 +60,9 @@ haptools transform -o "$output_dir"/haps.pgen "$geno_file".pgen <(
     done
 ) &> "$output_dir"/haps.log
 
-echo "Merging SNPs and haps for each MAF" 1>&2
 for maf in "${all_mafs[@]}"; do
     if printf '%s\0' "${mafs[@]}" | grep -qzxF "$maf"; then
-        [ ! -f "$output_dir/$maf.rds" ] && \
+        echo "Merging SNPs and haps for MAF $maf" 1>&2
         workflow/scripts/merge_plink.py \
         --chunk-size 1000 \
         --maf "$maf" \
@@ -74,10 +73,15 @@ for maf in "${all_mafs[@]}"; do
         "$output_dir"/haps.pgen \
         "$output_dir/$maf".merge.pgen &> "$output_dir/$maf".merge.log
     else
+        echo "Filtering SNPs for MAF $maf" 1>&2
         plink2 --maf "$maf" --pfile "$geno_file" --make-pgen --out "$output_dir/$maf".merge &>/dev/null
-    fi && \
+    fi
+    conda activate .snakemake/conda/885b27680699bdbf0ec4008de1a842a3_
+    [ ! -f "$output_dir/$maf.rds" ] && \
+    echo "Running SuSiE for MAF $maf" 1>&2 \
     workflow/scripts/run_SuSiE.R "$output_dir/$maf".merge.pgen "$pheno" "$output_dir" NULL 10 &> "$output_dir/$maf".susie.log && \
     workflow/scripts/extract_pips.R "$output_dir/$maf.rds" "$output_dir/$maf.pips.tsv" &>"$output_dir/$maf.pips.log"
+    conda deactivate
 done
 
 echo "Computing variance explained for each haplotype" 1>&2
