@@ -9,6 +9,7 @@
 # Note: You should first investigate the MAF of the causal SNP to determine the best MAFs to use:
 # plink2 --pfile out/"$region"/genotypes/"$pheno_name"/"$geno_name" --out out/"$region"/genotypes/"$pheno_name"/"$geno_name".maf --freq
 
+eval "$(conda shell.bash hook)"
 set -euo pipefail
 
 best_variant="$1"
