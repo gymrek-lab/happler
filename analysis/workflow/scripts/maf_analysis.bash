@@ -82,7 +82,7 @@ for maf in "${all_mafs[@]}"; do
     [ ! -f "$output_dir/susie_$maf"/susie.rds ] && \
     echo "Running SuSiE for MAF $maf" 1>&2 && \
     workflow/scripts/run_SuSiE.R "$output_dir/susie_$maf"/merge.pgen "$pheno" "$output_dir/susie_$maf" NULL "$(echo "$region" | sed 's/_/:/')" 10 &> "$output_dir/susie_$maf"/susie.log && \
-    workflow/scripts/extract_pips.R "$output_dir/susie_$maf"/susie.rds "$output_dir/susie_$maf"/pips.tsv" &>"$output_dir/susie_$maf"/pips.log
+    workflow/scripts/extract_pips.R "$output_dir/susie_$maf"/susie.rds "$output_dir/susie_$maf"/pips.tsv &>"$output_dir/susie_$maf"/pips.log
     conda deactivate
 done
 
