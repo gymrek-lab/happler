@@ -110,30 +110,6 @@ echo "Getting the best SNP at each MAF threshold" 1>&2
 tail -n+2 "$output_dir/$best_variant"/snps.vcor | sort -k5,5gr | cut -f3-5 > "$output_dir/$best_variant"/snps.sort.vcor
 
 set +o pipefail
-echo "Creating r2 report for the SNPs" 1>&2
-{
-    echo -e "maf_thresh\tsnp\tmaf\tr2"
-    for maf in "${all_mafs[@]}"; do
-        echo -ne "$maf\t"
-        if awk -v n1="$maf" -v n2="$best_variant_maf" 'BEGIN { exit (n1 > n2 ? 0 : 1) }'; then
-            awk -F $'\t' '$2 > '"$maf" "$output_dir/$best_variant"/snps.sort.vcor | head -1
-        else
-            echo -e "$best_variant\t$best_variant_maf\t1"
-        fi
-    done
-} > "$output_dir/$best_variant"/snps.ld
-set -o pipefail
-
-echo "Merging the SNP and hap r2 reports together" 1>&2
-{
-    echo -e "maf_thresh\thap_id\thap_r2\tsnp_r2\tsnp_maf"
-    join -t $'\t' -a1 -11 -22 <(
-        tail -n+2 "$output_dir/$best_variant"/snps.ld | cut -f 1,3,4 | sort -k1,1
-    ) <(
-        tail -n+2 "$output_dir/$best_variant"/haps.ld | cut -f3,4 | sed 's/:/\t/' | sort -k2,2
-    ) | \
-    awk -F $'\t' -v 'OFS=\t' 'NF == 3 { $4="H0";$5=$3 } {print $1, $4, $5, $3, $2;}'
-} > "$output_dir/$best_variant"/maf_hap_snp_r2.tsv
 
 echo "Creating SNP and hap PIP report" 1>&2
 {
@@ -147,6 +123,32 @@ echo "Creating SNP and hap PIP report" 1>&2
         sed 's/$/\t'"$snp_pip"'/;s/^/'"$maf"'\t/'
     done
 } > "$output_dir"/maf_hap_snp_pip.tsv
+
+echo "Creating r2 report for the SNPs" 1>&2
+{
+    echo -e "maf_thresh\tsnp\tmaf\tr2"
+    for maf in "${all_mafs[@]}"; do
+        echo -ne "$maf\t"
+        if awk -v n1="$maf" -v n2="$best_variant_maf" 'BEGIN { exit (n1 > n2 ? 0 : 1) }'; then
+            awk -F $'\t' '$2 > '"$maf" "$output_dir/$best_variant"/snps.sort.vcor | head -1
+        else
+            echo -e "$best_variant\t$best_variant_maf\t1"
+        fi
+    done
+} > "$output_dir/$best_variant"/snps.ld
+
+set -o pipefail
+
+echo "Merging the SNP and hap r2 reports together" 1>&2
+{
+    echo -e "maf_thresh\thap_id\thap_r2\tsnp_r2\tsnp_maf"
+    join -t $'\t' -a1 -11 -22 <(
+        tail -n+2 "$output_dir/$best_variant"/snps.ld | cut -f 1,3,4 | sort -k1,1
+    ) <(
+        tail -n+2 "$output_dir/$best_variant"/haps.ld | cut -f3,4 | sed 's/:/\t/' | sort -k2,2
+    ) | \
+    awk -F $'\t' -v 'OFS=\t' 'NF == 3 { $4="H0";$5=$3 } {print $1, $4, $5, $3, $2;}'
+} > "$output_dir/$best_variant"/maf_hap_snp_r2.tsv
 
 # -------------
 
@@ -170,7 +172,7 @@ EOF
 
 echo "Plotting PIPs" 1>&2
 ( cd "$output_dir" && (
-  echo "a=["$(tail -n+2 maf_hap_snp_pip.tsv | cut -f1-3,5 | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  echo "a=["$(tail -n+2 maf_hap_snp_pip.tsv | cut -f1-3,5 | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/;s/\tH2\t/\tH2:'"$maf"'\t/;s/\tH3\t/\tH3:'"$maf"'\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
@@ -199,7 +201,7 @@ EOF
 
 echo "Plotting LD with causal variant" 1>&2
 ( cd "$output_dir/$best_variant" && (
-  echo "causal_variant=\"$best_variant\"; a=["$(tail -n+2 maf_hap_snp_r2.tsv | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  echo "causal_variant=\"$best_variant\"; a=["$(tail -n+2 maf_hap_snp_r2.tsv | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/;s/\tH2\t/\tH2:'"$maf"'\t/;s/\tH3\t/\tH3:'"$maf"'\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
