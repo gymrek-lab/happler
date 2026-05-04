@@ -63,27 +63,28 @@ haptools transform -o "$output_dir"/haps.pgen "$geno_file".pgen <(
 
 for maf in "${all_mafs[@]}"; do
     mkdir -p "$output_dir/susie_$maf"
-    if printf '%s\0' "${mafs[@]}" | grep -qzxF "$maf"; then
-        echo "Merging SNPs and haps for MAF $maf" 1>&2
-        workflow/scripts/merge_plink.py \
-        --chunk-size 1000 \
-        --maf "$maf" \
-        --maf-file 2 \
-        --extract <(grep -Ev '^#' "$output_dir"/haps.pvar | cut -f3 | grep ':'"$maf") \
-        --verbosity DEBUG \
-        "$output_dir"/haps.pgen \
-        "$geno_file".pgen \
-        "$output_dir/susie_$maf"/merge.pgen &> "$output_dir/susie_$maf"/merge.log
-    else
-        echo "Filtering SNPs for MAF $maf" 1>&2
-        plink2 --maf "$maf" --pfile "$geno_file" --make-pgen --out "$output_dir/susie_$maf"/merge &>/dev/null
-    fi
-    conda activate .snakemake/conda/885b27680699bdbf0ec4008de1a842a3_
-    [ ! -f "$output_dir/susie_$maf"/susie.rds ] && \
-    echo "Running SuSiE for MAF $maf" 1>&2 && \
-    workflow/scripts/run_SuSiE.R "$output_dir/susie_$maf"/merge.pgen "$pheno" "$output_dir/susie_$maf" NULL "$(echo "$region" | sed 's/_/:/')" 10 &> "$output_dir/susie_$maf"/susie.log && \
-    workflow/scripts/extract_pips.R "$output_dir/susie_$maf"/susie.rds "$output_dir/susie_$maf"/pips.tsv &>"$output_dir/susie_$maf"/pips.log
-    conda deactivate
+    if [ ! -f "$output_dir/susie_$maf"/susie.rds ]; then
+        if printf '%s\0' "${mafs[@]}" | grep -qzxF "$maf"; then
+            echo "Merging SNPs and haps for MAF $maf" 1>&2
+            workflow/scripts/merge_plink.py \
+            --chunk-size 1000 \
+            --maf "$maf" \
+            --maf-file 2 \
+            --extract <(grep -Ev '^#' "$output_dir"/haps.pvar | cut -f3 | grep ':'"$maf") \
+            --verbosity DEBUG \
+            "$output_dir"/haps.pgen \
+            "$geno_file".pgen \
+            "$output_dir/susie_$maf"/merge.pgen &> "$output_dir/susie_$maf"/merge.log
+        else
+            echo "Filtering SNPs for MAF $maf" 1>&2
+            plink2 --maf "$maf" --pfile "$geno_file" --make-pgen --out "$output_dir/susie_$maf"/merge &>/dev/null
+        fi
+        conda activate .snakemake/conda/885b27680699bdbf0ec4008de1a842a3_
+        echo "Running SuSiE for MAF $maf" 1>&2 && \
+        workflow/scripts/run_SuSiE.R "$output_dir/susie_$maf"/merge.pgen "$pheno" "$output_dir/susie_$maf" NULL "$(echo "$region" | sed 's/_/:/')" 10 &> "$output_dir/susie_$maf"/susie.log && \
+        workflow/scripts/extract_pips.R "$output_dir/susie_$maf"/susie.rds "$output_dir/susie_$maf"/pips.tsv &>"$output_dir/susie_$maf"/pips.log
+        conda deactivate
+    done
 done
 
 echo "Computing variance explained for each haplotype" 1>&2
@@ -104,12 +105,12 @@ echo "Computing LD between each haplotype and the causal variant" 1>&2
 workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir/$best_variant"/haps.ld "$output_dir"/haps.pgen "$output_dir/$best_variant"/best_variant.pgen &> "$output_dir/$best_variant"/haps.ld.log
 
 echo "Computing LD between all SNPs and the causal variant at each threshold" 1>&2
-plink2 --r2-unphased 'inter-chr' 'cols=id,freq' --ld-snp "$best_variant" --ld-window-r2 0 --nonfounders --pfile "$geno_file" --out "$output_dir/$best_variant"/snps
+plink2 --r2-unphased 'inter-chr' 'cols=id,freq' --ld-snp "$best_variant" --ld-window-r2 0 --nonfounders --pfile "$geno_file" --out "$output_dir/$best_variant"/snps &>/dev/null
 echo "Getting the best SNP at each MAF threshold" 1>&2
 tail -n+2 "$output_dir/$best_variant"/snps.vcor | sort -k5,5gr | cut -f3-5 > "$output_dir/$best_variant"/snps.sort.vcor
 
 set +o pipefail
-# create an r^2 report for the SNPs
+echo "Creating r2 report for the SNPs" 1>&2
 {
     echo -e "maf_thresh\tsnp\tmaf\tr2"
     for maf in "${all_mafs[@]}"; do
@@ -134,6 +135,18 @@ echo "Merging the SNP and hap r2 reports together" 1>&2
     awk -F $'\t' -v 'OFS=\t' 'NF == 3 { $4="H0";$5=$3 } {print $1, $4, $5, $3, $2;}'
 } > "$output_dir/$best_variant"/maf_hap_snp_r2.tsv
 
+echo "Creating SNP and hap PIP report" 1>&2
+{
+    echo -e "maf_thresh\thap_id\thap_pip\tsnp_id\tsnp_pip"
+    for maf in "${all_mafs[@]}"; do
+        paste <(
+            grep -hE '^H[0-9]+' "$output_dir"/susie_$maf/pips.tsv | sed 's/:/\t/' | cut -f1,3 | grep . || echo -e "H0\t1"
+        ) <(
+            grep -hvE '^H[0-9]+' "$output_dir"/susie_$maf/pips.tsv | sort -k2,2 -g | tail -n1
+        ) | sed 's/^/'"$maf"'\t/'
+    done
+} > "$output_dir"/maf_hap_snp_pip.tsv
+
 # -------------
 
 echo "Plotting variance explained" 1>&2
@@ -145,11 +158,40 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 data = np.array(a)
-plt.plot(-np.log10(data[:,0]), data[:,1], '-o')
-plt.xlabel("-log10(MAF)")
+plt.plot(data[:,0], data[:,1], '-o')
+plt.xlabel("MAF")
 plt.ylabel("Haplotype / Haplotype's SNPs")
 plt.title("Variance Explained (R^2)")
 plt.savefig("varexp_maf.png")
+
+EOF
+) | python; )
+
+echo "Plotting PIPs" 1>&2
+( cd "$output_dir" && (
+  echo "a=["$(tail -n+2 maf_hap_snp_pip.tsv | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  cat <<'EOF'
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+data = np.array(a)
+both = data[data[:,2] == data[:,3]]
+hap_ids = np.unique(data[:,1])
+# Pick a colormap and sample as many distinct colors as needed
+cmap = plt.get_cmap("tab20")  # good for up to ~20 distinct colors
+colors = cmap(np.linspace(0, 1, len(hap_ids)))
+color_by_hap = {hp: colors[i] for i, hp in enumerate(hap_ids)}
+for hp_id in hap_ids:
+    dat = data[hp_id == data[:,1]]
+    plt.plot(dat[:,0], dat[:,2], 'o-', color=color_by_hap[hp_id], label=f"Haplotype {int(hp_id)}")
+plt.plot(data[:,0], data[:,3], 'o-', color='black', label="Best SNP")
+plt.plot(both[:,0], both[:,3], 'o', color='grey', label="Both")
+plt.xlabel("MAF")
+plt.ylabel("PIP")
+plt.ylim(0, 1.02)
+plt.legend()
+plt.savefig("pip_maf.png")
 
 EOF
 ) | python; )
