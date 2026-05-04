@@ -57,7 +57,7 @@ echo "Transforming all haplotypes into one merged PGEN" 1>&2
 haptools transform -o "$output_dir"/haps.pgen "$geno_file".pgen <(
     grep -E '^#' "$output_dir/${mafs[0]}".hap
     for maf in "${mafs[@]}"; do
-        sed 's/\tH0\t/\tH0:'"$maf"'\t/;s/\tH1\t/\tH1:'"$maf"'\t/' "$output_dir/$maf".hap | grep -Ev '^#'
+        sed 's/\tH0\t/\tH0:'"$maf"'\t/;s/\tH1\t/\tH1:'"$maf"'\t/;s/\tH2\t/\tH2:'"$maf"'\t/;s/\tH3\t/\tH3:'"$maf"'\t/' "$output_dir/$maf".hap | grep -Ev '^#'
     done
 ) &> "$output_dir"/haps.log
 
@@ -70,7 +70,7 @@ for maf in "${all_mafs[@]}"; do
             --chunk-size 1000 \
             --maf "$maf" \
             --maf-file 2 \
-            --extract <(grep -Ev '^#' "$output_dir"/haps.pvar | cut -f3 | grep ':'"$maf") \
+            --extract <(grep -Ev '^#' "$output_dir"/haps.pvar | cut -f3 | grep ':'"$maf$") \
             --verbosity DEBUG \
             "$output_dir"/haps.pgen \
             "$geno_file".pgen \
