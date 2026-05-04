@@ -139,11 +139,12 @@ echo "Creating SNP and hap PIP report" 1>&2
 {
     echo -e "maf_thresh\thap_id\thap_pip\tsnp_id\tsnp_pip"
     for maf in "${all_mafs[@]}"; do
-        paste <(
-            grep -hE '^H[0-9]+' "$output_dir"/susie_$maf/pips.tsv | sed 's/:/\t/' | cut -f1,3 | grep . || echo -e "H0\t1"
-        ) <(
-            grep -hvE '^H[0-9]+' "$output_dir"/susie_$maf/pips.tsv | sort -k2,2 -g | tail -n1
-        ) | sed 's/^/'"$maf"'\t/'
+        snp_pip="$(grep -hvE '^H[0-9]+' "$output_dir"/susie_$maf/pips.tsv | sort -k2,2 -g | tail -n1)"
+        grep -hE '^H[0-9]+' "$output_dir"/susie_$maf/pips.tsv | \
+        sed 's/:/\t/' | \
+        cut -f1,3 | \
+        { grep . || echo -e "H0\t1"; } | \
+        sed 's/$/\t'"$snp_pip"'/;s/^/'"$maf"'\t/'
     done
 } > "$output_dir"/maf_hap_snp_pip.tsv
 
