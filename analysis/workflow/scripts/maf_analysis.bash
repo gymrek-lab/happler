@@ -71,8 +71,8 @@ for maf in "${all_mafs[@]}"; do
         --maf-file 2 \
         --extract <(grep -Ev '^#' "$output_dir"/haps.pvar | cut -f3 | grep ':'"$maf") \
         --verbosity DEBUG \
-        "$geno_file".pgen \
         "$output_dir"/haps.pgen \
+        "$geno_file".pgen \
         "$output_dir/susie_$maf"/merge.pgen &> "$output_dir/susie_$maf"/merge.log
     else
         echo "Filtering SNPs for MAF $maf" 1>&2
