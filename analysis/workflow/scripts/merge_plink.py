@@ -52,7 +52,7 @@ from haptools.data import GenotypesPLINK
 )
 @click.option(
     "--extract",
-    type=click.Path(path_type=Path),
+    type=click.File("r"),
     default=None,
     show_default="all variants",
     help="Keep only certain variants from file1. Works similarly to plink2's --extract",
