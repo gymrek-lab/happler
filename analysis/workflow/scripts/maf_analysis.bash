@@ -154,17 +154,28 @@ echo "Merging the SNP and hap r2 reports together" 1>&2
 
 echo "Plotting variance explained" 1>&2
 ( cd "$output_dir" && (
-  echo "a=["$(cut -f1,6 variance_explained.tsv | tail -n+2 | tr ':' $'\t' | grep 'H0' | cut -f 1,3 | sort -g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  echo "a=["$(cut -f1,4,5 variance_explained.tsv | tail-n+2 | sed 's/:/\t/;s/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/;s/\tH2\t/\t2\t/;s/\tH3\t/\t3\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 data = np.array(a)
-plt.plot(data[:,0], data[:,1], '-o')
+both = data[data[:,2] == data[:,3]]
+hap_ids = np.unique(data[:,1])
+# Pick a colormap and sample as many distinct colors as needed
+cmap = plt.get_cmap("tab20")  # good for up to ~20 distinct colors
+colors = cmap(np.linspace(0, 1, len(hap_ids)))
+color_by_hap = {hp: colors[i] for i, hp in enumerate(hap_ids)}
+for hp_id in hap_ids:
+    dat = data[hp_id == data[:,1]]
+    plt.plot(dat[:,0], dat[:,2], 'o-', color=color_by_hap[hp_id], label=f"Haplotype {int(hp_id)}")
+plt.plot(data[:,0], data[:,3], 'o-', color='black', label="Best SNP")
+plt.plot(both[:,0], both[:,3], 'o', color='grey', label="Both")
 plt.xlabel("MAF")
-plt.ylabel("Haplotype / Haplotype's SNPs")
-plt.title("Variance Explained (R^2)")
+plt.ylabel("Variance Explained (R^2)")
+plt.ylim(0, 1.02)
+plt.legend()
 plt.savefig("varexp_maf.png")
 
 EOF
@@ -172,7 +183,7 @@ EOF
 
 echo "Plotting PIPs" 1>&2
 ( cd "$output_dir" && (
-  echo "a=["$(tail -n+2 maf_hap_snp_pip.tsv | cut -f1-3,5 | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/;s/\tH2\t/\tH2:'"$maf"'\t/;s/\tH3\t/\tH3:'"$maf"'\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  echo "a=["$(tail -n+2 maf_hap_snp_pip.tsv | cut -f1-3,5 | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/;s/\tH2\t/\t2\t/;s/\tH3\t/\t3\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
@@ -201,7 +212,7 @@ EOF
 
 echo "Plotting LD with causal variant" 1>&2
 ( cd "$output_dir/$best_variant" && (
-  echo "causal_variant=\"$best_variant\"; a=["$(tail -n+2 maf_hap_snp_r2.tsv | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/;s/\tH2\t/\tH2:'"$maf"'\t/;s/\tH3\t/\tH3:'"$maf"'\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  echo "causal_variant=\"$best_variant\"; a=["$(tail -n+2 maf_hap_snp_r2.tsv | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/;s/\tH2\t/\t2\t/;s/\tH3\t/\t3\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
