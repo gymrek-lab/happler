@@ -97,11 +97,11 @@ workflow/scripts/variance_explained_plot.py \
 
 mkdir -p "$output_dir"/$best_variant
 echo "Creating PGEN for best variant" 1>&2
-plink2 --snp "$best_variant" --pfile "$geno_file" --make-pgen --freq --out "$output_dir/$best_variant"/best_variant
+plink2 --snp "$best_variant" --pfile "$geno_file" --make-pgen --freq --out "$output_dir/$best_variant"/best_variant &>/dev/null
 best_variant_maf="$(grep -P "\t$best_variant\t" "$output_dir/$best_variant"/best_variant.afreq | cut -f5 | awk '{min = ($1 < 1-$1 ? $1 : 1-$1); print min;}')"
 echo "Causal variant MAF: $best_variant_maf" 1>&2
 echo "Computing LD between each haplotype and the causal variant" 1>&2
-workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir/$best_variant"/haps.ld "$output_dir"/haps.pgen "$output_dir"/best_variant.pgen &> "$output_dir/$best_variant"/haps.ld.log
+workflow/scripts/compute_pgen_ld.py --r2 --no-estimate -o "$output_dir/$best_variant"/haps.ld "$output_dir"/haps.pgen "$output_dir/$best_variant"/best_variant.pgen &> "$output_dir/$best_variant"/haps.ld.log
 
 echo "Computing LD between all SNPs and the causal variant at each threshold" 1>&2
 plink2 --r2-unphased 'inter-chr' 'cols=id,freq' --ld-snp "$best_variant" --ld-window-r2 0 --nonfounders --pfile "$geno_file" --out "$output_dir/$best_variant"/snps
