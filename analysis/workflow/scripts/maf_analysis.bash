@@ -84,7 +84,7 @@ for maf in "${all_mafs[@]}"; do
         workflow/scripts/run_SuSiE.R "$output_dir/susie_$maf"/merge.pgen "$pheno" "$output_dir/susie_$maf" NULL "$(echo "$region" | sed 's/_/:/')" 10 &> "$output_dir/susie_$maf"/susie.log && \
         workflow/scripts/extract_pips.R "$output_dir/susie_$maf"/susie.rds "$output_dir/susie_$maf"/pips.tsv &>"$output_dir/susie_$maf"/pips.log
         conda deactivate
-    done
+    fi
 done
 
 echo "Computing variance explained for each haplotype" 1>&2
