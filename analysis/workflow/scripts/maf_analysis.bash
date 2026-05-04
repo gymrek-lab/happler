@@ -154,7 +154,7 @@ echo "Merging the SNP and hap r2 reports together" 1>&2
 
 echo "Plotting variance explained" 1>&2
 ( cd "$output_dir" && (
-  echo "a=["$(cut -f1,4,5 variance_explained.tsv | tail-n+2 | sed 's/:/\t/;s/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/;s/\tH2\t/\t2\t/;s/\tH3\t/\t3\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  echo "a=["$(cut -f1,4,5 variance_explained.tsv | tail -n+2 | sed 's/:/\t/;s/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/;s/\tH2\t/\t2\t/;s/\tH3\t/\t3\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
@@ -174,7 +174,6 @@ plt.plot(data[:,0], data[:,3], 'o-', color='black', label="Best SNP")
 plt.plot(both[:,0], both[:,3], 'o', color='grey', label="Both")
 plt.xlabel("MAF")
 plt.ylabel("Variance Explained (R^2)")
-plt.ylim(0, 1.02)
 plt.legend()
 plt.savefig("varexp_maf.png")
 
