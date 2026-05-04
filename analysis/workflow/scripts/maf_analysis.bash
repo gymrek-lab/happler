@@ -152,6 +152,8 @@ echo "Merging the SNP and hap r2 reports together" 1>&2
 
 # -------------
 
+# TODO: also include variance explained of the SNPs even when happler didn't give us a hap
+
 echo "Plotting variance explained" 1>&2
 ( cd "$output_dir" && (
   echo "a=["$(cut -f1,4,5 variance_explained.tsv | tail -n+2 | sed 's/:/\t/;s/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/;s/\tH2\t/\t2\t/;s/\tH3\t/\t3\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
