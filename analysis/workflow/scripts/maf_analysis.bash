@@ -169,7 +169,7 @@ EOF
 
 echo "Plotting PIPs" 1>&2
 ( cd "$output_dir" && (
-  echo "a=["$(tail -n+2 maf_hap_snp_pip.tsv | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
+  echo "a=["$(tail -n+2 maf_hap_snp_pip.tsv | cut -f1-3,5 | sed 's/\tH0\t/\t0\t/;s/\tH1\t/\t1\t/' | sort -t$'\t' -k1,1g | tr $'\t' , | sed 's/^/(/;s/$/)/' | paste -s -d,)"]"
   cat <<'EOF'
 import numpy as np
 import matplotlib
