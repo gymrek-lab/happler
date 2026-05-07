@@ -21,12 +21,14 @@ out="$5"
 
 output_dir="$out/$region"/mafs
 min_maf=0.0001
+happler_bic_thresh=20
 pheno_name=platelet_count
 geno_name=snps.qc.EUR_WHITE
 geno_file="$out/$region"/genotypes/"$pheno_name"/"$geno_name"
 
 mkdir -p "$output_dir"
 
+echo "Using happler BIC threshold: $happler_bic_thresh" 1>&2
 for maf in "${mafs[@]}"; do
     [ ! -f "$output_dir/$maf".hap ] && \
     echo "Running happler for MAF "$maf 1>&2 && \
@@ -40,7 +42,7 @@ for maf in "${mafs[@]}"; do
     --discard-multiallelic \
     --remove-SNPs \
     --indep-thresh 15 \
-    -t 18 \
+    -t "$happler_bic_thresh" \
     --chunk-size 500 \
     --out-thresh 5e-08 \
     "$geno_file".pgen \
@@ -152,7 +154,7 @@ echo "Merging the SNP and hap r2 reports together" 1>&2
 
 # -------------
 
-# TODO: also include variance explained of the SNPs even when happler didn't give us a hap
+# TODO: also include variance explained of the SNPs even when happler didn't give us a hap?
 
 echo "Plotting variance explained" 1>&2
 ( cd "$output_dir" && (
