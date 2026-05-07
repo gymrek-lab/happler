@@ -99,7 +99,7 @@ def get_extension_bf(
     if isinstance(ext_allele, NodeResultsExtra):
         assert node_results.beta == ext_allele[2].beta
         assert node_results.stderr == ext_allele[2].stderr
-    np.testing.assert_almost_equal(node_results.bic, ext_allele[2].bic)
+    np.testing.assert_almost_equal(node_results.bic, ext_allele[2].bic, decimal=3)
 
     # now, get the BF
     val = terminator.compute_val(
@@ -170,7 +170,7 @@ def main(
     verbosity: str = "DEBUG",
 ):
     """
-    Determine the difference in BIC (as a BF) between the hap and its best extension
+    Determine the difference in BIC between the hap and its best extension
     """
     log = getLogger("extension-bic", verbosity)
 

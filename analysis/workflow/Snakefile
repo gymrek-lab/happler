@@ -195,6 +195,8 @@ if mode != "run":
         "sample_size": config["sample_size"],
     }
     if mode == "midway":
+        plots_config["original_hap"] = plots_config["causal_hap"]
+        plots_config["causal_hap"] = rules.midway_manhattan.output.hap
         plots_config["midway_linear"] = rules.midway_manhattan.output.linear
         plots_config["finemap_metrics"] = rules.happler_metrics.output.metrics
         plots_config["loci"] = locus
@@ -281,11 +283,11 @@ elif mode == "midway":
             switch=(
                 # "bic",
                 # "tscore",
-                "interact",
+                # "interact",
                 # "covariance",
-                "interact-bic",
+                # "interact-bic",
                 "extension-bic",
-                "extension-tscore",
+                # "extension-tscore",
             ),
             allow_missing=True,
         ) + expand(

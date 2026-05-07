@@ -40,7 +40,24 @@ def agg_ld_range_obs(wildcards):
             **wildcards,
         )
 
-def agg_ld_range_causal(wildcards):
+switch_sim_mode = {
+    "interact": ("hap", "indep"),
+    "tscore": ("hap", "parent"),
+    "covariance": ("hap", "parent"),
+    "bic": ("hap", "parent"),
+    "interact-bic": ("hap", "indep"),
+    "pip-parent": ("hap", "parent"),
+    "pip-interact": ("hap", "indep"),
+    "extension-bic": ("hap", "hap"),
+    "extension-tscore": ("hap", "hap"),
+}
+
+switch_ext_mode = {
+    "extension-bic": ("bic", "extension-bic"),
+    "extension-tscore": ("tscore", "extension-tscore"),
+}
+
+def agg_ld_range_causal(wildcards, beta: bool = False):
     """ return a list of hap files from the LD range checkpoint """
     if "ld_range_checkpoint" in config:
         checkpoint_output, ld_vals = agg_ld(wildcards)
@@ -52,10 +69,45 @@ def agg_ld_range_causal(wildcards):
             **wildcards,
         )
     elif mode == "midway":
-        return expand(
-            config["causal_hap"],
-            locus = config["loci"],
-        )
+        if wildcards.switch.startswith("extension-"):
+            switches = switch_ext_mode[wildcards.switch]
+            expand_partial = expand
+            if beta:
+                expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
+            else:
+                expand_partial = partial(expand_partial, beta=wildcards.beta)
+            # make sure to remove 'switch' wildcard since we will be replacing it
+            wildcards = dict(wildcards)
+            del wildcards["switch"]
+            return expand_partial(
+                config["causal_hap"],
+                locus=config["loci"],
+                rep=range(config["mode_attrs"]["reps"]),
+                sim_mode=("hap",),
+                switch=switches,
+                **wildcards,
+                allow_missing=True,
+            )
+        elif wildcards.switch.startswith("pip-"):
+            return expand(
+                config["original_hap"],
+                locus = config["loci"],
+            )
+        else:
+            sim_modes = switch_sim_mode[wildcards.switch]
+            expand_partial = expand
+            if beta:
+                expand_partial = partial(expand_partial, beta=config["mode_attrs"]["beta"])
+            else:
+                expand_partial = partial(expand_partial, beta=wildcards.beta)
+            return expand_partial(
+                config["causal_hap"],
+                locus=config["loci"],
+                rep=range(config["mode_attrs"]["reps"]),
+                sim_mode=sim_modes,
+                **wildcards,
+                allow_missing=True,
+            )
     else:
         return expand(
             config["causal_hap"],
@@ -86,24 +138,6 @@ def agg_ld_range_metrics(wildcards):
             ex=("in",),
             **wildcards,
         )
-
-
-switch_sim_mode = {
-    "interact": ("hap", "indep"),
-    "tscore": ("hap", "parent"),
-    "covariance": ("hap", "parent"),
-    "bic": ("hap", "parent"),
-    "interact-bic": ("hap", "indep"),
-    "pip-parent": ("hap", "parent"),
-    "pip-interact": ("hap", "indep"),
-    "extension-bic": ("hap", "hap"),
-    "extension-tscore": ("hap", "hap"),
-}
-
-switch_ext_mode = {
-    "extension-bic": ("bic", "extension-bic"),
-    "extension-tscore": ("tscore", "extension-tscore"),
-}
 
 
 def agg_midway_linear(wildcards, beta: bool = False):
@@ -343,7 +377,7 @@ rule midway:
     """summarize the results from many midway-manhattan runs"""
     input:
         linears=partial(agg_midway_linear, beta=True),
-        snplists=agg_ld_range_causal,
+        snplists=partial(agg_ld_range_causal, beta=True),
     params:
         case_type=lambda wildcards: "switch" if wildcards.switch.startswith("extension-") else "sim_mode",
         pos_type=lambda wildcards: wildcards.switch[len("extension-"):] if wildcards.switch.startswith("extension-") else "hap",
@@ -411,7 +445,7 @@ rule finemap:
     """summarize the results from many finemapping runs"""
     input:
         finemaps=partial(agg_finemap, beta=True),
-        haps=agg_ld_range_causal,
+        haps=partial(agg_ld_range_causal, beta=True),
     params:
         case_type="sim_mode",
         pos_type="hap",
@@ -449,7 +483,7 @@ rule finemap:
 rule finemap_beta:
     """summarize the results from many finemapping runs for a specific value of beta"""
     input:
-        finemaps=partial(agg_finemap),
+        finemaps=agg_finemap,
         haps=agg_ld_range_causal,
     params:
         case_type="sim_mode",
@@ -489,7 +523,7 @@ rule finemap_cs_length:
     """summarize the results from many finemapping runs. Show CS length instead of PIPs"""
     input:
         finemaps=partial(agg_finemap, beta=True, also_exclude=True),
-        haps=agg_ld_range_causal,
+        haps=partial(agg_ld_range_causal, beta=True),
     params:
         case_type="ex",
         finemaps=lambda wildcards: fill_out_globals_finemap_cs_len(wildcards, config["finemap_metrics"]),
