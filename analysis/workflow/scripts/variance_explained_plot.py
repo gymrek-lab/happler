@@ -135,7 +135,7 @@ def compute_multisnp_rsquared(gt: npt.NDArray, pt: npt.NDArray):
 
 def compute_summary_stats(gt: npt.NDArray, pt: npt.NDArray):
     """
-    Compute the R-squared value for SNPs (from a single haplotype) in a multiple linear
+    Compute summary stats for SNPs (from a single haplotype) in a multiple linear
     regression
 
     Parameters
@@ -147,14 +147,14 @@ def compute_summary_stats(gt: npt.NDArray, pt: npt.NDArray):
 
     Returns
     -------
-    tuple[float, float]
+    tuple[float, float, float]
         1. Effect size
         2. P-value
         3. BIC
     """
     # standardize the phenotypes and genotypes
     pt = standardize(pt[:, np.newaxis]).flatten()
-    gt = standardize(gt[:, np.newaxis]).flatten()
+    gt = standardize(gt)
     # fitting a linear model y = beta1 * x1
     fit = sm.OLS(pt, gt).fit()
     return (fit.params[0], fit.pvalues[0], fit.bic)
@@ -315,6 +315,8 @@ def get_metrics(
         10. effect size for the haplotype's SNP 2
         11. p-value for the haplotype's SNP 2
         12. BIC value for the haplotype's SNP 2
+        13. BIC value for all alleles of the haplotype (independently)
+        14. the number of alleles in the haplotype
     """
     gts, hps, pts = load_data(gts, hps, pts)
 
@@ -328,7 +330,7 @@ def get_metrics(
     for variant in gts.variants["id"]:
         summary_stats[variant] = compute_summary_stats(
             gts.subset(variants=(variant,)).data.sum(axis=2),
-            pts.data[:, 0]
+            pts.data[:, 0],
         )
 
     vals = {}
@@ -350,6 +352,10 @@ def get_metrics(
             )
         else:
             hp_vars_ld = float("inf")
+        indep_bic = compute_summary_stats(
+            gts.subset(variants=hp_vars).data.sum(axis=2),
+            pts.data[:, 0],
+        )[2]
         vals[hp.id] = (
             hp_vars_ld,
             afs[hp.id],
@@ -364,6 +370,8 @@ def get_metrics(
             flip_effect(summary_stats[hp_vars[1]][0], hp_vars_alls[hp_vars[1]]),
             summary_stats[hp_vars[1]][1],
             summary_stats[hp_vars[1]][2],
+            indep_bic,
+            len(hp_vars),
         )
 
     return vals
@@ -488,6 +496,8 @@ def main(
     snp2_betas = other_vals[:, 10]
     snp2_pvals = other_vals[:, 11]
     snp2_bics = other_vals[:, 12]
+    indep_bics = other_vals[:, 13]
+    num_alleles = other_vals[:, 14]
 
     # how good are we doing?
     percent_success = 100*(
@@ -543,6 +553,8 @@ def main(
             snp2_betas,
             snp2_pvals,
             snp2_bics,
+            indep_bics,
+            num_alleles,
         ), picklef)
 
     with open(output.with_suffix(".tsv"), 'w', newline='') as tsvfile:
@@ -567,6 +579,8 @@ def main(
             "snp2_betas",
             "snp2_pvals",
             "snp2_bics",
+            "indep_bics",
+            "num_alleles",
         ])
         if ("locus" in params.dtype.names) and ("gene" in params.dtype.names):
             name = lambda i: i["locus"]+":"+i["gene"]
@@ -593,6 +607,8 @@ def main(
                 snp2_betas[i],
                 snp2_pvals[i],
                 snp2_bics[i],
+                indep_bics[i],
+                num_alleles[i],
             ])
 
     ax1.scatter(explained_variances[:, 0], explained_variances[:, 0]/explained_variances[:, 1])
