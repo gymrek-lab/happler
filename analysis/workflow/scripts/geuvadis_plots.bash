@@ -34,6 +34,7 @@ echo "Of those $num_regions, here is a breakdown of the number of alleles in eac
 avg_num_alleles="$(for i in $multiline_files; do grep '^V' $i | cut -f2 | sort | uniq -c | sed 's/^ *//' | cut -f1 -d' '; done | tee >(sort | uniq -c 2>&1) | awk '{ total += $1 } END { print total/NR }')"
 echo "Of those $num_regions, the average number of alleles in each haplotype is $avg_num_alleles."
 
+geno_file_name=snps
 if [ "$mode" == "geuvadis" ]; then
   # now, let's make the variance_explained.png plot
   workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/geuvadis/phenos/{gene}.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
@@ -41,6 +42,7 @@ elif [ "$mode" == "ukb" ]; then
   # now, let's make the variance_explained.png plot
   workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/ukb/phenos/{gene}.resid.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
 elif [ "$mode" == "aou" ]; then
+  geno_file_name=snps.qc.EUR_WHITE
   workflow/scripts/variance_explained_plot.py --verbosity WARNING -o "$out/variance_explained.png" -s <(echo "$multiline_files") "$out"/{locus}/happler/run/{gene}/include/merged.pgen data/aou/phenos/{gene}.resid.pheno "$out"/{locus}/happler/run/{gene}/happler.hap
 fi
 echo "Created $out/variance_explained.png" 1>&2
@@ -238,14 +240,12 @@ EOF
   echo "Created $out/ld_str_vs_sv.png"; 1>&2
 fi
 
-# TODO: use snps.qc.EUR_WHITE instead of snps for aou
-
 # let's make a plot to show runtime and memory usage
 echo -e "locus\tnum_vars\ttime_s\tmem_mb" > bench.tsv
 # To get just the multiline ones, use '$(sed 's+out/++;s+happler.hap$+bench/run+' multiline.txt)' instead of */happler/run/*/bench/run
 # To get just the ones that were considered in data/aou/phenos/platelet_count.bed, use '$(cut -f-3 ../data/aou/phenos/platelet_count.bed | sed 's/\t/_/;s/\t/-/;s+$+/happler/run/platelet_count/bench/run+')' instead of */happler/run/*/bench/run
 for i in */happler/run/*/bench/run; do
-  echo -e "$(echo $i | sed 's+/happler/run/+:+;s+/bench/run++')\t$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/run+snps.pvar+')" | cut -f1 -d' ')\t$(cut -f1,3 "$i" | tail -n1)"
+  echo -e "$(echo $i | sed 's+/happler/run/+:+;s+/bench/run++')\t$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/run+'"$geno_file_name"'.pvar+')" | cut -f1 -d' ')\t$(cut -f1,3 "$i" | tail -n1)"
 done >> bench.tsv
 echo "Created $out/bench.tsv" 1>&2
 (
