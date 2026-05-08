@@ -238,9 +238,12 @@ EOF
   echo "Created $out/ld_str_vs_sv.png"; 1>&2
 fi
 
+# TODO: use snps.qc.EUR_WHITE instead of snps for aou
+
 # let's make a plot to show runtime and memory usage
 echo -e "locus\tnum_vars\ttime_s\tmem_mb" > bench.tsv
 # To get just the multiline ones, use '$(sed 's+out/++;s+happler.hap$+bench/run+' multiline.txt)' instead of */happler/run/*/bench/run
+# To get just the ones that were considered in data/aou/phenos/platelet_count.bed, use '$(cut -f-3 ../data/aou/phenos/platelet_count.bed | sed 's/\t/_/;s/\t/-/;s+$+/happler/run/platelet_count/bench/run+')' instead of */happler/run/*/bench/run
 for i in */happler/run/*/bench/run; do
   echo -e "$(echo $i | sed 's+/happler/run/+:+;s+/bench/run++')\t$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/run+snps.pvar+')" | cut -f1 -d' ')\t$(cut -f1,3 "$i" | tail -n1)"
 done >> bench.tsv
@@ -265,6 +268,35 @@ plt.savefig("bench.png")
 EOF
 ) | python
 echo "Created $out/bench.png" 1>&2
+
+# let's make a plot to show runtime and memory usage for SuSiE
+# echo -e "locus\tnum_vars\ttime_s\tmem_mb" > bench.tsv
+# # To get just the multiline ones, use '$(sed 's+out/++;s+happler.hap$+bench/run+' multiline.txt)' instead of */happler/run/*/bench/run
+# # To get just the ones that were considered in data/aou/phenos/platelet_count.bed, use '$(cut -f-3 ../data/aou/phenos/platelet_count.bed | sed 's/\t/_/;s/\t/-/;s+$+/happler/run/platelet_count/bench/run+')' instead of */happler/run/*/bench/run
+# for i in $(cut -f-3 ../data/aou/phenos/platelet_count.bed | sed 's/\t/_/;s/\t/-/;s+$+/happler/run/platelet_count/bench/exclude/finemapper+'); do
+#   echo -e "$(echo $i | sed 's+/happler/run/+:+;s+/bench/exclude/finemapper++')\t$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/exclude/finemapper+snps.pvar+')" | cut -f1 -d' ')\t$(cut -f1,3 "$i" | tail -n1)"
+# done >> bench.tsv
+# echo "Created $out/bench.tsv" 1>&2
+# (
+#   echo "a=["$(tail -n+2 bench.tsv | cut -f2- --output-delimiter , | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
+#   cat <<'EOF'
+# import numpy as np
+# import matplotlib
+# matplotlib.use('Agg')
+# import matplotlib.pyplot as plt
+# data = np.array(a)
+# fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(6.5,3))
+# axes[0].scatter(data[:, 0], data[:, 1]/60)
+# axes[0].set_xlabel("Number of variants in locus")
+# axes[0].set_ylabel("SuSiE Runtime (mins)")
+# axes[1].scatter(data[:, 0], data[:, 2]/1000)
+# axes[1].set_xlabel("Number of variants in locus")
+# axes[1].set_ylabel("SuSiE Max Memory (GB)")
+# plt.tight_layout()
+# plt.savefig("bench.png")
+# EOF
+# ) | python
+# echo "Created $out/bench.png" 1>&2
 
 # merge all of the .tsv files together
 (
