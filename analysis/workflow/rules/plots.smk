@@ -370,7 +370,7 @@ rule metrics:
 
 
 create_glob_from_wildcards = lambda path, wildcards: re.sub(r"\{[^}]+\}", "*", expand(path, sim_mode="{"+switch_sim_mode[wildcards.switch].join(",")+"}", allow_missing=True))
-bic_thresh = lambda wildcards: (15,20)[str(wildcards.switch).startswith("extension")]
+bic_thresh = lambda wildcards: (15,25)[str(wildcards.switch).startswith("extension")]
 
 
 rule midway:

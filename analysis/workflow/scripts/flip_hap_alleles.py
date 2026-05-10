@@ -39,7 +39,7 @@ def main(
     """
     Rewrite a two-allele haplotype in a .hap file. Output the new .hap file to stdout.
 
-    If the BIC of the second allele is more than the first, swap them so that the second allele becomes first.
+    If the BIC of the second allele is less than the first, swap them so that the second allele becomes first.
 
     Otherwise, just don't print anything.
     """
@@ -60,7 +60,7 @@ def main(
         phen.data[:, 0],
     ).data
 
-    if data["bic"][0] - data["bic"][1]:
+    if data["bic"][1] < data["bic"][0]:
         hap.data["H0"].variants = hap.data["H0"].variants[::-1]
         hap.fname = output
         hap.write()
