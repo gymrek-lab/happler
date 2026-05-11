@@ -53,6 +53,8 @@ echo "Collecting haplotypes with more than one allele" 1>&2
 all_mafs=( "${mafs[@]}" )
 mafs=$(for maf in "${mafs[@]}"; do echo -e "$(wc -l "$output_dir/$maf".hap)\t$maf"; done | grep -v '^0' | cut -f2)
 mafs=( $mafs )
+hap_maf_counts=$(echo "${mafs[@]}" | wc -w)
+echo "Found $hap_maf_counts haplotypes with more than one allele" 1>&2
 
 echo "Transforming all haplotypes into one merged PGEN" 1>&2
 # merge all of the hap files for each MAF value and transform them all
