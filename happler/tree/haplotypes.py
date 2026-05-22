@@ -339,6 +339,51 @@ class HapplerHaplotype(HaplotypeBase):
         ),
     )
 
+    @staticmethod
+    def _handle_nan(val, key):
+        try:
+            if val[key] is not None:
+                return val[key]
+        except TypeError:
+            pass
+        return np.nan
+
+    @classmethod
+    def from_happler_haplotype(
+        cls, haplotype: Haplotype, gts: GenotypesVCF, hap_id: str, results: tuple[float],
+    ) -> HapplerHaplotype:
+        """
+        Create a new haptools haplotype from a happler Haplotype and a GenotypesVCF object
+        """
+        hap_out = HapplerHaplotype(
+            chrom=gts.variants[haplotype.nodes[0][0].idx]["chrom"],
+            start=0,  # this is filled out later
+            end=0,  # this is filled out later
+            id=hap_id,
+            beta=0,  # this can be filled out later
+            pval=1,  # this can be filled out later
+        )
+        alleles = {
+            node[0].idx: gts.variants[node[0].idx]["alleles"][
+                cls._handle_nan(node, 1)
+            ]
+            for node in haplotype.nodes
+        }
+        hap_out.variants = tuple(
+            HapplerVariant(
+                start=node[0].pos,
+                end=node[0].pos + len(alleles[node[0].idx]),
+                id=node[0].id,
+                allele=alleles[node[0].idx],
+                score=results[node_idx],
+            )
+            for node_idx, node in enumerate(haplotype.nodes)
+        )
+        # now, fill out the info we neglected to fill out at the beginning
+        hap_out.start = min(n.start for n in hap_out.variants)
+        hap_out.end = max(n.end for n in hap_out.variants)
+        return hap_out
+
 
 class Haplotypes(HaplotypesBase):
     """
@@ -358,15 +403,6 @@ class Haplotypes(HaplotypesBase):
     log: Logger
         A logging instance for recording debug statements.
     """
-
-    @staticmethod
-    def _handle_nan(val, key):
-        try:
-            if val[key] is not None:
-                return val[key]
-        except TypeError:
-            pass
-        return np.nan
 
     @classmethod
     def from_tree(
@@ -417,7 +453,7 @@ class Haplotypes(HaplotypesBase):
             )
             alleles = {
                 node["variant"].idx: gts.variants[node["variant"].idx]["alleles"][
-                    cls._handle_nan(node, "allele")
+                    HapplerHaplotype._handle_nan(node, "allele")
                 ]
                 for node in haplotype
             }
@@ -427,7 +463,7 @@ class Haplotypes(HaplotypesBase):
                     end=node["variant"].pos + len(alleles[node["variant"].idx]),
                     id=node["variant"].id,
                     allele=alleles[node["variant"].idx],
-                    score=cls._handle_nan(node["results"], "bic"),
+                    score=HapplerHaplotype._handle_nan(node["results"], "bic"),
                 )
                 for node in haplotype
             )

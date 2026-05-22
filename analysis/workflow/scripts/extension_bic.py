@@ -10,9 +10,9 @@ from haptools.logging import getLogger
 
 from happler.tree import TreeBuilder
 from happler.tree.variant import Variant
-from happler.tree.haplotypes import Haplotype
 from happler.tree.assoc_test import NodeResultsExtra
 from happler.tree.terminator import BICTerminator, TTestTerminator
+from happler.tree.haplotypes import Haplotype, HapplerHaplotype, HapplerVariant
 from happler.tree.assoc_test import AssocTestSimpleSM, AssocTestSimpleSMTScore
 
 
@@ -119,8 +119,19 @@ def get_extension_bf(
 
     if np.isnan(bf_val):
         raise ValueError("Some BFs were NA")
-    
-    return ext_allele, results, bf_val
+
+    new_haps = data.Haplotypes(
+        fname=None, haplotype=HapplerHaplotype, variant=HapplerVariant, log=log
+    )
+    new_haps.data = {}
+    hap_node_results = (parent_res.bic, node_results.bic)
+    new_haps.data[hp.id] = HapplerHaplotype.from_happler_haplotype(
+        new_hap, og_gts, hp.id, hap_node_results,
+    )
+    new_haps.data[hp.id].beta = node_results.beta
+    new_haps.data[hp.id].pval = -np.log10(node_results.pval)
+
+    return ext_allele, results, bf_val, new_haps
 
 
 @click.command()
@@ -191,10 +202,13 @@ def main(
     assert phen.samples == og_gts.samples and phen.samples == hap_gts.samples
 
     # call method to compute BIC
-    ext_allele, results, bf_val = get_extension_bf(
+    ext_allele, results, bf_val, new_haps = get_extension_bf(
         hp, hap_gts, og_gts, phen, mode, maf, log,
     )
 
+    log.info("Outputting new .hap file")
+    new_haps.fname = output.with_suffix(".hap")
+    new_haps.write()
 
     log.info("Outputting BF values")
     PLINK_COLS = {
