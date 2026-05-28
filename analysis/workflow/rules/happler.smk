@@ -3,6 +3,7 @@ from pathlib import Path
 
 out = config["out"]
 mode = config["mode"]
+pheno = config["pheno"]
 logs = out + "/logs"
 bench = out + "/bench"
 
@@ -32,32 +33,6 @@ def gs_fix(og_value, tsfm_func):
 wildcard_constraints:
     rep=r"\d+"
 
-
-rule sub_pheno:
-    """
-    subset the phenotype file to include only the desired replicate
-    """
-    input:
-        pheno=config["pheno"],
-    params:
-        rep=lambda wildcards: int(wildcards.rep)+2,
-    output:
-        pheno=out + "/phen.pheno",
-    resources:
-        runtime=7,
-    threads: 1,
-    log:
-        logs + "/sub_pheno",
-    benchmark:
-        bench + "/sub_pheno",
-    conda:
-        "../envs/default.yml"
-    shell:
-        "cut -f 1,{params.rep} {input.pheno} | "
-        "(echo -e \"#IID\\thap\" && tail -n+2) >{output.pheno} 2>{log}"
-
-
-pheno = rules.sub_pheno.output.pheno if "{rep}" in out else config["pheno"]
 if mode in ("run", "midway"):
     # if the pvar size is larger than 100 MB, just use the default memory instead (if it is lower)
     rsrc_func = lambda x: max if 100 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000 else min
@@ -65,6 +40,7 @@ else:
     rsrc_func = lambda x: min
 
 
+# TODO: create a version of the happler rule for the midway analysis which runs with only one iteration, one signal, and BIC threshold of -inf
 rule run:
     """ execute happler! """
     input:

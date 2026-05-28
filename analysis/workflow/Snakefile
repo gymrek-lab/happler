@@ -164,17 +164,43 @@ elif mode == "run":
 else:
     raise ValueError("Unsupported operating 'mode' in config")
 
-module happler:
-    snakefile: "rules/happler.smk"
-    config: happler_config
-use rule * from happler as happler_*
+
+rule sub_pheno:
+    """
+    subset the phenotype file to include only the desired replicate
+    """
+    input:
+        pheno=happler_config["pheno"],
+    params:
+        rep=lambda wildcards: int(wildcards.rep)+2,
+    output:
+        pheno=happler_config["out"] + "/phen.pheno",
+    resources:
+        runtime=7,
+    threads: 1,
+    log:
+        happler_config["out"] + "/logs/sub_pheno",
+    benchmark:
+        happler_config["out"] + "/bench/sub_pheno",
+    conda:
+        "envs/default.yml"
+    shell:
+        "cut -f 1,{params.rep} {input.pheno} | "
+        "(echo -e \"#IID\\thap\" && tail -n+2) >{output.pheno} 2>{log}"
+
+happler_config["pheno"] = rules.sub_pheno.output.pheno if "{rep}" in happler_config["pheno"] else happler_config["pheno"]
+
 
 if mode == "midway":
-    happler_config["pheno"] = rules.happler_run.input.pts
     module midway:
         snakefile: "rules/midway.smk"
         config: happler_config
     use rule manhattan from midway as midway_manhattan
+
+module happler:
+    snakefile: "rules/happler.smk"
+    config: happler_config
+use rule * from happler as happler_*
 
 if mode == "ld_range" and config["modes"][mode]["random"]:
     happler_config["random"] = rules.simulate_random_transform.output
