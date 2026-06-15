@@ -1,6 +1,7 @@
 use-conda: true
 latency-wait: 30
 keep-going: true
+scheduler: firstfit
 printshellcmds: true
 conda-frontend: conda
 rerun-trigger: [mtime, params, input]

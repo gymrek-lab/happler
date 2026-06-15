@@ -14,6 +14,7 @@ tswitch = {
     "interact-bic": 5,
     "extension-bic": 6,
     "extension-tscore": 7,
+    "extension-parent-bic": 8,
 }
 
 wildcard_constraints:
@@ -41,9 +42,9 @@ rule manhattan:
     output:
         dir=directory(out + "/{switch}"),
         linear=out + "/{switch}/out.linear",
-        transform_pgen=temp(out + "/{switch}/out.pgen"),
-        transform_pvar=temp(out + "/{switch}/out.pvar"),
-        transform_psam=temp(out + "/{switch}/out.psam"),
+        pgen=temp(out + "/{switch}/out.pgen"),
+        pvar=temp(out + "/{switch}/out.pvar"),
+        psam=temp(out + "/{switch}/out.psam"),
         hap=out + "/{switch}/out.hap",
     resources:
         runtime=20,

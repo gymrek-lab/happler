@@ -50,6 +50,7 @@ switch_sim_mode = {
     "pip-interact": ("hap", "indep"),
     "extension-bic": ("hap", "hap"),
     "extension-tscore": ("hap", "hap"),
+    "extension-parent-bic-pip": ("parent", "parent"),
 }
 
 switch_ext_mode = {

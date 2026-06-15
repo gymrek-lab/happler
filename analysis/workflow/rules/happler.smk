@@ -7,7 +7,6 @@ pheno = config["pheno"]
 logs = out + "/logs"
 bench = out + "/bench"
 
-
 # whether to include the happler haplotype ("in") or no haplotypes ("ex")
 exclude_obs = {"in": 0, "ex": 1}
 # or, if config["random"] is not None, this denotes
@@ -30,8 +29,13 @@ def gs_fix(og_value, tsfm_func):
         return storage(str(tsfm_func(og_value)).replace(".snakemake/storage/gcs", "gs:/"))
     return tsfm_func(og_value)
 
-wildcard_constraints:
-    rep=r"\d+"
+if mode == "midway":
+    wildcard_constraints:
+        switch="(pip|extension-parent-bic-pip)",
+        rep=r"\d+"
+else:
+    wildcard_constraints:
+        rep=r"\d+"
 
 if mode in ("run", "midway"):
     # if the pvar size is larger than 100 MB, just use the default memory instead (if it is lower)
@@ -40,7 +44,6 @@ else:
     rsrc_func = lambda x: min
 
 
-# TODO: create a version of the happler rule for the midway analysis which runs with only one iteration, one signal, and BIC threshold of -inf
 rule run:
     """ execute happler! """
     input:
@@ -220,7 +223,8 @@ rule igv:
 
 rule transform:
     input:
-        hap=rules.run.output.gz,
+        hap=lambda wildcards: expand(config["midway_out"].hap, switch="extension-parent-bic", allow_missing=True) \
+            if mode == "midway" and wildcards.switch == "extension-parent-bic-pip" else rules.run.output.gz,
         pgen=config["snp_panel"],
         pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
         psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
@@ -304,32 +308,29 @@ rule sv_ld:
 
 
 def merge_hps_input(wildcards):
-    if mode in ("run", "ld_range"):
+    res = None
+    if mode in ("run", "ld_range", "midway"):
         if config["random"] is None:
             # include the hap that happler found
-            return rules.transform.output
+            res = rules.transform.output
         else:
             if exclude_obs[wildcards.ex]:
                 # exclude the random hap (and use the causal hap, instead)
-                return config["causal_gt"]
+                res = config["causal_gt"]
             else:
                 # include the random hap
-                return config["random"]
-    elif mode == "midway":
-        return snakemake.io.Namedlist(fromdict=dict(zip(
-            dict(config["causal_gt"]).keys(),
-            expand(config["causal_gt"], sim_mode="hap", allow_missing=True)
-        )))
-    else:
+                res = config["random"]
+        if mode == "midway":
+            if wildcards.switch == "extension-parent-bic-pip":
+                res = rules.transform.output
+            else:
+                res = snakemake.iocontainers.Namedlist(fromdict=dict(zip(
+                    dict(config["causal_gt"]).keys(),
+                    expand(config["causal_gt"], sim_mode="hap", allow_missing=True)
+                )))
+    if res is None:
         raise ValueError("Unsupported mode: {}".format(mode))
-
-
-if mode == "midway":
-    out += "/{switch}"
-    logs = logs[:-len("logs")] + "{switch}/logs"
-    bench = bench[:-len("bench")] + "{switch}/bench"
-    wildcard_constraints:
-        switch="pip"
+    return res
 
 
 rule merge:

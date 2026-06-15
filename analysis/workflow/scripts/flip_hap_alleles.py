@@ -52,7 +52,7 @@ def main(
     phen = Phenotypes(pt)
     phen.read()
 
-    hap_gts = GenotypesPLINK.load(gt)
+    hap_gts = GenotypesPLINK.load(gt, samples=set(phen.samples))
     hap_gts = hap_gts.subset(variants=hap_vars)
 
     data = AssocTestSimpleSMTScore(with_bic=True).run(

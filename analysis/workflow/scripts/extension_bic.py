@@ -7,14 +7,135 @@ import numpy as np
 import pandas as pd
 from haptools import data
 from haptools.logging import getLogger
+from haptools.ld import pearson_corr_ld
 
 from happler.tree import TreeBuilder
 from happler.tree.variant import Variant
 from happler.tree.assoc_test import NodeResultsExtra
 from happler.tree.terminator import BICTerminator, TTestTerminator
 from happler.tree.haplotypes import Haplotype, HapplerHaplotype, HapplerVariant
-from happler.tree.assoc_test import AssocTestSimpleSM, AssocTestSimpleSMTScore
+from happler.tree.assoc_test import AssocResults, AssocTestSimpleSM, AssocTestSimpleSMTScore
 
+
+def var_gts(
+    variant: Variant,
+    allele: int,
+    gts: data.Genotypes,
+):
+    return gts.subset(variants=(variant.id,)).data[:,0] == allele
+
+def get_extension_bf_parent(
+    hp: data.Haplotype,
+    hap_gts: data.Genotypes,
+    og_gts: data.Genotypes,
+    phen: data.Phenotypes,
+    mode: str = "parent-bic",
+    maf: float = None,
+    log: Logger = None,
+):
+    if mode != "parent-bic":
+        raise ValueError("Unsupported mode")
+
+    log.info("Setting up tree builder")
+    hap_tree = TreeBuilder(
+        og_gts,
+        phen,
+        maf=maf,
+        method=AssocTestSimpleSM(with_bic=True),
+        terminator=BICTerminator(bf_thresh=-float("inf"), log=log),
+        indep_thresh=-float("inf"),
+        ld_prune_thresh=0.95,
+        covariance_correction=False,
+        log=log,
+    )
+
+    log.info("Locating best delta BIC value among four haplotypes")
+    best_bic_value = {"ext_allele": None, "results": None, "bf_val": -float("inf"), "new_haps": None}
+    parent_hap = Haplotype(num_samples=len(hap_tree.gens.samples))
+    parent_res = None
+
+    # find the variant-allele pairs that give the best haplotype
+    vals = hap_tree._find_split_rigid(parent_hap, parent_res)
+
+    if vals is not None:
+
+        for variant, allele, results in vals:
+            if variant is None:
+                # there were no significant variants!
+                continue
+            # create a new Haplotype with the variant-allele pair added
+            variant_gts = hap_tree.gens.data[:, variant.idx, :2] == allele
+            new_parent_hap = parent_hap.append(variant, allele, variant_gts)
+            new_vals = hap_tree._find_split_rigid(new_parent_hap, results)
+            parent_res = results
+
+            if new_vals is None:
+                continue
+
+            for new_variant, new_allele, new_results in new_vals:
+                if new_variant is None:
+                    continue
+
+                new_variant_gts = hap_tree.gens.data[:, new_variant.idx, :2] == new_allele
+                new_hap = new_parent_hap.append(new_variant, new_allele, new_variant_gts)
+
+                num_tests = 1
+                parent_corr = 0
+                num_samps = int(len(og_gts.samples))
+                node_results = new_results
+                ext_allele = (new_variant, new_allele, new_results)
+                assoc_results = AssocResults(
+                    np.array(
+                        [(node_results.beta,node_results.pval,node_results.stderr,node_results.bic),],
+                        dtype=[
+                            ("beta", np.float64),
+                            ("pval", object),
+                            ("stderr", np.float64),
+                            ("bic", np.float64),
+                        ],
+                    )
+                )
+
+                # now, get the BF
+                val = BICTerminator().compute_val(
+                    parent_res,
+                    node_results,
+                    assoc_results,
+                    0,
+                    num_samps,
+                    num_tests,
+                    parent_corr=parent_corr,
+                    short_circuit=False,
+                )
+                if val != True:
+                    bf_val = val[mode.endswith("bic")]
+                else:
+                    bf_val = float("inf") if mode.endswith("bic") else 0
+
+                if np.isnan(bf_val):
+                    raise ValueError("Some BFs were NA")
+
+                if bf_val > best_bic_value["bf_val"]:
+
+                    new_haps = data.Haplotypes(
+                        fname=None, haplotype=HapplerHaplotype, variant=HapplerVariant, log=log
+                    )
+                    new_haps.data = {}
+                    hap_node_results = (parent_res.bic, node_results.bic)
+                    new_haps.data[hp.id] = HapplerHaplotype.from_happler_haplotype(
+                        new_hap, og_gts, hp.id, hap_node_results,
+                    )
+                    new_haps.data[hp.id].beta = node_results.beta
+                    new_haps.data[hp.id].pval = -np.log10(node_results.pval)
+
+                    best_bic_value = {
+                        "ext_allele": ext_allele,
+                        "results": assoc_results,
+                        "bf_val": bf_val,
+                        "new_haps": new_haps,
+                    }
+
+    return tuple(best_bic_value.values())
 
 def get_extension_bf(
     hp: data.Haplotype,
@@ -25,26 +146,6 @@ def get_extension_bf(
     maf: float = None,
     log: Logger = None,
 ):
-    log.info("Setting up delta BIC test")
-    # parent node model: y ~ h_hap
-    parent = Haplotype.from_haptools_haplotype(hp, og_gts)
-    if mode == "bic":
-        parent_res = NodeResultsExtra.from_np(
-            AssocTestSimpleSM(with_bic=True).run(
-                hap_gts.data.sum(axis=2),
-                phen.data[:, 0],
-            ).data[0]
-        )
-    elif mode == "tscore":
-        parent_res = NodeResultsExtra.from_np(
-            AssocTestSimpleSMTScore(with_bic=True).run(
-                hap_gts.data.sum(axis=2),
-                phen.data[:, 0],
-            ).data[0]
-        )
-    else:
-        raise ValueError("Unsupported mode")
-
     log.info("Setting up tree builder")
     hap_tree = TreeBuilder(
         og_gts,
@@ -56,6 +157,27 @@ def get_extension_bf(
         covariance_correction=False,
         log=log,
     )
+
+    log.info("Setting up delta BIC test")
+    # parent node model: y ~ h_hap
+    parent = Haplotype.from_haptools_haplotype(hp, og_gts)
+    hap_gts_data = hap_gts.data
+    if mode.endswith("bic"):
+        parent_res = NodeResultsExtra.from_np(
+            AssocTestSimpleSM(with_bic=True).run(
+                hap_gts_data.sum(axis=2),
+                phen.data[:, 0],
+            ).data[0]
+        )
+    elif mode == "tscore":
+        parent_res = NodeResultsExtra.from_np(
+            AssocTestSimpleSMTScore(with_bic=True).run(
+                hap_gts_data.sum(axis=2),
+                phen.data[:, 0],
+            ).data[0]
+        )
+    else:
+        raise ValueError("Unsupported mode")
 
     log.info("Running tree builder for a single node")
     ext_allele = list(filter(
@@ -74,7 +196,7 @@ def get_extension_bf(
         new_allele_gts = ~new_allele_gts
     new_hap = parent.append(ext_allele[0], ext_allele[1], new_allele_gts)
     # current node model: y ~ h_hap' where hap' is hap extended by the next best allele
-    if mode == "bic":
+    if mode.endswith("bic"):
         terminator = BICTerminator()
         results = AssocTestSimpleSM(with_bic=True).run(
             new_hap.data.sum(axis=1)[:, np.newaxis],
@@ -113,9 +235,9 @@ def get_extension_bf(
         short_circuit=False,
     )
     if val != True:
-        bf_val = val[mode == "bic"]
+        bf_val = val[mode.endswith("bic")]
     else:
-        bf_val = float("inf") if mode == "bic" else 0
+        bf_val = float("inf") if mode.endswith("bic") else 0
 
     if np.isnan(bf_val):
         raise ValueError("Some BFs were NA")
@@ -124,6 +246,8 @@ def get_extension_bf(
         fname=None, haplotype=HapplerHaplotype, variant=HapplerVariant, log=log
     )
     new_haps.data = {}
+    # NOTE: this code is broken for --mode bic and needs to be fixed! an extra bic
+    # value must be prepended to the following tuple
     hap_node_results = (parent_res.bic, node_results.bic)
     new_haps.data[hp.id] = HapplerHaplotype.from_happler_haplotype(
         new_hap, og_gts, hp.id, hap_node_results,
@@ -149,7 +273,7 @@ def get_extension_bf(
 @click.option(
     "-m",
     "--mode",
-    type=click.Choice(["tscore", "bic"]),
+    type=click.Choice(["tscore", "bic", "parent-bic"]),
     default="bic",
     show_default=True,
     help="The type of values to compute",
@@ -202,9 +326,14 @@ def main(
     assert phen.samples == og_gts.samples and phen.samples == hap_gts.samples
 
     # call method to compute BIC
-    ext_allele, results, bf_val, new_haps = get_extension_bf(
-        hp, hap_gts, og_gts, phen, mode, maf, log,
-    )
+    if mode == "parent-bic":
+        ext_allele, results, bf_val, new_haps = get_extension_bf_parent(
+            hp, hap_gts, og_gts, phen, mode, maf, log,
+        )
+    else:
+        ext_allele, results, bf_val, new_haps = get_extension_bf(
+            hp, hap_gts, og_gts, phen, mode, maf, log,
+        )
 
     log.info("Outputting new .hap file")
     new_haps.fname = output.with_suffix(".hap")

@@ -61,5 +61,9 @@ min_maf: 0
 # Sample sizes to use
 sample_size: [800, 1600, 2400, 3200]
 
+# If specified, run happler on this fraction of the data and SuSiE on the other portion
+# If commented, defaults to no split: where happler is executed upon 100% and SuSiE on the same 100%
+split: 0.5
+
 # A threshold on the pvalues of the haplotypes
 out_thresh: 5e-8
