@@ -255,9 +255,9 @@ if mode == "midway":
         snakefile: "rules/midway.smk"
         config: happler_config
     use rule manhattan from midway as midway_manhattan
-    happler_config["out"] = happler_config["out"] + "/{switch}"
+    happler_config["out"] = happler_config["out"] + "/{switch}/{split}"
     happler_config["midway_out"] = rules.midway_manhattan.output
-    happler_config["pheno"] = expand(rules.sub_pheno_split.output.pheno, split="test", allow_missing=True)[0]
+    happler_config["pheno"] = rules.sub_pheno_split.output.pheno
 
 module happler:
     snakefile: "rules/happler.smk"

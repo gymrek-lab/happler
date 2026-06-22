@@ -32,6 +32,7 @@ def gs_fix(og_value, tsfm_func):
 if mode == "midway":
     wildcard_constraints:
         switch="(pip|extension-parent-bic-pip)",
+        split="(train|test)",
         rep=r"\d+"
 else:
     wildcard_constraints:
