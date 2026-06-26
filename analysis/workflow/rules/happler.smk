@@ -44,6 +44,9 @@ if mode in ("run", "midway"):
 else:
     rsrc_func = lambda x: min
 
+if check_config("split"):
+    og_pheno = pheno
+    pheno = expand(og_pheno, split="train", allow_missing=True)[0]
 
 rule run:
     """ execute happler! """
@@ -220,6 +223,10 @@ rule igv:
         "sed 's+mySnapshotDirectory+{params.outdir}+;s/REGION/'$region'/;s+BED+{output.bed}+' workflow/scripts/igv.bat && "
         "cut -f1,2 --output-delimiter=: {output.bed} | sort -u | sed 's/^/SORT BASE /' && echo 'snapshot {params.outfile}' && echo exit"
         ") &>{log}"
+
+
+if check_config("split"):
+    pheno = expand(og_pheno, split="test", allow_missing=True)[0]
 
 
 rule transform:

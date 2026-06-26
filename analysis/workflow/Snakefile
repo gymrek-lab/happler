@@ -4,7 +4,7 @@ import snakemake.io as io
 from snakemake.utils import min_version
 
 ##### set minimum snakemake version #####
-min_version("9.23.0")
+min_version("8.30.0")
 
 
 # if --configfile was not specified, import the default config file
@@ -186,8 +186,10 @@ rule sub_pheno:
     conda:
         "envs/default.yml"
     shell:
-        "cut -f 1,{params.rep} {input.pheno} | "
-        "(echo -e \"#IID\\thap\" && tail -n+2) >{output.pheno} 2>{log}"
+        "awk -F '\\t' -v col={params.rep} "
+        "'NR==1 {{if (col > NF) {{print \"Check rep number\" > \"/dev/stderr\"; exit 1}}}} "
+        "{{print $1, $col}}' OFS='\\t' {input.pheno} | "
+        "(echo -e \"#IID\\thap\" && tail -n+2) > {output.pheno} 2>{log}"
 
 happler_config["pheno"] = rules.sub_pheno.output.pheno if "{rep}" in happler_config["out"] else happler_config["pheno"]
 
@@ -245,19 +247,23 @@ rule sub_pheno_split:
         "awk 'NR==FNR {{ids[$1]; next}} $1 in ids' - {input.pheno} | "
         "grep -F -x -f - {input.pheno}; ) > {output.pheno} 2>>{log}"
 
-if check_config("split"):
-    if mode == "midway":
-        happler_config["pheno"] = expand(rules.sub_pheno_split.output.pheno, split="train", allow_missing=True)[0]
-
+if check_config("split") and mode == "midway":
+    happler_config["pheno"] = expand(rules.sub_pheno_split.output.pheno, split="train", allow_missing=True)[0]
 
 if mode == "midway":
     module midway:
         snakefile: "rules/midway.smk"
         config: happler_config
     use rule manhattan from midway as midway_manhattan
-    happler_config["out"] = happler_config["out"] + "/{switch}/{split}"
+    happler_config["out"] = happler_config["out"] + "/{switch}"
     happler_config["midway_out"] = rules.midway_manhattan.output
+
+happler_config["split"] = False
+if check_config("split") and mode in ("midway", "ld_range"):
+    if mode == "midway":
+        happler_config["out"] = happler_config["out"] + "/{split}"
     happler_config["pheno"] = rules.sub_pheno_split.output.pheno
+    happler_config["split"] = True
 
 module happler:
     snakefile: "rules/happler.smk"
