@@ -307,16 +307,15 @@ def get_metrics(
         2. effect size for the haplotype
         3. p-value for the haplotype
         4. BIC value for the haplotype
-        5. allele frequency for the haplotype's SNP 1
-        6. effect size for the haplotype's SNP 1
-        7. p-value for the haplotype's SNP 1
-        8. BIC value for the haplotype's SNP 1
-        9. allele frequency for the haplotype's SNP 2
-        10. effect size for the haplotype's SNP 2
-        11. p-value for the haplotype's SNP 2
-        12. BIC value for the haplotype's SNP 2
-        13. BIC value for all alleles of the haplotype (independently)
-        14. the number of alleles in the haplotype
+        5. BIC value for all alleles of the haplotype (independently)
+        6. the number of alleles in the haplotype
+        7. allele frequency for the haplotype's SNPs
+        8. effect size for the haplotype's SNPs
+        9. p-value for the haplotype's SNPs
+        10. BIC value for the haplotype's SNPs
+        11. delta BIC values for the haplotype's SNPs
+        12. Original BIC value for the haplotype's SNPs (from the .hap file)
+        13. Original delta BIC values for the haplotype's SNPs (from the .hap file)
     """
     gts, hps, pts = load_data(gts, hps, pts)
 
@@ -356,22 +355,35 @@ def get_metrics(
             gts.subset(variants=hp_vars).data.sum(axis=2),
             pts.data[:, 0],
         )[2]
+        hp_al_afs = np.empty(len(hp_vars))
+        hp_al_effects = np.empty(len(hp_vars))
+        hp_al_pvals = np.empty(len(hp_vars))
+        hp_al_bics = np.empty(len(hp_vars))
+        hp_al_deltas = np.empty(len(hp_vars))
+        for hp_al_idx in range(len(hp_vars)):
+            hp_al_afs[hp_al_idx] = flip_allele(afs[hp_vars[hp_al_idx]], hp_vars_alls[hp_vars[hp_al_idx]])
+            hp_al_effects[hp_al_idx] = flip_effect(summary_stats[hp_vars[hp_al_idx]][0], hp_vars_alls[hp_vars[hp_al_idx]])
+            hp_al_pvals[hp_al_idx] = summary_stats[hp_vars[hp_al_idx]][1]
+            hp_al_bics[hp_al_idx] = summary_stats[hp_vars[hp_al_idx]][2]
+        hp_al_bics_og = np.array([v.score for v in hps.data[hp.id].variants])
+        breakpoint()
+        hp_al_deltas = hp_al_bics[:-1] - hp_al_bics[1:]
+        hp_al_deltas_og = hp_al_bics_og[:-1] - hp_al_bics_og[1:]
         vals[hp.id] = (
             hp_vars_ld,
             afs[hp.id],
             summary_stats[hp.id][0],
             summary_stats[hp.id][1],
             summary_stats[hp.id][2],
-            flip_allele(afs[hp_vars[0]], hp_vars_alls[hp_vars[0]]),
-            flip_effect(summary_stats[hp_vars[0]][0], hp_vars_alls[hp_vars[0]]),
-            summary_stats[hp_vars[0]][1],
-            summary_stats[hp_vars[0]][2],
-            flip_allele(afs[hp_vars[1]], hp_vars_alls[hp_vars[1]]),
-            flip_effect(summary_stats[hp_vars[1]][0], hp_vars_alls[hp_vars[1]]),
-            summary_stats[hp_vars[1]][1],
-            summary_stats[hp_vars[1]][2],
             indep_bic,
             len(hp_vars),
+            list(hp_al_afs),
+            list(hp_al_effects),
+            list(hp_al_pvals),
+            list(hp_al_bics),
+            list(hp_al_deltas),
+            list(hp_al_bics_og),
+            list(hp_al_deltas_og),
         )
 
     return vals
@@ -474,13 +486,13 @@ def main(
     explained_variances = vals[:, (0, 2)]
     rsquareds = vals[:, (1, 3)]
 
-    if np.any(explained_variances > 1):
+    if np.any(explained_variances[:, 0] > 1):
         log.error(
             "Some of the explained variances are greater than 1! Check that nothing "
             "went wrong."
         )
 
-    params1, hp_ids1, other_vals = np.array([v[0] for v in other_vals]), [v[1] for v in other_vals], np.array([v[2] for v in other_vals])
+    params1, hp_ids1, other_vals = np.array([v[0] for v in other_vals]), [v[1] for v in other_vals], np.array([v[2] for v in other_vals], dtype=object)
     assert (params == params1).all()
     assert hp_ids1 == hp_ids
     lds = other_vals[:, 0]
@@ -488,16 +500,15 @@ def main(
     hap_betas = other_vals[:, 2]
     hap_pvals = other_vals[:, 3]
     hap_bics = other_vals[:, 4]
-    snp1_afs = other_vals[:, 5]
-    snp1_betas = other_vals[:, 6]
-    snp1_pvals = other_vals[:, 7]
-    snp1_bics = other_vals[:, 8]
-    snp2_afs = other_vals[:, 9]
-    snp2_betas = other_vals[:, 10]
-    snp2_pvals = other_vals[:, 11]
-    snp2_bics = other_vals[:, 12]
-    indep_bics = other_vals[:, 13]
-    num_alleles = other_vals[:, 14]
+    indep_bics = other_vals[:, 5]
+    num_alleles = other_vals[:, 6]
+    allele_afs = other_vals[:, 7]
+    allele_effects = other_vals[:, 8]
+    allele_pvals = other_vals[:, 9]
+    allele_bics = other_vals[:, 10]
+    allele_deltas = other_vals[:, 11]
+    allele_bics_og = other_vals[:, 12]
+    allele_deltas_og = other_vals[:, 13]
 
     # how good are we doing?
     percent_success = 100*(
@@ -545,16 +556,15 @@ def main(
             hap_betas,
             hap_pvals,
             hap_bics,
-            snp1_afs,
-            snp1_betas,
-            snp1_pvals,
-            snp1_bics,
-            snp2_afs,
-            snp2_betas,
-            snp2_pvals,
-            snp2_bics,
             indep_bics,
             num_alleles,
+            allele_afs,
+            allele_effects,
+            allele_pvals,
+            allele_bics,
+            allele_deltas,
+            allele_bics_og,
+            allele_deltas_og,
         ), picklef)
 
     with open(output.with_suffix(".tsv"), 'w', newline='') as tsvfile:
@@ -571,16 +581,15 @@ def main(
             "hap_betas",
             "hap_pvals",
             "hap_bics",
-            "snp1_afs",
-            "snp1_betas",
-            "snp1_pvals",
-            "snp1_bics",
-            "snp2_afs",
-            "snp2_betas",
-            "snp2_pvals",
-            "snp2_bics",
             "indep_bics",
             "num_alleles",
+            "allele_afs",
+            "allele_effects",
+            "allele_pvals",
+            "allele_bics",
+            "allele_deltas",
+            "allele_bics_og",
+            "allele_deltas_og",
         ])
         if ("locus" in params.dtype.names) and ("gene" in params.dtype.names):
             name = lambda i: i["locus"]+":"+i["gene"]
@@ -599,16 +608,15 @@ def main(
                 hap_betas[i],
                 hap_pvals[i],
                 hap_bics[i],
-                snp1_afs[i],
-                snp1_betas[i],
-                snp1_pvals[i],
-                snp1_bics[i],
-                snp2_afs[i],
-                snp2_betas[i],
-                snp2_pvals[i],
-                snp2_bics[i],
                 indep_bics[i],
                 num_alleles[i],
+                ",".join(map(str,allele_afs[i])),
+                ",".join(map(str,allele_effects[i])),
+                ",".join(map(str,allele_pvals[i])),
+                ",".join(map(str,allele_bics[i])),
+                ",".join(map(str,allele_deltas[i])),
+                ",".join(map(str,allele_bics_og[i])),
+                ",".join(map(str,allele_deltas_og[i])),
             ])
 
     ax1.scatter(explained_variances[:, 0], explained_variances[:, 0]/explained_variances[:, 1])

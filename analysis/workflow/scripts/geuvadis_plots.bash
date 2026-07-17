@@ -134,9 +134,30 @@ if [ "$mode" == "geuvadis" ]; then
   # create SV LD plot
   # first, copy all of the results over
   mkdir -p sv_ld/H0
-  for i in $(sed 's+out/++;s+.hap$+_svs.ld+' multiline.txt); do region="$(echo "$i" | sed 's\/happler_svs.ld$\\;s+/happler/run/+\t+')"; cp "$i" sv_ld/H0/$(echo "$region" | cut -f1):$(echo "$region" | cut -f2).ld; done
+  for i in $(sed 's+out/++;s+.hap$+_svs.ld+' multiline.txt); do
+    region="$(echo "$i" | sed 's\/happler_svs.ld$\\;s+/happler/run/+\t+')";
+    cp "$i" sv_ld/H0/$(echo "$region" | cut -f1):$(echo "$region" | cut -f2).ld;
+  done
   # now, collate the results
-  { echo -e 'file\tpip\tpos\tid\tld'; tail -n+2 pips.tsv | sort -gr -k2,2 | { while read -r line; do file="sv_ld/$(echo "$line" | cut -f1 | cut -f3 -d:)/$(echo "$line" | cut -f1 | cut -f-2 -d:).ld"; echo -en "$file"$'\t'; echo -en "$(echo "$line" | cut -f2)"$'\t'; awk -F $'\t' -v 'OFS=\t' '{print $2, $3, sqrt($4*$4);}' "$file" | sort -gr -k3,3 | head -n1; done } | sed 's/^.*sv_ld\///'; } > pips_sv_ld.tsv
+  {
+    echo -e 'file\tpip\tpos\tid\tld';
+    tail -n+2 pips.tsv | \
+    sort -gr -k2,2 | {
+      while read -r line; do
+        hapid=$(echo "$line" | cut -f1 | cut -f3 -d:);
+        if [ "$hapid" != "H0" ]; then
+          continue
+        fi
+        file="sv_ld/$(echo "$line" | cut -f1 | cut -f3 -d:)/$(echo "$line" | cut -f1 | cut -f-2 -d:).ld";
+        echo -en "$file"$'\t';
+        echo -en "$(echo "$line" | cut -f2)"$'\t';
+        awk -F $'\t' -v 'OFS=\t' '{print $2, $3, sqrt($4*$4);}' "$file" | \
+        sort -gr -k3,3 | \
+        head -n1;
+      done;
+    } | \
+    sed 's/^.*sv_ld\///';
+  } > pips_sv_ld.tsv
   echo "Created $out/pips_sv_ld.tsv" 1>&2
   # now, visualize all of the results
   (
@@ -178,15 +199,19 @@ EOF
   echo -e "hap\tpip\tpos\tid\tld\talleles" > "$out"/pips_str_ld.tsv
   while IFS= read -r line; do
     str_id="$(echo "$line" | cut -f5,6 --output-delimiter ':')"
-    echo -ne "$(echo "$line" | cut -f1-3 --output-delimiter ':')\t$(echo "$line" | cut -f4)\t$(echo "$line" | cut -f6)\t$str_id\t"
-    echo -ne "$(workflow/scripts/compute_pgen_ld.py --verbosity WARNING --target-is-repeat --hap-id "$str_id" -o /dev/stdout "$out/$(echo "$line" | cut -f1)"/happler/run/"$(echo "$line" | cut -f2)"/happler.pgen data/geuvadis/mlamkin/all_Geuvadis_STRs.pgen | tail -n+2 | cut -f4)"
-    echo -e "\t$(grep -P '\t'"$str_id"'\t' data/geuvadis/mlamkin/all_Geuvadis_STRs.pvar | cut -f 4,5 --output-delimiter ,)"
+    region="$(echo "$line" | cut -f1 | sed 's/_/:/')"
+    pgen_hap_lds="$(workflow/scripts/compute_pgen_ld.py --verbosity WARNING --target-is-repeat --region "$region" --hap-id "$str_id" -o /dev/stdout "$out/$(echo "$line" | cut -f1)"/happler/run/"$(echo "$line" | cut -f2)"/happler.pgen data/geuvadis/mlamkin/all_Geuvadis_STRs.pgen | tail -n+2 | cut -f4)"
+    hap_id=0
+    for pgen_hap_ld in $pgen_hap_lds; do
+      echo -e "$(echo "$line" | cut -f1-3 --output-delimiter ':' | sed 's/:H0$/:H'"$hap_id"'/')\t$(echo "$line" | cut -f4)\t$(echo "$line" | cut -f6)\t$str_id\t$pgen_hap_ld\t$(grep -P '\t'"$str_id"'\t' data/geuvadis/mlamkin/all_Geuvadis_STRs.pvar | cut -f 4,5 --output-delimiter ,)"
+      hap_id=$((hap_id + 1))
+    done
   done < <(tail -n+2 "$out"/STR_assocations.tsv) >> "$out"/pips_str_ld.tsv
   echo "Created $out/pips_str_ld.tsv" 1>&2
   (
     head -n1 "$out/pips_str_ld.tsv"
     tail -n+2 "$out/pips_str_ld.tsv" \
-      | awk -F'\t' -v OFS='\t' '{$5 = ($5 < 0) ? -$5 : $5; print}' \
+      | awk -F'\t' -v OFS='\t' 'NF == 6 {$5 = ($5 < 0) ? -$5 : $5; print}' \
       | sort -t$'\t' -k1,1 -k5,5nr \
       | awk -F'\t' -v OFS='\t' '!seen[$1]++ { print }'
   ) > "$out/pips_best_str_ld.tsv"
@@ -237,20 +262,21 @@ plt.savefig("ld_str_vs_sv.png")
 
 EOF
 ) | python
-  echo "Created $out/ld_str_vs_sv.png"; 1>&2
+  echo "Created $out/ld_str_vs_sv.png" 1>&2
 fi
 
 # let's make a plot to show runtime and memory usage
-echo -e "locus\tnum_vars\ttime_s\tmem_mb" > bench.tsv
-# To get just the multiline ones, use '$(sed 's+out/++;s+happler.hap$+bench/run+' multiline.txt)' instead of */happler/run/*/bench/run
-# To get just the ones that were considered in data/aou/phenos/platelet_count.bed, use '$(cut -f-3 ../data/aou/phenos/platelet_count.bed | sed 's/\t/_/;s/\t/-/;s+$+/happler/run/platelet_count/bench/run+')' instead of */happler/run/*/bench/run
-for i in */happler/run/*/bench/run; do
-  echo -e "$(echo $i | sed 's+/happler/run/+:+;s+/bench/run++')\t$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/run+'"$geno_file_name"'.pvar+')" | cut -f1 -d' ')\t$(cut -f1,3 "$i" | tail -n1)"
-done >> bench.tsv
-echo "Created $out/bench.tsv" 1>&2
-(
-  echo "a=["$(tail -n+2 bench.tsv | cut -f2- --output-delimiter , | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
-  cat <<'EOF'
+if [ "$mode" != "geuvadis" ]; then
+  echo -e "locus\tnum_vars\ttime_s\tmem_mb" > bench.tsv
+  # To get just the multiline ones, use '$(sed 's+out/++;s+happler.hap$+bench/run+' multiline.txt)' instead of */happler/run/*/bench/run
+  # To get just the ones that were considered in data/aou/phenos/platelet_count.bed, use '$(cut -f-3 ../data/aou/phenos/platelet_count.bed | sed 's/\t/_/;s/\t/-/;s+$+/happler/run/platelet_count/bench/run+')' instead of */happler/run/*/bench/run
+  for i in */happler/run/*/bench/run; do
+    echo -e "$(echo $i | sed 's+/happler/run/+:+;s+/bench/run++')\t$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/run+'"$geno_file_name"'.pvar+')" | cut -f1 -d' ')\t$(cut -f1,3 "$i" | tail -n1)"
+  done >> bench.tsv
+  echo "Created $out/bench.tsv" 1>&2
+  (
+    echo "a=["$(tail -n+2 bench.tsv | cut -f2- --output-delimiter , | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
+    cat <<'EOF'
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -266,20 +292,20 @@ axes[1].set_ylabel("Happler Max Memory (GB)")
 plt.tight_layout()
 plt.savefig("bench.png")
 EOF
-) | python
-echo "Created $out/bench.png" 1>&2
+  ) | python
+  echo "Created $out/bench.png" 1>&2
 
-# let's make a plot to show runtime and memory usage for SuSiE
-# echo -e "locus\tnum_vars\ttime_s\tmem_mb" > bench.tsv
-# # To get just the multiline ones, use '$(sed 's+out/++;s+happler.hap$+bench/run+' multiline.txt)' instead of */happler/run/*/bench/run
-# # To get just the ones that were considered in data/aou/phenos/platelet_count.bed, use '$(cut -f-3 ../data/aou/phenos/platelet_count.bed | sed 's/\t/_/;s/\t/-/;s+$+/happler/run/platelet_count/bench/run+')' instead of */happler/run/*/bench/run
-# for i in $(cut -f-3 ../data/aou/phenos/platelet_count.bed | sed 's/\t/_/;s/\t/-/;s+$+/happler/run/platelet_count/bench/exclude/finemapper+'); do
-#   echo -e "$(echo $i | sed 's+/happler/run/+:+;s+/bench/exclude/finemapper++')\t$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/exclude/finemapper+snps.pvar+')" | cut -f1 -d' ')\t$(cut -f1,3 "$i" | tail -n1)"
-# done >> bench.tsv
-# echo "Created $out/bench.tsv" 1>&2
-# (
-#   echo "a=["$(tail -n+2 bench.tsv | cut -f2- --output-delimiter , | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
-#   cat <<'EOF'
+  # let's make a plot to show runtime and memory usage for SuSiE
+  # echo -e "locus\tnum_vars\ttime_s\tmem_mb" > bench.tsv
+  # # To get just the multiline ones, use '$(sed 's+out/++;s+happler.hap$+bench/run+' multiline.txt)' instead of */happler/run/*/bench/run
+  # # To get just the ones that were considered in data/aou/phenos/platelet_count.bed, use '$(cut -f-3 ../data/aou/phenos/platelet_count.bed | sed 's/\t/_/;s/\t/-/;s+$+/happler/run/platelet_count/bench/run+')' instead of */happler/run/*/bench/run
+  # for i in $(cut -f-3 ../data/aou/phenos/platelet_count.bed | sed 's/\t/_/;s/\t/-/;s+$+/happler/run/platelet_count/bench/exclude/finemapper+'); do
+  #   echo -e "$(echo $i | sed 's+/happler/run/+:+;s+/bench/exclude/finemapper++')\t$(wc -l "$(echo "$i" | sed 's+happler/run+genotypes+;s+bench/exclude/finemapper+snps.pvar+')" | cut -f1 -d' ')\t$(cut -f1,3 "$i" | tail -n1)"
+  # done >> bench.tsv
+  # echo "Created $out/bench.tsv" 1>&2
+  # (
+  #   echo "a=["$(tail -n+2 bench.tsv | cut -f2- --output-delimiter , | sed 's+^+(+;s+$+)+' | paste -s -d,)"]"
+  #   cat <<'EOF'
 # import numpy as np
 # import matplotlib
 # matplotlib.use('Agg')
@@ -294,9 +320,10 @@ echo "Created $out/bench.png" 1>&2
 # axes[1].set_ylabel("SuSiE Max Memory (GB)")
 # plt.tight_layout()
 # plt.savefig("bench.png")
-# EOF
-# ) | python
-# echo "Created $out/bench.png" 1>&2
+  # EOF
+  # ) | python
+  # echo "Created $out/bench.png" 1>&2
+fi
 
 # merge all of the .tsv files together
 (

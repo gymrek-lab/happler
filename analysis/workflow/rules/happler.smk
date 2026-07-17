@@ -57,7 +57,7 @@ rule run:
         pts=pheno,
         covar=config["covar"],
     params:
-        thresh=lambda wildcards: 20 if not hasattr(wildcards, "alpha") else wildcards.alpha,
+        thresh=lambda wildcards: check_config("thresh_alpha", default=20) if not hasattr(wildcards, "alpha") else wildcards.alpha,
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
         covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else "",
         maf = check_config("min_maf", 0),

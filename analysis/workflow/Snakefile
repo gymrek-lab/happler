@@ -160,6 +160,8 @@ elif mode == "run":
         "out_thresh": check_config("out_thresh", 5e-8),
         "mode": mode,
     }
+    if check_config("thresh_alpha"):
+        happler_config["thresh_alpha"] = check_config("thresh_alpha")
     if check_config("SVs", place=config["modes"][mode]):
         happler_config["SVs"] = config["modes"][mode]["SVs"]
 else:
