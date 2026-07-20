@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import csv
+import copy
 import pickle
 from pathlib import Path
 from logging import Logger
@@ -319,10 +320,6 @@ def get_metrics(
     """
     gts, hps, pts = load_data(gts, hps, pts)
 
-    # flip allele if needed before computing AFs and summary stats of variants for each hap
-    flip_allele = lambda af, flip: 1-af if flip else af
-    flip_effect = lambda effect, flip: -effect if flip else effect
-
     afs = dict(zip(gts.variants['id'], gts.check_maf()))
 
     summary_stats = {}
@@ -361,12 +358,16 @@ def get_metrics(
         hp_al_bics = np.empty(len(hp_vars))
         hp_al_deltas = np.empty(len(hp_vars))
         for hp_al_idx in range(len(hp_vars)):
-            hp_al_afs[hp_al_idx] = flip_allele(afs[hp_vars[hp_al_idx]], hp_vars_alls[hp_vars[hp_al_idx]])
-            hp_al_effects[hp_al_idx] = flip_effect(summary_stats[hp_vars[hp_al_idx]][0], hp_vars_alls[hp_vars[hp_al_idx]])
-            hp_al_pvals[hp_al_idx] = summary_stats[hp_vars[hp_al_idx]][1]
-            hp_al_bics[hp_al_idx] = summary_stats[hp_vars[hp_al_idx]][2]
+            hp_cp = copy.deepcopy(hp)
+            hp_cp.variants = hp.variants[:hp_al_idx+1]
+            hp_cp_gt = hp_cp.transform(gts).sum(axis=1)[:, np.newaxis]
+            hp_al_summary_stats = compute_summary_stats(hp_cp_gt, pts.data[:, 0])
+
+            hp_al_afs[hp_al_idx] = hp_cp_gt.sum() / (2*len(hp_cp_gt))
+            hp_al_effects[hp_al_idx] = hp_al_summary_stats[0]
+            hp_al_pvals[hp_al_idx] = hp_al_summary_stats[1]
+            hp_al_bics[hp_al_idx] = hp_al_summary_stats[2]
         hp_al_bics_og = np.array([v.score for v in hps.data[hp.id].variants])
-        breakpoint()
         hp_al_deltas = hp_al_bics[:-1] - hp_al_bics[1:]
         hp_al_deltas_og = hp_al_bics_og[:-1] - hp_al_bics_og[1:]
         vals[hp.id] = (
