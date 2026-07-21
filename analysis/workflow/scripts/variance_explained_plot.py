@@ -190,6 +190,7 @@ def load_data(
     pts.read()
 
     # load the haplotypes
+    hps_path = hps
     hps = Haplotypes(hps, haplotype=HapplerHaplotype, variant=HapplerVariant, log=log)
     hps.read()
     if not len(hps.data):
@@ -207,13 +208,14 @@ def load_data(
     region = chrom + ":" + str(min_pos) + "-" + str(max_pos)
 
     # load the SNP and hap genotypes
+    gts_path = gts
     gts = GenotypesPLINK(fname=gts, log=log)
     gts.read(variants=variants, region=region, samples=set(pts.samples))
     gts.check_phase()
     gts.check_missing()
     gts.check_biallelic()
     gts.index()
-    assert snp_variants.issubset(gts.variants["id"])
+    assert snp_variants.issubset(gts.variants["id"]), f"Couldn't find all variants for {hps_path} in {gts_path}"
     # check that the hps IDs are in there too
     if not all(h in gts.variants["id"] for h in hps.data.keys()):
         gts = GenotypesPLINK.merge_variants((gts, hps.transform(gts)), fname=gts.fname)
