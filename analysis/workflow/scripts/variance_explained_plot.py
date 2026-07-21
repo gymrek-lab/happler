@@ -196,8 +196,8 @@ def load_data(
         return dict()
 
     # which variants do we need?
-    variants = {v.id for hap in hps.data.values() for v in hap.variants}
-    variants.update(hps.data.keys())
+    snp_variants = {v.id for hap in hps.data.values() for v in hap.variants}
+    variants = snp_variants | hps.data.keys()
 
     # what region should we use?
     # we can figure it out by looking at the haps in the .hap file
@@ -213,6 +213,7 @@ def load_data(
     gts.check_missing()
     gts.check_biallelic()
     gts.index()
+    assert snp_variants.issubset(gts.variants["id"])
     # check that the hps IDs are in there too
     if not all(h in gts.variants["id"] for h in hps.data.keys()):
         gts = GenotypesPLINK.merge_variants((gts, hps.transform(gts)), fname=gts.fname)
