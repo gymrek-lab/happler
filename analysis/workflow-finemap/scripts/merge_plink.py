@@ -1,0 +1,1 @@
+../../workflow/scripts/merge_plink.py

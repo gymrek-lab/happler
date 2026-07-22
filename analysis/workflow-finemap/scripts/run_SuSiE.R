@@ -1,0 +1,1 @@
+../../workflow/scripts/run_SuSiE.R

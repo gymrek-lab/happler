@@ -4,3 +4,10 @@ keep-going: true
 printshellcmds: true
 conda-frontend: conda
 rerun-trigger: [mtime, params, input]
+
+executor: slurm
+default-resources:
+    slurm_account: ddp268
+    slurm_partition: ind-shared
+    runtime: 30
+    nodes: 1

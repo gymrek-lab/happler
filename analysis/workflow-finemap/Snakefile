@@ -1,0 +1,243 @@
+import warnings
+from pathlib import Path
+import snakemake.io as io
+from snakemake.utils import min_version
+
+##### set minimum snakemake version #####
+min_version("8.30.0")
+
+# --------- INPUT ------------
+snp_panel = "/expanse/protected/gymreklab-dbgap/mount/mlamkin/GTEx/GTEx_hg38_VCFs/imputed_data/GTEx_V8_{gene}_imputed_TRs.pgen"
+hap_file = "/expanse/projects/gymreklab/mlamkin/AryaGTExVarExplained/new_hapfiles/thresh{thresh}/{locus}:{gene}.hap.txt"
+pheno = "/expanse/projects/gymreklab/mlamkin/AryaGTExVarExplained/pheno_files/{gene}.pheno"
+out = "/expanse/projects/gymreklab/mlamkin/AryaGTExVarExplained/results" # path to output directory
+# ----------------------------
+
+out_thresh = out + "/thresh{thresh}"
+out = out_thresh + "/{locus}:{gene}"
+maf = 0.1
+logs = out + "/logs"
+bench = out + "/bench"
+# whether to include the happler haplotype ("in") or no haplotypes ("ex")
+exclude_obs = {"in": 0, "ex": 1}
+rsrc_func = lambda x: max if 100 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000 else min
+
+
+
+rule transform:
+    input:
+        hap=hap_file,
+        pgen=snp_panel,
+        pvar=Path(snp_panel).with_suffix(".pvar"),
+        psam=Path(snp_panel).with_suffix(".psam"),
+        pts=pheno,
+    params:
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+    output:
+        pgen=out + "/happler.pgen",
+        pvar=out + "/happler.pvar",
+        psam=out + "/happler.psam",
+    resources:
+        runtime=10,
+    log:
+        logs + "/transform",
+    benchmark:
+        bench + "/transform",
+    conda:
+        "happler"
+    shell:
+        "haptools transform -o {output.pgen} --region {params.region} "
+        "--samples-file <(tail -n+2 {input.pts} | cut -f1) "
+        "{input.pgen} {input.hap} &>{log}"
+
+
+rule merge:
+    input:
+        gts=rules.transform.input.pgen,
+        gts_pvar=rules.transform.input.pvar,
+        gts_psam=rules.transform.input.psam,
+        hps=lambda wildcards: rules.transform.output.pgen,
+        hps_pvar=lambda wildcards: rules.transform.output.pvar,
+        hps_psam=lambda wildcards: rules.transform.output.psam,
+    params:
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        maf = maf,
+        chunk_size="--chunk-size 1000",
+    output:
+        pgen=out + "/{ex}clude/merged.pgen",
+        pvar=out + "/{ex}clude/merged.pvar",
+        psam=out + "/{ex}clude/merged.psam",
+    resources:
+        runtime=20,
+        mem_mb = 5000,
+    log:
+        logs + "/{ex}clude/merge",
+    benchmark:
+        bench + "/{ex}clude/merge",
+    conda:
+        "happler"
+    shell:
+        "workflow/scripts/merge_plink.py {params.chunk_size} --region {params.region} "
+        "--maf {params.maf} --maf-file 1 --verbosity DEBUG {input.gts} {input.hps} {output.pgen} "
+        "&> {log}"
+
+
+def parse_locus(locus):
+    """parse locus into chrom, start, end"""
+    chrom = locus.split("_")[0]
+    end = locus.split("-")[1]
+    start = locus.split("_")[1].split("-")[0]
+    return chrom, start, end
+
+
+rule filter_maf:
+    input:
+        gts=rules.transform.input.pgen,
+        gts_pvar=rules.transform.input.pvar,
+        gts_psam=rules.transform.input.psam,
+    params:
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        maf = maf,
+        in_gts=lambda wildcards, input: Path(input.gts).with_suffix(""),
+        out_gts=lambda wildcards, output: Path(output.pgen).with_suffix(""),
+        start=lambda wildcards: parse_locus(wildcards.locus)[1],
+        end=lambda wildcards: parse_locus(wildcards.locus)[2],
+        chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
+    output:
+        pgen=out + "/{ex}clude/filter_maf.pgen",
+        pvar=out + "/{ex}clude/filter_maf.pvar",
+        psam=out + "/{ex}clude/filter_maf.psam",
+    resources:
+        runtime=15,
+        mem_mb = 5000,
+    log:
+        logs + "/{ex}clude/filter_maf",
+    benchmark:
+        bench + "/{ex}clude/filter_maf",
+    conda:
+        "envs/default.yml"
+    shell:
+        "plink2 --from-bp {params.start} --to-bp {params.end} --chr {params.chrom} "
+        "--nonfounders --geno 0 --allow-extra-chr --max-alleles 2 --maf {params.maf} "
+        "--pfile {params.in_gts} --out {params.out_gts} --make-pgen "
+        "--threads {threads} --memory {resources.mem_mb} &> {log}" 
+
+
+def finemapper_input(wildcards):
+    if exclude_obs[wildcards.ex]:
+        return rules.filter_maf.output
+    else:
+        # include the hap that happler found
+        return rules.merge.output
+
+
+rule finemapper:
+    """ execute SuSiE using the haplotypes from happler """
+    input:
+        gt=lambda wildcards: finemapper_input(wildcards).pgen,
+        gt_pvar=lambda wildcards: finemapper_input(wildcards).pvar,
+        gt_psam=lambda wildcards: finemapper_input(wildcards).psam,
+        phen=pheno,
+    params:
+        outdir=lambda wildcards, output: Path(output.susie).parent,
+        exclude_causal="NULL",
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        # num_signals=lambda wildcards: get_num_haplotypes(
+        #     expand(hap_file, **wildcards)[0]
+        # ) + 1,
+        num_signals=10,
+        # TODO: also add MAF filter
+    output:
+        susie=out + "/{ex}clude/susie.rds",
+    resources:
+        runtime=lambda wildcards, input: (
+            rsrc_func(input.gt)(10, Path(input.gt_pvar).stat().st_size/1000 * 0.3)
+        ),
+        mem_mb = 15000,
+    threads: 1,
+    log:
+        logs + "/{ex}clude/finemapper",
+    benchmark:
+        bench + "/{ex}clude/finemapper",
+    conda:
+        "envs/susie.yml"
+    shell:
+        "workflow/scripts/run_SuSiE.R {input.gt} {input.phen} {params} &>{log}"
+
+
+rule pips:
+    """ extract PIPs to a TSV file """
+    input:
+        rds=rules.finemapper.output.susie,
+    output:
+        tsv=out + "/{ex}clude/susie_pips.tsv",
+    resources:
+        runtime=7,
+        mem_mb = 4000,
+    threads: 1,
+    log:
+        logs + "/{ex}clude/pips",
+    benchmark:
+        bench + "/{ex}clude/pips",
+    conda:
+        "envs/susie.yml"
+    shell:
+        "workflow/scripts/extract_pips.R {input} {output} &>{log}"
+
+
+rule metrics:
+    """ compute summary metrics from the output of the finemapper """
+    input:
+        gt=rules.finemapper.input.gt,
+        gt_pvar=rules.finemapper.input.gt_pvar,
+        gt_psam=rules.finemapper.input.gt_psam,
+        phen=pheno,
+        finemap=rules.finemapper.output.susie,
+    params:
+        hap=lambda wildcards: expand(
+            hap_file, **wildcards
+        )[0] if wildcards.ex == "in" else "NULL",
+        exclude_causal="NULL",
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+    output:
+        metrics=out + "/{ex}clude/susie_metrics.tsv",
+    resources:
+        runtime=30,
+        mem_mb = 8500,
+    threads: 1,
+    log:
+        logs + "/{ex}clude/metrics",
+    benchmark:
+        bench + "/{ex}clude/metrics",
+    conda:
+        "envs/susie.yml"
+    shell:
+        "workflow/scripts/susie_metrics.R {input.gt} {input.phen} {input.finemap} "
+        "{params} >{output} 2>{log}"
+
+
+FINAL_OUTPUT = rules.pips.output.tsv
+bic_ext_thresholds, loci, genes = io.glob_wildcards(hap_file)
+
+def check_config(value, default=False, place=config, as_set=False):
+    """return true if config value exists and is true"""
+    value = place[value] if (value in place and place[value]) else default
+    return (set(value) if isinstance(value, list) else {value}) if as_set else value
+
+# If '--config debug=true' is specified, we won't try to build the entire DAG
+# This can be faster when you want to play around with a specific target output
+if not ("debug" in config and config["debug"]):
+    rule all:
+        input:
+            expand(
+                expand(
+                    FINAL_OUTPUT,
+                    zip,
+                    locus=loci,
+                    gene=genes,
+                    thresh=bic_ext_thresholds,
+                    allow_missing=True,
+                ),
+                ex=exclude_obs.keys(),
+            )
+        default_target: True

@@ -61,3 +61,6 @@ min_maf: 0.1
 
 # A threshold on the pvalues of the haplotypes
 out_thresh: 5e-6
+
+# A threshold on the delta BIC of each node in the tree
+thresh_alpha: 20
