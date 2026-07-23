@@ -77,7 +77,7 @@ rule merge:
     conda:
         "happler"
     shell:
-        "workflow/scripts/merge_plink.py {params.chunk_size} --region {params.region} "
+        "workflow-finemap/scripts/merge_plink.py {params.chunk_size} --region {params.region} "
         "--maf {params.maf} --maf-file 1 --verbosity DEBUG {input.gts} {input.hps} {output.pgen} "
         "&> {log}"
 
@@ -162,7 +162,7 @@ rule finemapper:
     conda:
         "envs/susie.yml"
     shell:
-        "workflow/scripts/run_SuSiE.R {input.gt} {input.phen} {params} &>{log}"
+        "workflow-finemap/scripts/run_SuSiE.R {input.gt} {input.phen} {params} &>{log}"
 
 
 rule pips:
@@ -182,7 +182,7 @@ rule pips:
     conda:
         "envs/susie.yml"
     shell:
-        "workflow/scripts/extract_pips.R {input} {output} &>{log}"
+        "workflow-finemap/scripts/extract_pips.R {input} {output} &>{log}"
 
 
 rule metrics:
@@ -212,7 +212,7 @@ rule metrics:
     conda:
         "envs/susie.yml"
     shell:
-        "workflow/scripts/susie_metrics.R {input.gt} {input.phen} {input.finemap} "
+        "workflow-finemap/scripts/susie_metrics.R {input.gt} {input.phen} {input.finemap} "
         "{params} >{output} 2>{log}"
 
 
