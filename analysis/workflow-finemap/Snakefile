@@ -51,37 +51,6 @@ rule transform:
         "{input.pgen} {input.hap} &>{log}"
 
 
-rule merge:
-    input:
-        gts=rules.transform.input.pgen,
-        gts_pvar=rules.transform.input.pvar,
-        gts_psam=rules.transform.input.psam,
-        hps=lambda wildcards: rules.transform.output.pgen,
-        hps_pvar=lambda wildcards: rules.transform.output.pvar,
-        hps_psam=lambda wildcards: rules.transform.output.psam,
-    params:
-        region=lambda wildcards: wildcards.locus.replace("_", ":"),
-        maf = maf,
-        chunk_size="--chunk-size 1000",
-    output:
-        pgen=out + "/{ex}clude/merged.pgen",
-        pvar=out + "/{ex}clude/merged.pvar",
-        psam=out + "/{ex}clude/merged.psam",
-    resources:
-        runtime=20,
-        mem_mb = 5000,
-    log:
-        logs + "/{ex}clude/merge",
-    benchmark:
-        bench + "/{ex}clude/merge",
-    conda:
-        "happler"
-    shell:
-        "workflow-finemap/scripts/merge_plink.py {params.chunk_size} --region {params.region} "
-        "--maf {params.maf} --maf-file 1 --verbosity DEBUG {input.gts} {input.hps} {output.pgen} "
-        "&> {log}"
-
-
 def parse_locus(locus):
     """parse locus into chrom, start, end"""
     chrom = locus.split("_")[0]
@@ -104,23 +73,53 @@ rule filter_maf:
         end=lambda wildcards: parse_locus(wildcards.locus)[2],
         chrom=lambda wildcards: parse_locus(wildcards.locus)[0],
     output:
-        pgen=out + "/{ex}clude/filter_maf.pgen",
-        pvar=out + "/{ex}clude/filter_maf.pvar",
-        psam=out + "/{ex}clude/filter_maf.psam",
+        pgen=out + "/filter_maf.pgen",
+        pvar=out + "/filter_maf.pvar",
+        psam=out + "/filter_maf.psam",
     resources:
         runtime=15,
         mem_mb = 5000,
     log:
-        logs + "/{ex}clude/filter_maf",
+        logs + "/filter_maf",
     benchmark:
-        bench + "/{ex}clude/filter_maf",
+        bench + "/filter_maf",
     conda:
         "envs/default.yml"
     shell:
         "plink2 --from-bp {params.start} --to-bp {params.end} --chr {params.chrom} "
         "--nonfounders --geno 0 --allow-extra-chr --max-alleles 2 --maf {params.maf} "
         "--pfile {params.in_gts} --out {params.out_gts} --make-pgen "
-        "--threads {threads} --memory {resources.mem_mb} &> {log}" 
+        "--threads {threads} --memory {resources.mem_mb} &> {log}"
+
+
+rule merge:
+    input:
+        gts=rules.filter_maf.output.pgen,
+        gts_pvar=rules.filter_maf.output.pvar,
+        gts_psam=rules.filter_maf.output.psam,
+        hps=rules.transform.output.pgen,
+        hps_pvar=rules.transform.output.pvar,
+        hps_psam=rules.transform.output.psam,
+    params:
+        region=lambda wildcards: wildcards.locus.replace("_", ":"),
+        chunk_size="--chunk-size 1000",
+    output:
+        pgen=out + "/{ex}clude/merged.pgen",
+        pvar=out + "/{ex}clude/merged.pvar",
+        psam=out + "/{ex}clude/merged.psam",
+    resources:
+        runtime=20,
+        mem_mb = 5000,
+    log:
+        logs + "/{ex}clude/merge",
+    benchmark:
+        bench + "/{ex}clude/merge",
+    conda:
+        "happler"
+    shell:
+        "workflow-finemap/scripts/merge_plink.py {params.chunk_size} --region {params.region} "
+        "--verbosity DEBUG {input.gts} {input.hps} {output.pgen} "
+        "&> {log}"
 
 
 def finemapper_input(wildcards):
