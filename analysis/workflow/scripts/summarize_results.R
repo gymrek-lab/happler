@@ -85,7 +85,6 @@ exclude_causal = (susie_results$causal_excluded == "NULL")
 fitted = susie_results$fitted
 susie_pip = fitted$pip
 
-write("Handling causal variable", stderr())
 # first, we must create a vector with the causal status
 # this vector indicates which variant is truly causal
 b = rep(0, ncol(X))
@@ -178,7 +177,7 @@ pip_plot = function(pips, X, b, pos, susie_cs=NULL) {
     xlab('Chromosomal Position') +
     ylab('Posterior Inclusion Probability (PIP)') + 
     ylim(0,1) +
-    theme_grey(base_size=16)
+    theme_classic(base_size = 16)
 }
 
 # define a function for PIP plotting with haplotypes as lines
@@ -190,6 +189,15 @@ pip_plot_haps = function(pips, X, b, pos, haplotypes, susie_cs=NULL) {
     # note that we must convert to integer b/c they're characters
     start_end = t(data.frame(as.integer(haplotypes[1, c("start", "end")])))
     colnames(start_end) = c("start", "end")
+    # enforce minimum span of 500 bp while keeping midpoint fixed
+    min_span <- 50000
+    if ((start_end[1, "end"] - start_end[1, "start"]) < min_span) {
+        mid <- (start_end[1, "start"] + start_end[1, "end"]) / 2
+        half <- min_span / 2
+        start_end[1, "start"] <- floor(mid - half)
+        start_end[1, "end"]   <- ceiling(mid + half)
+    }
+    write(start_end, stderr())
     # extract the haplotypes to another data frame
     data_hap = cbind(data[haplotypes[1, "id"],], start_end)
     data_hap$color = c("black", "red")[as.integer(data_hap$b)+1]
@@ -206,11 +214,11 @@ pip_plot_haps = function(pips, X, b, pos, haplotypes, susie_cs=NULL) {
         plt = plt + geom_point(aes(fill=1, stroke=cs, color=factor(cs)), size=7, shape=21, show.legend=F)
     }
     plt + scale_color_manual(name='Credible Sets', values=c('transparent', '#7C9299'), guide="none") +
-    geom_segment(data=data_hap, aes(x = start, xend = end, y = pip, yend = pip, color=factor(b)), color=data_hap$color, size=3) +
+    geom_segment(data=data_hap, inherit.aes = FALSE, aes(x = start, xend = end, y = pip, yend = pip), color="black", linewidth=4, lineend="square") +
     xlab('Chromosomal Position') +
     ylab('Posterior Inclusion Probability (PIP)') +
     ylim(0,1) +
-    theme_grey(base_size=16)
+    theme_classic(base_size = 16)
 }
 
 # # plot the results of susie

@@ -11,6 +11,10 @@ snp_panel = "/expanse/protected/gymreklab-dbgap/mount/mlamkin/GTEx/GTEx_hg38_VCF
 hap_file = "/expanse/projects/gymreklab/mlamkin/AryaGTExVarExplained/new_hapfiles/thresh{thresh}/{locus}:{gene}.hap.txt"
 pheno = "/expanse/projects/gymreklab/mlamkin/AryaGTExVarExplained/pheno_files/{gene}.pheno"
 out = "/expanse/projects/gymreklab/mlamkin/AryaGTExVarExplained/results" # path to output directory
+# snp_panel = "data/geuvadis/geuvadis_ensemble_phasing.maf0.1.pgen"
+# hap_file = "outs/hapfiles-geuvadis-rankbybic-thresh/thresh{thresh}/{locus}:{gene}.hap.txt"
+# pheno = "data/geuvadis/phenos/{gene}.pheno"
+# out = "results" # path to output directory
 # ----------------------------
 
 out_thresh = out + "/thresh{thresh}"
