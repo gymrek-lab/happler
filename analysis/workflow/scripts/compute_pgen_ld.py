@@ -68,7 +68,7 @@ def corr(a, b):
     show_default="the first haplotype ID",
     help=(
         "A haplotype ID from the target file to use "
-        "(ex: '-i H1')."
+        "(ex: '-i H1')"
     ),
 )
 @click.option(
