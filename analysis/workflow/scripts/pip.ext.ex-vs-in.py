@@ -195,6 +195,19 @@ def main(
     fig.add_artist(con1)
     fig.add_artist(con2)
 
+    # add panel labels
+    panel_labels = ["A", "B", "C", "D", "E", "F"]
+    visible_axes = [ax for row in axes for ax in row if ax.has_data()]
+    for label, ax in zip(panel_labels, visible_axes[:4]):
+        ax.text(
+            -0.14, 1.05, label,
+            transform=ax.transAxes,
+            fontsize=20,
+            fontweight="bold",
+            va="top",
+            ha="right",
+        )
+
     # Adjust layout to prevent overlap
     plt.tight_layout()
 
