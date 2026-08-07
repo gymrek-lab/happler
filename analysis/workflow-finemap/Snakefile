@@ -121,6 +121,7 @@ rule merge:
     conda:
         "happler"
     shell:
+        # TODO: also add --maf {params.maf} --maf-file 1 in case plink2 didn't filter some variants that it should have
         "workflow-finemap/scripts/merge_plink.py {params.chunk_size} --region {params.region} "
         "--verbosity DEBUG {input.gts} {input.hps} {output.pgen} "
         "&> {log}"
