@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# arg1: the ID of the causal SNP (ex: 5:88884379)
+# arg0: the ID of the causal SNP (ex: 5:88884379)
 # arg1: region to extract (ex: 5_87367336-90059999)
 # arg2: MAFs (ex: "0.001 0.01 0.015 0.02 0.025 0.03 0.035 0.04 0.045 0.05 0.065 0.085 0.1")
 # arg3: phenotype file (ex: data/aou/phenos/platelet_count.resid.pheno)

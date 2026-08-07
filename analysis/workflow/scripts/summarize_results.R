@@ -166,14 +166,14 @@ pip_plot = function(pips, X, b, pos, susie_cs=NULL) {
     plt = ggplot(data, aes(x=pos, y=pip))
     if ("ld_causal" %in% colnames(data)) {
         write("Plotting with causal LD", stderr())
-        plt = plt + geom_point(aes(fill=ld_causal, stroke=cs, color=factor(cs)), size=7, shape=21) +
+        plt = plt + geom_point(aes(fill=ld_causal, stroke=cs, color=factor(cs)), size=4, shape=21) +
         scale_fill_gradient(name='LD with Causal Variant', low='#FBBA72', high='#691E06')
     } else {
         write("Not including causal variable", stderr())
-        plt = plt + geom_point(aes(fill=1, stroke=cs, color=factor(cs)), size=7, shape=21, show.legend=F)
+        plt = plt + geom_point(aes(fill=1, stroke=cs, color=factor(cs)), size=4, shape=21, show.legend=F)
     }
     plt + scale_color_manual(name='Credible Sets', values=c('transparent', '#7C9299'), guide="none") +
-    geom_point(data=data_causal, aes(stroke=cs, color=factor(cs)), fill='red', size=7, shape=21) +
+    geom_point(data=data_causal, aes(stroke=cs, color=factor(cs)), fill='red', size=4, shape=21) +
     xlab('Chromosomal Position') +
     ylab('Posterior Inclusion Probability (PIP)') + 
     ylim(0,1) +
@@ -207,11 +207,11 @@ pip_plot_haps = function(pips, X, b, pos, haplotypes, susie_cs=NULL) {
     plt = ggplot(data, aes(x=pos, y=pip))
     if ("ld_causal" %in% colnames(data)) {
         write("Plotting with causal LD", stderr())
-        plt = plt + geom_point(aes(fill=ld_causal, stroke=cs, color=factor(cs)), size=7, shape=21) +
+        plt = plt + geom_point(aes(fill=ld_causal, stroke=cs, color=factor(cs)), size=4, shape=21) +
         scale_fill_gradient(name='LD with Causal Variant', low='#FBBA72', high='#691E06')
     } else {
         write("Not including causal variable", stderr())
-        plt = plt + geom_point(aes(fill=1, stroke=cs, color=factor(cs)), size=7, shape=21, show.legend=F)
+        plt = plt + geom_point(aes(fill=1, stroke=cs, color=factor(cs)), size=4, shape=21, show.legend=F)
     }
     plt + scale_color_manual(name='Credible Sets', values=c('transparent', '#7C9299'), guide="none") +
     geom_segment(data=data_hap, inherit.aes = FALSE, aes(x = start, xend = end, y = pip, yend = pip), color="black", linewidth=4, lineend="square") +
