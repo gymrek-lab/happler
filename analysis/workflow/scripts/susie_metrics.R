@@ -129,6 +129,24 @@ for (happler_hap_id in happler_hap_ids) {
     happler_hap_idx = which(names(susie_pip) %in% happler_hap_id)
 
     write(paste("Computing metrics for", happler_hap_id), stderr())
+    if (length(happler_hap_idx) == 0) {
+        write(
+            paste(
+                "Warning:", happler_hap_id,
+                "not found in SuSiE PIP names; outputting default metrics"
+            ),
+            stderr()
+        )
+        obs_pip = 0
+        has_highest_pip = 0
+        best_variant_pip = 0
+        in_credible_set = 0
+        num_credible_sets = length(susie_CSs)
+        purity = 0
+        cs_length = 0
+        write(paste(happler_hap_id, obs_pip, has_highest_pip, best_variant_pip, in_credible_set, num_credible_sets, purity, cs_length), stdout())
+        next
+    }
     # The metrics are:
     # 1) What is the ID of the hap?
     # 2) What is the PIP of the hap?
@@ -144,7 +162,7 @@ for (happler_hap_id in happler_hap_ids) {
     num_credible_sets = length(susie_CSs)
     # iterate through each of the credible sets to find the one with the hap in it
     for (cs in names(susie_CSs)) {
-        if (happler_hap_idx %in% susie_CSs[[cs]]) {
+        if (any(happler_hap_idx %in% susie_CSs[[cs]])) {
             credible_set = cs
             break
         }

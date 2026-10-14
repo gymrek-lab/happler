@@ -8,9 +8,9 @@ git clone https://github.com/aryarm/happler
 You can also download example data for the pipeline. See [the config file](config/config.yml) for links and instructions.
 
 # setup
-The pipeline is written as a Snakefile which can be executed via [Snakemake](https://snakemake.readthedocs.io). For reproduciblity, we recommend installing the version that we used (8.12.0):
+The pipeline is written as a Snakefile which can be executed via [Snakemake](https://snakemake.readthedocs.io). For reproduciblity, we recommend installing the version that we used (8.30.0):
 ```
-conda create -n snakemake -c conda-forge --no-channel-priority 'bioconda::snakemake==8.12.0'
+conda create -n snakemake -c conda-forge --no-channel-priority 'bioconda::snakemake==8.30.0' 'bioconda::snakemake-executor-plugin-slurm'
 ```
 `snakemake` will [automatically install all dependencies](https://snakemake.readthedocs.io/en/stable/snakefiles/deployment.html#integrated-package-management) of the pipeline upon its first execution using `conda`.
 

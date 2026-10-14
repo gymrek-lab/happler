@@ -187,19 +187,19 @@ def Fig2(data_3200, data_800, output_dir):
     fig.tight_layout()
     fig.savefig(output_dir / "Happler_Fig2A_Draft.pdf")
 
-def Fig3(data_800, output_dir):
-    LDVALS = [0.01, 0.24, 0.73, 0.99]
+def Fig3(data_3200, output_dir):
+    LDVALS = [0.02, 0.26, 0.71, 0.94]
     colors = ["red", "orange", "blue", "purple"]
     BETA = 0.40
     fig, axs = plt.subplot_mosaic("ABC", figsize=(12,4))
-    assert set(LDVALS) < set(np.unique(data_800[0]["ld"]).tolist()), "Check that the desired LD vals exist in the data"
+    assert set(LDVALS) < set(np.unique(data_3200[0]["ld"]).tolist()), "Check that the desired LD vals exist in the data"
     for n, (key, ax) in enumerate(axs.items()):
         if n == 0:
-            PlotBestPipByBetaLDVals(data_800, colors, LDVALS, ["LD=%.2f"%item for item in LDVALS], ax=ax, include="all")
+            PlotBestPipByBetaLDVals(data_3200, colors, LDVALS, ["LD=%.2f"%item for item in LDVALS], ax=ax, include="all")
         #if n == 1:
-        #    PlotAllPIPs(data_800, colors, LDVALS, BETA, ["LD=%.2f"%item for item in LDVALS], ax=ax)
+        #    PlotAllPIPs(data_3200, colors, LDVALS, BETA, ["LD=%.2f"%item for item in LDVALS], ax=ax)
         #if n == 1:
-        #    PlotPIPSNoMatchVsMatch(data_800, colors, LDVALS, BETA, ["LD=%.2f"%item for item in LDVALS], ax=ax)
+        #    PlotPIPSNoMatchVsMatch(data_3200, colors, LDVALS, BETA, ["LD=%.2f"%item for item in LDVALS], ax=ax)
         if n == 1 or n == 2:
             ax.spines["left"].set_visible(False)
             ax.spines["bottom"].set_visible(False)
@@ -240,6 +240,8 @@ def main(
     """
     log = getLogger("final-plots", verbosity)
 
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     with open(str(sim_params).format(sampsize=800), "rb") as f:
         data_800 = pickle.load(f)
         ldvals = np.unique(data_800[0]["ld"]).tolist()
@@ -249,9 +251,9 @@ def main(
         ldvals = np.unique(data_3200[0]["ld"]).tolist()
         log.info(f"LD for 3200: {ldvals}")
     Fig2(data_3200, data_800, output_dir)
-    with open(str(sim_params_finemap).format(sampsize=800), "rb") as f:
-        data_800 = pickle.load(f)
-    Fig3(data_800, output_dir)
+    with open(str(sim_params_finemap).format(sampsize=3200), "rb") as f:
+        data_3200 = pickle.load(f)
+    Fig3(data_3200, output_dir)
 
 
 if __name__ == "__main__":

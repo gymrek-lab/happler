@@ -25,6 +25,9 @@ from haptools.data import (
 
 FIGSIZE = 6
 
+# TODO one day:
+# Instead of using an orange dot to symbolize the haplotype, plot it as a black bar
+# extending from its start to its end coordinates
 
 def make_manhattan(
     ax: plt.Axes,
@@ -341,6 +344,9 @@ def main(
     gts.check_missing()
     gts.check_biallelic()
     gts.check_maf(threshold=maf, discard_also=True)
+    if not set(hps.data.keys()).isdisjoint(gts.variants["id"]):
+        # check that the haplotypes aren't already in the gts and remove them if they are
+        gts.subset(variants=tuple(v for v in gts.variants["id"] if v not in hps.data.keys()), inplace=True)
     positions = gts.variants["pos"]
     # reorder the phenotypes and ensure there is only one phenotype
     pts.subset(names=(pts.names[0],), samples=gts.samples, inplace=True)
@@ -367,6 +373,11 @@ def main(
         all_axs = axs
         axs = axs[0]
 
+    # Reverse panel placement so plots are filled right-to-left in indexing,
+    # which displays left-to-right in the desired reversed order.
+    def ax_at(i: int):
+        return axs[-(i + 1)]
+
     # highlight alleles in red
     red_mask = np.zeros(len(gts.variants), dtype=np.bool_)
     for snp in variants:
@@ -375,12 +386,12 @@ def main(
     log.info("Creating haplotype plot")
     # first, encode the haplotype as covariate
     make_manhattan(
-        axs[0],
+        ax_at(0),
         positions,
         condition_on_variable_chunked(gts, pts, hap_gt, chunk_size=chunk_size),
         red_mask
     )
-    axs[0].set_title("Haplotype"+("s" if len(hap_gt.variants)-1 else ""))
+    ax_at(0).set_title("Haplotype"+("s" if len(hap_gt.variants)-1 else ""))
     log.info("Creating haplotype alleles plot")
     # now, encode the haplotypes' alleles as separate covariates
     covars = gts.subset(variants=variants)
@@ -389,7 +400,7 @@ def main(
     for snp in variants:
         exclude[gts._var_idx[snp]] = False
     make_manhattan(
-        axs[1],
+        ax_at(1),
         positions,
         condition_on_variable_chunked(gts, pts, covars, chunk_size=chunk_size),
         red_mask,
@@ -397,7 +408,7 @@ def main(
     )
     # f-string expressions cannot include a backslash
     f_str_quotation_plural_agh = 's\'' if len(hap_gt.variants)-1 else '\'s'
-    axs[1].set_title(f"Haplotype{f_str_quotation_plural_agh} Alleles")
+    ax_at(1).set_title(f"Haplotype{f_str_quotation_plural_agh} Alleles")
     # finally, encode each of the alleles as a covariate in a separate plot
     for idx in range(len(variants)):
         log.info(f"Creating plot #{idx+3}")
@@ -405,13 +416,13 @@ def main(
         exclude = np.ones(len(gts.variants), dtype=np.bool_)
         exclude[gts._var_idx[variants[idx]]] = False
         make_manhattan(
-            axs[idx+2],
+            ax_at(idx+2),
             positions,
             condition_on_variable_chunked(gts, pts, covars, chunk_size=chunk_size),
             red_mask,
             exclude,
         )
-        axs[idx+2].set_title(variants[idx])
+        ax_at(idx+2).set_title(variants[idx])
     if show_original:
         log.info("Creating original manhattan plot")
         # we're going to have to append the haplotypes to the original SNP genotypes,
@@ -423,14 +434,14 @@ def main(
         new_gt = Genotypes.merge_variants((gts, hap_gt), fname=None, log=log)
         # now, let's finally plot everything and append the haps to the gts
         make_manhattan(
-            axs[-1],
+            ax_at(len(variants)+2),
             new_gt.variants["pos"],
             condition_on_variable_chunked(new_gt, pts, chunk_size=chunk_size),
             red_mask,
             exclude_mask=None,
             orange_mask=orange_mask,
         )
-        axs[-1].set_title("")
+        ax_at(len(variants)+2).set_title("")
 
     if log_file is not None:
         new_gt.index()

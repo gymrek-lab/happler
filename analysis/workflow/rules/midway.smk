@@ -14,6 +14,7 @@ tswitch = {
     "interact-bic": 5,
     "extension-bic": 6,
     "extension-tscore": 7,
+    "extension-parent-bic": 8,
 }
 
 wildcard_constraints:
@@ -37,12 +38,14 @@ rule manhattan:
         target = "H0",
         tswitch=lambda wildcards: tswitch[wildcards.switch],
         just_target_snp=1,
+        sim_mode=lambda wildcards: wildcards.sim_mode,
     output:
         dir=directory(out + "/{switch}"),
         linear=out + "/{switch}/out.linear",
-        transform_pgen=temp(out + "/{switch}/out.pgen"),
-        transform_pvar=temp(out + "/{switch}/out.pvar"),
-        transform_psam=temp(out + "/{switch}/out.psam"),
+        pgen=temp(out + "/{switch}/out.pgen"),
+        pvar=temp(out + "/{switch}/out.pvar"),
+        psam=temp(out + "/{switch}/out.psam"),
+        hap=out + "/{switch}/out.hap",
     resources:
         runtime=20,
         mem_mb=lambda wildcards, input: (
@@ -55,7 +58,10 @@ rule manhattan:
     conda:
         "happler"
     shell:
-        "rsid=\"$(grep -E '^V' {input.hap} | cut -f5 | tail -n1)\" && "
-        "workflow/scripts/midway_manhattan.bash {input.gts} {input.pts} {input.hap} "
+        "mkdir -p {output.dir} && "
+        "new_hap=\"$(workflow/scripts/flip_hap_alleles.py {input.gts} {input.pts} {input.hap} 2> {log})\" && "
+        "{{ [ -z \"$new_hap\" ] || [ \"{params.sim_mode}\" != \"hap\" ] && cp {input.hap} {output.hap} || (echo \"$new_hap\" > {output.hap}); }} 2>>{log} && "
+        "rsid=\"$(grep -E '^V' {output.hap} | cut -f5 | tail -n1)\" && "
+        "workflow/scripts/midway_manhattan.bash {input.gts} {input.pts} {output.hap} "
         "{params.out_prefix} {params.target} \"$rsid\" {params.maf} {params.tswitch} "
-        "{params.just_target_snp} &> {log}"
+        "{params.just_target_snp} &>> {log}"

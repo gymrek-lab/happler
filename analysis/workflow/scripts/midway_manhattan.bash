@@ -7,7 +7,7 @@
 # arg5: ID of the target haplotype in the hap file
 # arg6: ID of a "child" SNP in the target haplotype. The parent will include all SNPs of the haplotype up to this one.
 # arg7: MAF threshold for filtering SNPs
-# arg8: 0 or 1 indicating whether to include just the parent (0) or both the parent and child SNPs (1) in the regression as covariates, or 2 if the regular p-values should be converted to t-test p-values. 1 requires that the child SNP be the second node from the root of the tree. Additionally, the value 3 indicates that t-test p-values should be computed with a covariance correction and the value 4 indicates that delta BIC values should be generated in place of p-values. The value 5 indicates that delta BIC values should be generated for situation #1 (interact). The value 6 or 7 indicates that delta BIC (or tscore pval) should be generated for a hap against its extension. (optional - defaults to 0)
+# arg8: 0 or 1 indicating whether to include just the parent (0) or both the parent and child SNPs (1) in the regression as covariates, or 2 if the regular p-values should be converted to t-test p-values. 1 requires that the child SNP be the second node from the root of the tree. Additionally, the value 3 indicates that t-test p-values should be computed with a covariance correction and the value 4 indicates that delta BIC values should be generated in place of p-values. The value 5 indicates that delta BIC values should be generated for situation #1 (interact). The value 6 or 7 indicates that delta BIC (or tscore pval) should be generated for a hap against its extension. And the value 8 indicates that delta BIC should be generated for a parent against its best extension. (optional - defaults to 0)
 # arg9: 0 or 1 indicating whether to compute p-values for just the target SNP or all SNPs.  (optional - defaults to 0)
 # ex: workflow/scripts/midway_manhattan.bash out/19_55363180-55833573/genotypes/snps.pgen 19_55363180-55833573.indep.pheno 19_55363180-55833573.indep.hap 19_55363180-55833573.indep H0 rs61734259 0.005 1
 
@@ -190,17 +190,30 @@ if [ "$condition" -eq 2 ] || [ "$condition" -eq 3 ] || [ "$condition" -eq 4 ] ||
     # rename the linear file
     linear_file="$out_prefix".ttest.linear
     last_arg="-a 0.05"
-elif [ "$condition" -eq 6 ] || [ "$condition" -eq 7 ]; then
+elif [ "$condition" -eq 6 ] || [ "$condition" -eq 7 ] || [ "$condition" -eq 8 ]; then
     if [ "$condition" -eq 6 ]; then
         extra_flag="--mode bic"
     elif [ "$condition" -eq 7 ]; then
         extra_flag="--mode tscore"
+    elif [ "$condition" -eq 8 ]; then
+        extra_flag="--mode parent-bic"
     fi
+    # now actually run it!
     python "$SCRIPT_DIR"/extension_bic.py \
     $extra_flag \
     --verbosity DEBUG \
     -o "$out_prefix".ttest.linear \
     "$hap_file" "$out_prefix".pgen "$pgen_file" "$pheno_file"
+    # if switch == extension-bic-parent, replace out.hap and out.pgen with the hap file found by extension_bic
+    if [ "$condition" -eq 8 ]; then
+        mv "$out_prefix".ttest.hap "$hap_file"
+        # transform the extended hap file
+        haptools transform \
+        --verbosity DEBUG \
+        -o "$out_prefix".pgen \
+        -S <(cut -f1 "$pheno_file" | tail -n+2) \
+        "$pgen_file" "$hap_file"
+    fi
     # rename the linear file
     linear_file="$out_prefix".ttest.linear
     last_arg="-a 0.05"

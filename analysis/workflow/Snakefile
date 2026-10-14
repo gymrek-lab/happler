@@ -4,7 +4,7 @@ import snakemake.io as io
 from snakemake.utils import min_version
 
 ##### set minimum snakemake version #####
-min_version("8.12.0")
+min_version("8.30.0")
 
 
 # if --configfile was not specified, import the default config file
@@ -139,6 +139,7 @@ if mode in ("str", "snp", "hap", "ld_range", "midway"):
         elif mode == "midway":
             # happler_config["hap_file"] = rules.simulate_simphenotype.input.hap # do not uncomment!
             happler_config["out"] = config["out"] + "/midway/sim_{sim_mode}/beta_{beta}"
+            happler_config["out_thresh"] = 1
     elif mode in ("str", "snp"):
         # also provide the SNP and STR IDs so that they can be used in the manhattan plot
         happler_config["snps"] = (config["modes"][mode]["id"],)
@@ -159,22 +160,117 @@ elif mode == "run":
         "out_thresh": check_config("out_thresh", 5e-8),
         "mode": mode,
     }
+    if check_config("thresh_alpha"):
+        happler_config["thresh_alpha"] = check_config("thresh_alpha")
     if check_config("SVs", place=config["modes"][mode]):
         happler_config["SVs"] = config["modes"][mode]["SVs"]
 else:
     raise ValueError("Unsupported operating 'mode' in config")
 
-module happler:
-    snakefile: "rules/happler.smk"
-    config: happler_config
-use rule * from happler as happler_*
+
+rule sub_pheno:
+    """
+    subset the phenotype file to include only the desired replicate
+    """
+    input:
+        pheno=happler_config["pheno"],
+    params:
+        rep=lambda wildcards: int(wildcards.rep)+2,
+    output:
+        pheno=happler_config["out"] + "/phen.pheno",
+    resources:
+        runtime=7,
+    threads: 1,
+    log:
+        happler_config["out"] + "/logs/sub_pheno",
+    benchmark:
+        happler_config["out"] + "/bench/sub_pheno",
+    conda:
+        "envs/default.yml"
+    shell:
+        "awk -F '\\t' -v col={params.rep} "
+        "'NR==1 {{if (col > NF) {{print \"Check rep number\" > \"/dev/stderr\"; exit 1}}}} "
+        "{{print $1, $col}}' OFS='\\t' {input.pheno} | "
+        "(echo -e \"#IID\\thap\" && tail -n+2) > {output.pheno} 2>{log}"
+
+happler_config["pheno"] = rules.sub_pheno.output.pheno if "{rep}" in happler_config["out"] else happler_config["pheno"]
+
+rule sub_pheno_sort:
+    """
+    subset the phenotype file to include only the desired replicate
+    """
+    input:
+        pheno=happler_config["pheno"],
+        psam=Path(happler_config["snp_panel"]).with_suffix(".psam"),
+    output:
+        txt=happler_config["out"] + "/phen_sort.txt",
+    resources:
+        runtime=7,
+    threads: 1,
+    log:
+        happler_config["out"] + "/logs/sub_pheno_sort",
+    benchmark:
+        happler_config["out"] + "/bench/sub_pheno_sort",
+    conda:
+        "envs/default.yml"
+    shell:
+        "comm -12 "
+        "<(grep -Ev '^#' {input.psam} | cut -f1 | sort -u) "
+        "<(grep -Ev '^#' {input.pheno} | cut -f1 | sort -u) >{output.txt} 2>{log}"
+
+rule sub_pheno_split:
+    """
+    split the phenotype file into train and test splits using the former/latter X
+    percent of the data where X is config["split"]
+    """
+    input:
+        pheno=rules.sub_pheno.output.pheno,
+        txt=rules.sub_pheno_sort.output.txt,
+    params:
+        split=lambda wildcards: check_config("split", default=1) if wildcards.split == "train" else (1 - check_config("split", default=0)),
+        keep=lambda wildcards: "head" if wildcards.split == "train" else "tail",
+    output:
+        pheno=happler_config["out"] + "/phen.{split}.pheno",
+    resources:
+        runtime=7,
+    threads: 1,
+    log:
+        happler_config["out"] + "/logs/sub_pheno_split.{split}",
+    benchmark:
+        happler_config["out"] + "/bench/sub_pheno_split.{split}",
+    conda:
+        "envs/default.yml"
+    shell:
+        "samp_count=\"$(wc -l <{input.txt})\" && "
+        "cutoff=\"$(echo 'scale=0; ('\"$samp_count\"' * {params.split}) / 1' | bc)\" && "
+        "( head -n1 {input.pheno} && "
+        "shuf --random-source <(openssl enc -aes-256-ctr -pass pass:42 -nosalt < /dev/zero 2>/dev/null) {input.txt} | "
+        "{params.keep} -n \"$cutoff\" | "
+        "awk 'NR==FNR {{ids[$1]; next}} $1 in ids' - {input.pheno} | "
+        "grep -F -x -f - {input.pheno}; ) > {output.pheno} 2>>{log}"
+
+if check_config("split") and mode == "midway":
+    happler_config["pheno"] = expand(rules.sub_pheno_split.output.pheno, split="train", allow_missing=True)[0]
 
 if mode == "midway":
-    happler_config["pheno"] = rules.happler_run.input.pts
     module midway:
         snakefile: "rules/midway.smk"
         config: happler_config
     use rule manhattan from midway as midway_manhattan
+    happler_config["out"] = happler_config["out"] + "/{switch}"
+    happler_config["midway_out"] = rules.midway_manhattan.output
+
+happler_config["split"] = False
+if check_config("split") and mode in ("midway", "ld_range"):
+    if mode == "midway":
+        happler_config["out"] = happler_config["out"] + "/{split}"
+    happler_config["pheno"] = rules.sub_pheno_split.output.pheno
+    happler_config["split"] = True
+
+module happler:
+    snakefile: "rules/happler.smk"
+    config: happler_config
+use rule * from happler as happler_*
 
 if mode == "ld_range" and config["modes"][mode]["random"]:
     happler_config["random"] = rules.simulate_random_transform.output
@@ -195,6 +291,8 @@ if mode != "run":
         "sample_size": config["sample_size"],
     }
     if mode == "midway":
+        plots_config["original_hap"] = plots_config["causal_hap"]
+        plots_config["causal_hap"] = rules.midway_manhattan.output.hap
         plots_config["midway_linear"] = rules.midway_manhattan.output.linear
         plots_config["finemap_metrics"] = rules.happler_metrics.output.metrics
         plots_config["loci"] = locus
@@ -281,11 +379,11 @@ elif mode == "midway":
             switch=(
                 # "bic",
                 # "tscore",
-                "interact",
+                # "interact",
                 # "covariance",
-                "interact-bic",
+                # "interact-bic",
                 "extension-bic",
-                "extension-tscore",
+                # "extension-tscore",
             ),
             allow_missing=True,
         ) + expand(

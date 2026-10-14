@@ -3,9 +3,9 @@ from pathlib import Path
 
 out = config["out"]
 mode = config["mode"]
+pheno = config["pheno"]
 logs = out + "/logs"
 bench = out + "/bench"
-
 
 # whether to include the happler haplotype ("in") or no haplotypes ("ex")
 exclude_obs = {"in": 0, "ex": 1}
@@ -29,41 +29,24 @@ def gs_fix(og_value, tsfm_func):
         return storage(str(tsfm_func(og_value)).replace(".snakemake/storage/gcs", "gs:/"))
     return tsfm_func(og_value)
 
-wildcard_constraints:
-    rep=r"\d+"
+if mode == "midway":
+    wildcard_constraints:
+        switch="(pip|extension-parent-bic-pip)",
+        split="(train|test)",
+        rep=r"\d+"
+else:
+    wildcard_constraints:
+        rep=r"\d+"
 
-
-rule sub_pheno:
-    """
-    subset the phenotype file to include only the desired replicate
-    """
-    input:
-        pheno=config["pheno"],
-    params:
-        rep=lambda wildcards: int(wildcards.rep)+2,
-    output:
-        pheno=out + "/phen.pheno",
-    resources:
-        runtime=7,
-    threads: 1,
-    log:
-        logs + "/sub_pheno",
-    benchmark:
-        bench + "/sub_pheno",
-    conda:
-        "../envs/default.yml"
-    shell:
-        "cut -f 1,{params.rep} {input.pheno} | "
-        "(echo -e \"#IID\\thap\" && tail -n+2) >{output.pheno} 2>{log}"
-
-
-pheno = rules.sub_pheno.output.pheno if "{rep}" in out else config["pheno"]
 if mode in ("run", "midway"):
     # if the pvar size is larger than 100 MB, just use the default memory instead (if it is lower)
     rsrc_func = lambda x: max if 100 > Path(x).with_suffix(".pvar").stat().st_size/1000/1000 else min
 else:
     rsrc_func = lambda x: min
 
+if check_config("split"):
+    og_pheno = pheno
+    pheno = expand(og_pheno, split="train", allow_missing=True)[0]
 
 rule run:
     """ execute happler! """
@@ -74,7 +57,7 @@ rule run:
         pts=pheno,
         covar=config["covar"],
     params:
-        thresh=lambda wildcards: 20 if not hasattr(wildcards, "alpha") else wildcards.alpha,
+        thresh=lambda wildcards: check_config("thresh_alpha", default=20) if not hasattr(wildcards, "alpha") else wildcards.alpha,
         region=lambda wildcards: wildcards.locus.replace("_", ":"),
         covar=lambda wildcards, input: ("--covar " + input["covar"] + " ") if check_config("covar") else "",
         maf = check_config("min_maf", 0),
@@ -242,9 +225,14 @@ rule igv:
         ") &>{log}"
 
 
+if check_config("split"):
+    pheno = expand(og_pheno, split="test", allow_missing=True)[0]
+
+
 rule transform:
     input:
-        hap=rules.run.output.gz,
+        hap=lambda wildcards: expand(config["midway_out"].hap, switch="extension-parent-bic", allow_missing=True) \
+            if mode == "midway" and wildcards.switch == "extension-parent-bic-pip" else rules.run.output.gz,
         pgen=config["snp_panel"],
         pvar=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".pvar")),
         psam=gs_fix(config["snp_panel"], lambda i: Path(i).with_suffix(".psam")),
@@ -328,32 +316,29 @@ rule sv_ld:
 
 
 def merge_hps_input(wildcards):
-    if mode in ("run", "ld_range"):
+    res = None
+    if mode in ("run", "ld_range", "midway"):
         if config["random"] is None:
             # include the hap that happler found
-            return rules.transform.output
+            res = rules.transform.output
         else:
             if exclude_obs[wildcards.ex]:
                 # exclude the random hap (and use the causal hap, instead)
-                return config["causal_gt"]
+                res = config["causal_gt"]
             else:
                 # include the random hap
-                return config["random"]
-    elif mode == "midway":
-        return snakemake.io.Namedlist(fromdict=dict(zip(
-            dict(config["causal_gt"]).keys(),
-            expand(config["causal_gt"], sim_mode="hap", allow_missing=True)
-        )))
-    else:
+                res = config["random"]
+        if mode == "midway":
+            if wildcards.switch == "extension-parent-bic-pip":
+                res = rules.transform.output
+            else:
+                res = snakemake.iocontainers.Namedlist(fromdict=dict(zip(
+                    dict(config["causal_gt"]).keys(),
+                    expand(config["causal_gt"], sim_mode="hap", allow_missing=True)
+                )))
+    if res is None:
         raise ValueError("Unsupported mode: {}".format(mode))
-
-
-if mode == "midway":
-    out += "/{switch}"
-    logs = logs[:-len("logs")] + "{switch}/logs"
-    bench = bench[:-len("bench")] + "{switch}/bench"
-    wildcard_constraints:
-        switch="pip"
+    return res
 
 
 rule merge:

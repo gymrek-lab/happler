@@ -182,7 +182,7 @@ def main(
         else:
             df['-log10(p)'] = -np.log10(df["pval"])
         # replace -infinity values with 0
-        df['-log10(p)'].replace([-np.inf], 0, inplace=True)
+        df['-log10(p)'] = df['-log10(p)'].replace([-np.inf], 0)
         df.chromosome = df.chromosome.astype('category')
         df.chromosome = df.chromosome.astype(
             CategoricalDtype(sorted(map(int, df.chromosome.dtype.categories)), ordered=True)
@@ -207,7 +207,7 @@ def main(
             v_ids = df[df["id"].isin(red_ids)]['id']
             x_ids = df[df["id"].isin(red_ids)]['pos']
             y_ids = df[df["id"].isin(red_ids)]['-log10(p)']
-            if np.any(np.vectorize(custom_isinf)(y_ids)):
+            if not y_ids.empty and any(custom_isinf(v) for v in y_ids):
                 raise ValueError(f"The p-values for {red_ids} are too powerful!")
             if small:
                 cur_ax.scatter(x_ids, y_ids, color='red', marker='o', s=POINT_SIZE)
@@ -224,7 +224,7 @@ def main(
             v_ids = df[df["id"].isin(orange_ids)]['id']
             x_ids = df[df["id"].isin(orange_ids)]['pos']
             y_ids = df[df["id"].isin(orange_ids)]['-log10(p)']
-            if np.any(np.vectorize(custom_isinf)(y_ids)):
+            if not y_ids.empty and any(custom_isinf(v) for v in y_ids):
                 raise ValueError(f"The p-values for {orange_ids} are too powerful!")
             if small:
                 cur_ax.scatter(x_ids, y_ids, color='orange', marker='o', s=POINT_SIZE)

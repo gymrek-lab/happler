@@ -27,7 +27,7 @@ snp_panel: AOU_WORKSPACE_BUCKET/phased_pgens/chr{chr}.pgen
 # genome of the reference panel VCFs
 # The contig should correspond with the contig name from the {chr} wildcard in the VCF
 # required! and unless otherwise noted, all attributes of each mode are required
-locus: data/aou/phenos/platelet_count.bed
+locus: data/aou/phenos/platelet_count.final.bed
 modes:
  run:
   pheno: data/aou/phenos/{trait}.resid.pheno

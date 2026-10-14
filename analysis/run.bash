@@ -43,7 +43,7 @@ fi
 # Check: Are we within a SLURM batch job or just an interactive node?
 if [ "$ENVIRONMENT" = "BATCH" ]; then
     snakemake \
-    --workflow-profile profile/slurm \
+    --workflow-profile profile/tscc \
     --notemp \
     -j 64 \
     -c 64 \
