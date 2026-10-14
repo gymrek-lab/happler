@@ -350,7 +350,11 @@ class HapplerHaplotype(HaplotypeBase):
 
     @classmethod
     def from_happler_haplotype(
-        cls, haplotype: Haplotype, gts: GenotypesVCF, hap_id: str, results: tuple[float],
+        cls,
+        haplotype: Haplotype,
+        gts: GenotypesVCF,
+        hap_id: str,
+        results: tuple[float],
     ) -> HapplerHaplotype:
         """
         Create a new haptools haplotype from a happler Haplotype and a GenotypesVCF object
@@ -364,9 +368,7 @@ class HapplerHaplotype(HaplotypeBase):
             pval=1,  # this can be filled out later
         )
         alleles = {
-            node[0].idx: gts.variants[node[0].idx]["alleles"][
-                cls._handle_nan(node, 1)
-            ]
+            node[0].idx: gts.variants[node[0].idx]["alleles"][cls._handle_nan(node, 1)]
             for node in haplotype.nodes
         }
         hap_out.variants = tuple(
