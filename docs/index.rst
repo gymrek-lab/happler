@@ -28,20 +28,33 @@ We gladly welcome any contributions to ``happler``!
 Please read our :doc:`contribution guidelines </project_info/contributing>` and then submit a `Github issue <https://github.com/gymrek-lab/happler/issues>`_.
 
 .. toctree::
-   :caption: Inputs
-   :name: inputs
+   :caption: Overview
+   :name: overview
    :hidden:
    :maxdepth: 1
 
-   executing/inputs.rst
+   project_info/contributing
+   project_info/example_files
+   project_info/installation
 
 .. toctree::
-   :caption: Outputs
-   :name: outputs
+   :caption: File Formats
+   :name: formats
    :hidden:
    :maxdepth: 1
 
-   executing/outputs.rst
+   formats/genotypes
+   formats/haplotypes
+   formats/phenotypes
+
+.. toctree::
+   :caption: Commands
+   :name: commands
+   :hidden:
+   :maxdepth: 1
+
+   commands/run
+   commands/transform
 
 .. toctree::
    :caption: API
@@ -50,11 +63,3 @@ Please read our :doc:`contribution guidelines </project_info/contributing>` and 
    :maxdepth: 1
 
    api/modules
-
-.. toctree::
-   :caption: Project Info
-   :name: project-info
-   :hidden:
-   :maxdepth: 1
-
-   project_info/contributing
