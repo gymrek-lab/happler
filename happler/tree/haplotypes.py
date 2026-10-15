@@ -330,12 +330,14 @@ class HapplerHaplotype(HaplotypeBase):
 
     beta: float
     pval: float
+    score: float = np.nan
     _extras: tuple = field(
         repr=False,
         init=False,
         default=(
             Extra("beta", ".2f", "Effect size in linear model"),
             Extra("pval", ".2f", "-log(pval) in linear model"),
+            Extra("score", ".2f", "Delta BIC recomputed for the final variant"),
         ),
     )
 
@@ -442,9 +444,12 @@ class Haplotypes(HaplotypesBase):
         )
         haps.data = {}
         results = {}
-        for hap_idx, haplotype in enumerate(tree.haplotypes()):
+        final_scores = {}
+        tree_haplotypes = tree.haplotypes()
+        for hap_idx, haplotype in enumerate(tree_haplotypes):
             hap_id = "H" + str(hap_idx)
             results[hap_idx] = haplotype[-1]["results"]
+            final_scores[hap_idx] = np.nan
             haps.data[hap_id] = HapplerHaplotype(
                 chrom=gts.variants[haplotype[0]["variant"].idx]["chrom"],
                 start=0,  # this is filled out later
@@ -476,7 +481,24 @@ class Haplotypes(HaplotypesBase):
         if pts is not None:
             haps_gts = haps.transform(gts).data.sum(axis=2)
             results = AssocTestSimpleSM(with_bic=True).run(haps_gts, pts.data).data
+            for hap_idx, haplotype in enumerate(tree_haplotypes):
+                if len(haplotype) < 2:
+                    continue
+                parent_hap = np.ones((gts.data.shape[0], gts.data.shape[2]), dtype=np.bool_)
+                for node in tuple(haplotype)[:-1]:
+                    parent_hap &= gts.data[:, node["variant"].idx] == node["allele"]
+                parent_hap = parent_hap.sum(axis=1)
+                final_hap = haps_gts[:, hap_idx]
+                parent_and_final = np.column_stack((parent_hap, final_hap))
+                parent_and_final_res = AssocTestSimpleSM(with_bic=True).run(
+                    parent_and_final,
+                    pts.data,
+                ).data
+                final_scores[hap_idx] = (
+                    parent_and_final_res[0]["bic"] - parent_and_final_res[1]["bic"]
+                )
         for hap_idx, hap_id in enumerate(haps.data.keys()):
             haps.data[hap_id].beta = results[hap_idx]["beta"]
             haps.data[hap_id].pval = -np.log10(results[hap_idx]["pval"])
+            haps.data[hap_id].score = final_scores[hap_idx]
         return haps
