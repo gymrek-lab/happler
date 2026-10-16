@@ -4,13 +4,13 @@ import os
 import shutil
 from pathlib import Path
 
-import nox
-from nox_poetry import Session
-from nox_poetry import session
+import nox  # type: ignore
+from nox_poetry import Session  # type: ignore
+from nox_poetry import session  # type: ignore
 
 package = "happler"
-python_versions = ["3.10", "3.11", "3.12", "3.13", "3.14"]
-locked_python_version = "3.10"
+python_versions = ["3.11", "3.12", "3.13", "3.14"]
+locked_python_version = "3.11"  # keep in sync with dev-env.yml
 nox.needs_version = ">= 2022.11.21"
 nox.options.sessions = (
     "docs",
