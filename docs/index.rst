@@ -3,14 +3,14 @@
 happler
 =======
 
-Happler is a haplotype-based fine-mapping method. This means that it tests for associations between a trait and haplotypes (ie sets of correlated SNPs instead of individual SNPs).
+Happler is a haplotype-based fine-mapping method. This means that it tests for associations between a trait and haplotypes (ie sets of variants in cis instead of individual SNPs).
 
 Commands
 ~~~~~~~~
 
 * :doc:`happler run </commands/run>`: Run the haplotype-based fine-mapping method
 
-* :doc:`happler transform </commands/transform>`: Transform a genotype matrix via a haplotype
+* :doc:`happler transform </commands/transform>`: Transform a genotype matrix via a haplotype. Note: this is just a utility function which is not required for haplotype-based fine-mapping.
 
 
 Detailed information about each command can be found in the *Commands* section of our documentation. Examples there utilize a set of example files described :doc:`here </project_info/example_files>`.

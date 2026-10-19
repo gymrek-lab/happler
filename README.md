@@ -1,7 +1,7 @@
 # happler
-[![pypi version](https://img.shields.io/pypi/v/happler)](https://pypi.org/project/happler)
+[![pypi version](https://img.shields.io/pypi/v/happler-fm)](https://pypi.org/project/happler-fm)
 [![image](https://anaconda.org/bioconda/happler/badges/version.svg)](https://anaconda.org/bioconda/happler)
-[![license](https://img.shields.io/pypi/l/happler)](LICENSE)
+[![license](https://img.shields.io/pypi/l/happler-fm)](LICENSE)
 ![status](https://github.com/gymrek-lab/happler/workflows/Tests/badge.svg)
 [<img src=https://github.com/codespaces/badge.svg width=160>](https://codespaces.new/gymrek-lab/happler)
 

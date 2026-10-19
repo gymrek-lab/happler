@@ -220,7 +220,7 @@ def run(
     PHENOTYPES must be a tab-separated file containing two columns: sample ID and
     phenotype value
 
-    Ex: happler run tests/data/simple.vcf tests/data/simple.tsv > simple.hap
+    Ex: happler run tests/data/simple.vcf tests/data/simple.pheno > simple.hap
     """
     from . import tree
     import numpy as np

@@ -6,6 +6,8 @@ transform
 
 Transform a genotype matrix using a haplotype from a ``.hap`` file.
 
+Note: This is a utility function which is not required for haplotype-based fine-mapping, but it can be useful for testing the effect of a haplotype in downstream analyses.
+
 The command removes the variants that define the selected haplotype and
 returns pseudo-genotypes for that haplotype extended by each retained variant.
 Each output variant therefore represents the number of chromosomes carrying

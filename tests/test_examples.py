@@ -839,7 +839,7 @@ def test_run_documentation_examples(tmp_path):
     Run every command example documented for ``happler run``.
     """
     simple_gt_file = DATADIR / "simple.vcf"
-    simple_pt_file = DATADIR / "simple.tsv"
+    simple_pt_file = DATADIR / "simple.pheno"
     gt_file = DATADIR / "19_45401409-46401409_1000G.pgen"
     pt_file = DATADIR / "19_45401409-46401409_1000G.pheno"
     runner = CliRunner()
