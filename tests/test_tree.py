@@ -298,14 +298,15 @@ def test_haplotypes_write():
     with open(fname, "r") as file:
         lines = [line.rstrip() for line in file.readlines()]
         assert lines == [
-            "#\torderH\tbeta\tpval",
+            "#\torderH\tbeta\tpval\tscore",
             "#\torderV\tscore",
             "#\tversion\t0.2.0",
             "#H\tbeta\t.2f\tEffect size in linear model",
             "#H\tpval\t.2f\t-log(pval) in linear model",
+            "#H\tscore\t.2f\tDelta BIC recomputed for the final variant",
             "#V\tscore\t.2f\tBIC assigned to this variant",
-            "H\t1\t1\t4\tH0\t0.10\t1.00",
-            "H\t1\t1\t3\tH1\t0.15\t1.00",
+            "H\t1\t1\t4\tH0\t0.10\t1.00\tnan",
+            "H\t1\t1\t3\tH1\t0.15\t1.00\tnan",
             "V\tH0\t1\t2\tSNP1\tA\t1.00",
             "V\tH0\t2\t3\tSNP2\tC\t1.00",
             "V\tH0\t3\t4\tSNP3\tT\t1.00",
