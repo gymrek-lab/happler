@@ -3,7 +3,7 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project]
-name = "happler"
+name = "happler-geno"
 version = "0.0.1"
 description = "A haplotype-based fine-mapping method"
 authors = [
