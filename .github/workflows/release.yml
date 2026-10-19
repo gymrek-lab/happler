@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          release-type: python
+
+      - uses: actions/checkout@v7
+        if: ${{ steps.release.outputs.release_created }}
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11' # keep synced with dev-env.yml
+
+      - name: Upgrade pip
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          pip install --upgrade pip
+          pip --version
+
+      - name: Install Poetry
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          pip install 'poetry==2.5.1'  # keep version synced with dev-env.yml
+          poetry --version
+
+      - name: Bump version for developmental release
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          version: ${{ steps.release.outputs.tag_name }}
+        run: |
+          poetry version $version
+
+      - name: Build package
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          poetry build --ansi
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ steps.release.outputs.release_created }}
+        with:
+          name: dist
+          path: dist/
+
+  upload_pypi:
+    needs: release
+    runs-on: ubuntu-latest
+    if: ${{ needs.release.outputs.release_created }}
+    environment: release
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write
+    steps:
+      - name: Get artifacts
+        uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Publish package on TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        if: github.ref != 'refs/heads/main'
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Publish package on PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

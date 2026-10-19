@@ -832,3 +832,194 @@ def test_1000G_real(capfd, caplog):
             assert var_ids == out_vars
 
     out_hp_file.unlink()
+
+
+def test_run_documentation_examples(tmp_path):
+    """
+    Run every command example documented for ``happler run``.
+    """
+    simple_gt_file = DATADIR / "simple.vcf"
+    simple_pt_file = DATADIR / "simple.tsv"
+    gt_file = DATADIR / "19_45401409-46401409_1000G.pgen"
+    pt_file = DATADIR / "19_45401409-46401409_1000G.pheno"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        main,
+        ["run", str(simple_gt_file), str(simple_pt_file)],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert result.output
+
+    output_file = tmp_path / "haplotypes.hap"
+    result = runner.invoke(
+        main,
+        [
+            "run",
+            "--max-signals",
+            "3",
+            "--max-iterations",
+            "3",
+            "--output",
+            str(output_file),
+            str(simple_gt_file),
+            str(simple_pt_file),
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert output_file.exists()
+
+    output_file = tmp_path / "haplotypes-region.hap"
+    result = runner.invoke(
+        main,
+        [
+            "run",
+            "--pheno-name",
+            "--pheno",
+            "hap",
+            "--region",
+            "19:45401409-46401409",
+            "--output",
+            str(output_file),
+            str(gt_file),
+            str(pt_file),
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert output_file.exists()
+
+    output_file = tmp_path / "haplotypes-tree.hap"
+    result = runner.invoke(
+        main,
+        [
+            "run",
+            "--show-tree",
+            "--remove-SNPs",
+            "--output",
+            str(output_file),
+            str(simple_gt_file),
+            str(simple_pt_file),
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert output_file.exists()
+    assert output_file.with_suffix(".dot").exists()
+
+
+def test_transform_documentation_examples(tmp_path):
+    """
+    Run every command example documented for ``happler transform``.
+    """
+    gt_file = DATADIR / "19_45401409-46401409_1000G.pgen"
+    hp_file = DATADIR / "19_45401409-46401409_1000G.hap"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        main,
+        ["transform", str(gt_file), str(hp_file)],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+
+    output_file = tmp_path / "transformed.vcf"
+    result = runner.invoke(
+        main,
+        [
+            "transform",
+            "--hap-id",
+            "H0",
+            "--output",
+            str(output_file),
+            str(gt_file),
+            str(hp_file),
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert output_file.exists()
+
+    output_file = tmp_path / "transformed-alt.vcf"
+    result = runner.invoke(
+        main,
+        [
+            "transform",
+            "--hap-id",
+            "H0",
+            "--allele",
+            "1",
+            "--output",
+            str(output_file),
+            str(gt_file),
+            str(hp_file),
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert output_file.exists()
+
+    output_file = tmp_path / "transformed-samples.vcf"
+    result = runner.invoke(
+        main,
+        [
+            "transform",
+            "--region",
+            "19:45401409-46401409",
+            "--sample",
+            "HG00096",
+            "--sample",
+            "HG00097",
+            "--output",
+            str(output_file),
+            str(gt_file),
+            str(hp_file),
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert output_file.exists()
+
+    samples_file = tmp_path / "samples.txt"
+    samples_file.write_text("HG00096\nHG00097\n")
+    output_file = tmp_path / "transformed.pgen"
+    result = runner.invoke(
+        main,
+        [
+            "transform",
+            "--samples-file",
+            str(samples_file),
+            "--chunk-size",
+            "1000",
+            "--output",
+            str(output_file),
+            str(gt_file),
+            str(hp_file),
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert output_file.exists()
+    assert output_file.with_suffix(".pvar").exists()
+    assert output_file.with_suffix(".psam").exists()
+
+    output_file = tmp_path / "transformed-variant.vcf"
+    result = runner.invoke(
+        main,
+        [
+            "transform",
+            "--hap-id",
+            "H0",
+            "--var-id",
+            "rs8106922",
+            "--output",
+            str(output_file),
+            str(gt_file),
+            str(hp_file),
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert output_file.exists()
