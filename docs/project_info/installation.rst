@@ -7,7 +7,8 @@ Installation
 Using pip
 ---------
 
-You can install ``happler`` from PyPI using ``pip``.
+You can install ``happler-fm`` from PyPI using ``pip``. This provides the
+``happler`` Python package and ``happler`` command.
 
 .. note::
    We recommend using ``pip >= 20.3``.
@@ -18,7 +19,7 @@ You can install ``happler`` from PyPI using ``pip``.
 
 .. code-block:: bash
 
-   pip install happler
+   pip install happler-fm
 
 Using conda
 -----------
