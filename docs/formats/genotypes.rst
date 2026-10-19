@@ -4,10 +4,6 @@
 Genotypes
 =========
 
-.. figure:: https://github.com/CAST-genomics/haptools/assets/23412689/6da88941-7520-4c19-beaa-27f540f6b047
-
-	The time required to load various genotype file formats.
-
 VCF/BCF
 ~~~~~~~
 
@@ -37,3 +33,10 @@ If you are seeing cryptic errors with haptools and your PGEN file, please valida
 .. code-block:: bash
 
 	plink2 --pfile output --validate
+
+Runtime for each format
+-----------------------
+
+.. figure:: https://github.com/CAST-genomics/haptools/assets/23412689/6da88941-7520-4c19-beaa-27f540f6b047
+
+	The time required to load various genotype file formats.

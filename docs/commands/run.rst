@@ -6,6 +6,16 @@ run
 
 Run the haplotype construction step.
 
+Quickstart
+~~~~~~~~~~
+
+.. code-block:: bash
+
+	happler run \
+	--max-signals 3 --max-iterations 3 \
+	--remove-SNPs \
+	GENOTYPES.vcf PHENOTYPES.pheno > HAPLOTYPES.hap
+
 Overview
 ~~~~~~~~
 
@@ -172,7 +182,7 @@ Run haplotype construction and write haplotypes to standard output:
 
 	happler run \
 		tests/data/simple.vcf \
-		tests/data/simple.tsv \
+		tests/data/simple.pheno \
 		> simple.hap
 
 Write haplotypes to a file and use three signals and three iterations:
@@ -184,7 +194,7 @@ Write haplotypes to a file and use three signals and three iterations:
 		--max-iterations 3 \
 		--output haplotypes.hap \
 		tests/data/simple.vcf \
-		tests/data/simple.tsv
+		tests/data/simple.pheno
 
 Select a phenotype by column name and restrict the analysis to a region:
 
@@ -207,7 +217,7 @@ Write the forest as a DOT file and omit single-variant haplotypes:
 		--remove-SNPs \
 		--output haplotypes.hap \
 		tests/data/simple.vcf \
-		tests/data/simple.tsv
+		tests/data/simple.pheno
 
 All files used in these examples are described :doc:`here </project_info/example_files>`.
 

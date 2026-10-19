@@ -48,7 +48,7 @@ class TreeBuilder:
     Examples
     --------
     >>> gens = Genotypes.load('tests/data/simple.vcf')
-    >>> phens = Phenotypes.load('tests/data/simple.tsv')
+    >>> phens = Phenotypes.load('tests/data/simple.pheno')
     >>> tree = TreeBuilder(gens, phens).run()
     """
 

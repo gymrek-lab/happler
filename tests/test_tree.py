@@ -192,7 +192,7 @@ def test_leaves():
 @pytest.mark.skip(reason="test not completely written yet")
 def test_tree_builder():
     gens = Genotypes.load(DATADIR.joinpath("simple.vcf"))
-    phens = Phenotypes.load(DATADIR.joinpath("simple.tsv"))
+    phens = Phenotypes.load(DATADIR.joinpath("simple.pheno"))
     tree_builder = TreeBuilder(gens, phens)
     # tree = tree_builder.run()
     # TODO: assert that the tree looks correct
