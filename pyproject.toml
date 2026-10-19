@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "happler-fm"
-version = "0.0.1"
+version = "0.1.0"
 description = "A haplotype-based fine-mapping method"
 authors = [
     {name = "Arya Massarat"},
