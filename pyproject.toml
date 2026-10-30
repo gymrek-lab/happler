@@ -20,7 +20,7 @@ dependencies = [
     "pysam>=0.21.0",
     "numpy>=1.26",
     "networkx>=2.6.3",
-    "haptools>=0.6.2",
+    "haptools>=0.6.3",
     "statsmodels>=0.13.3",
 ]
 
