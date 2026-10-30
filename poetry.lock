@@ -681,14 +681,14 @@ polars = ["polars (>=1)"]
 
 [[package]]
 name = "haptools"
-version = "0.6.2"
+version = "0.6.3"
 description = "Ancestry and haplotype aware simulation of genotypes and phenotypes for complex trait analysis"
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "haptools-0.6.2-py3-none-any.whl", hash = "sha256:3f31a8632bd53afb08d855a40b7611dd85f9207deba327168860aa01558680d8"},
-    {file = "haptools-0.6.2.tar.gz", hash = "sha256:67b9ae9a3232d010dfeaaea31514cc5a61b073c74c0f58332945c45a53c1b9ff"},
+    {file = "haptools-0.6.3-py3-none-any.whl", hash = "sha256:9a7961570370e2b2c78d2dca72be9949998f41aeeeefd1668c5ccda9cde9df84"},
+    {file = "haptools-0.6.3.tar.gz", hash = "sha256:b0779fcba91b262d3f4a2e03076d9be88a1a69a3b03e164238c02e312d39d322"},
 ]
 
 [package.dependencies]
@@ -2858,4 +2858,4 @@ dev = ["pytest", "setuptools"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "3053891d0cc5810844f9182a9d4a6ed667ae5f42b8f2bf07161143a1e1b6742d"
+content-hash = "ef4e13fe070e1621f82db1058881c8ead66812d1e779da251d2e00fcf9983912"
